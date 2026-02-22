@@ -1,95 +1,77 @@
-# OpenClaw - Affiliate Marketing Automation Bot
+# OpenClaw Affiliate Marketing Automation Bot
 
-OpenClaw is a multi-agent affiliate marketing automation system designed for scalable, safe, and observable content publishing operations.
+Owned by: Corey, DA/Don Anthony, Fern, David, Jamie.
 
-## Architecture Overview
+## What this is
+A cluster-ready automation system that:
+- researches niches/products
+- generates SEO-structured content
+- publishes and maintains niche sites (DRY_RUN default)
+- tracks performance and revenue signals
+- runs reliably with runbooks and policies
 
-- **orchestrator/** - The "brain" that decides what happens and when
-- **agents/** - The "hands" that execute specific tasks
-- **pipelines/** - Reusable assembly lines for repeatable workflows
-- **domains/** - Business logic models (offers, posts, campaigns, SEO)
-- **integrations/** - External service connectors (affiliate networks, CMS, DNS, proxies)
-- **ops/** + **config/** + **docs/** - Operational tooling for team use
+## What this is NOT
+- Not related to any other project
+- Not black-hat SEO automation
+- Not an ad arbitrage bot
 
-## Key Design Principles
-
-1. **Separation of concerns** - Agents decide, pipelines execute, integrations connect, domains model
-2. **Single controller** - All agent actions route through `orchestrator/controller.py` for rate-limiting, logging, kill switches, and dry-run mode
-3. **Policy enforcement** - Runtime constraints via policy files (posting, risk, AI rules)
-4. **Config-driven** - Change behavior via YAML config without code changes
-
-## Team / Node Roles
-
-| Node | Role | Responsibilities |
-|------|------|-----------------|
-| oc-core-01 | Control + Writing | Orchestrator, research, content generation, queue + DB |
-| oc-pub-01 | Publishing + Monitoring | Publishing pipeline, CMS/DNS/hosting, monitoring, backups |
-
-## Quick Start (Local Dev - Run on Your Laptop in <5 Minutes)
+## Quick Start (Local Dev)
 
 ```bash
-# 1. Install dependencies
+# 1. Clone and enter repo
+git clone <repo-url> && cd Affiliate-Whiz
+
+# 2. Create virtual environment
+python3.11 -m venv .venv && source .venv/bin/activate
+
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# 2. Initialize the system (creates DB, directories, .env)
+# 4. Initialize (creates DB, dirs, .env)
 python -m src.cli init
 
-# 3. Run the full pipeline in DRY_RUN mode (safe - no real API calls)
-python -m src.cli run --dry-run
+# 5. Run in DRY_RUN mode
+python -m src.cli run --dry-run --ticks 2
 
-# 4. Check system status (shows recent runs, DB state, config)
+# 6. Check status
 python -m src.cli status
 
-# 5. Run with more ticks and see it loop
-python -m src.cli run --dry-run --ticks 3 --interval 5
-
-# 6. Run only the content pipeline
-python -m src.cli run --dry-run --pipeline content
-
-# 7. Run the main entry point directly
-python -m src.main --node-role core --dry-run --max-ticks 1
+# 7. Run tests
+python -m pytest tests/ -v
 ```
 
-### What You'll See
+## Quick Start (Scripts)
+1) Copy `.env.example` to `.env` and fill placeholders.
+2) Bootstrap local environment:
+   - `bash scripts/dev/bootstrap_local.sh`
+3) Run DRY_RUN:
+   - `bash scripts/dev/run_local_dry.sh`
+4) Check status:
+   - `python -m src.cli status`
 
-The dry-run pipeline proves the full flow end-to-end:
-- **Scheduler** starts and ticks on an interval
-- **Research agent** plans keyword research, logs what it would do
-- **Content agent** plans article drafts, logs what it would generate
-- **Publishing agent** checks the queue, skips actual CMS publishing
-- **Analytics agent** plans metrics collection, logs what it would query
-- All runs are **recorded to SQLite** (`data/openclaw.db`)
-- All actions are **logged** to `logs/openclaw.log`
-
-### Docker (Alternative)
-
+## Docker (Local)
 ```bash
-# Local dev mode (single container)
 docker compose -f deployments/docker/docker-compose.yml up openclaw-dev
-
-# Cluster mode (two containers simulating Mac Mini nodes)
-docker compose -f deployments/docker/docker-compose.yml up openclaw-core openclaw-pub
 ```
 
-### Run Tests
-
-```bash
-pip install pytest
-python -m pytest tests/unit/ -v
-```
-
-## Branch Strategy
-
-- `main` - stable production
-- `dev` - integration branch
-- `feat/*` - feature branches (e.g., `feat/offer-scoring-v2`)
+## Cluster Hardware Context (Current)
+- 2× Mac minis (Node A, Node B)
+- 2× SSD docking stations
+- Netgear 16-port PoE gigabit switch
+- CyberPower CP1500AVRLCD3 UPS
+- Dedicated Spectrum router + dedicated 1Gbps internet
 
 ## Documentation
+Start here:
+- PRD.md
+- ARCHITECTURE.md
+- PLAN.md
+- AI_RULES.md
+- STARTUP_CHECKLIST.md
 
-- [PRD](PRD.md) - Product Requirements Document
-- [PLAN](PLAN.md) - Implementation Plan
-- [ARCHITECTURE](ARCHITECTURE.md) - System Architecture
-- [AI_RULES](AI_RULES.md) - AI Agent Constraints and Rules
-- [STARTUP_CHECKLIST](STARTUP_CHECKLIST.md) - Launch Checklist
-- [Runbooks](docs/runbooks/) - Operational runbooks
-- [Playbooks](docs/playbooks/) - Strategy playbooks
+Operations:
+- docs/ops/RUNBOOK_CLUSTER.md
+- docs/ops/RUNBOOK_SECURITY.md
+- docs/ops/RUNBOOK_BACKUP_DR.md
+- docs/ops/RUNBOOK_SITE_FACTORY.md
+- docs/ops/RUNBOOK_CONTENT_ENGINE.md

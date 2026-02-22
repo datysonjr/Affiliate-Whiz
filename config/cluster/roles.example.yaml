@@ -1,0 +1,31 @@
+# config/cluster/roles.example.yaml
+# Role definitions for cluster nodes
+# Copy to roles.yaml and customize
+
+roles:
+  primary:
+    description: "Scheduler + Orchestrator + Publishing"
+    services:
+      - orchestrator
+      - scheduler
+      - publishing_worker
+    max_concurrent_agents: 3
+
+  worker:
+    description: "Research + Content + Analytics"
+    services:
+      - research_worker
+      - content_worker
+      - analytics_worker
+    max_concurrent_agents: 4
+
+  full:
+    description: "All services on single node (local dev)"
+    services:
+      - orchestrator
+      - scheduler
+      - research_worker
+      - content_worker
+      - publishing_worker
+      - analytics_worker
+    max_concurrent_agents: 2

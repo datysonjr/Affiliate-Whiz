@@ -1,50 +1,38 @@
-# Implementation Plan
+# PLAN.md — Implementation Plan (Local → Cluster)
 
-## Phase 1: Foundation
-- [ ] Set up repo structure and CI/CD
-- [ ] Configure secrets management (vault)
-- [ ] Set up database and migrations
-- [ ] Implement core utilities (logger, settings, retry, errors)
-- [ ] Build orchestrator controller with kill switch and dry-run mode
+## Phase 0 — Repo & Docs
+- Create repo structure
+- Write governing docs (PRD, Architecture, AI Rules, Plan, Startup Checklist)
+- Add runbooks and policies
 
-## Phase 2: Research Pipeline
-- [ ] Implement affiliate network integrations (Amazon, Impact, CJ, ShareASale)
-- [ ] Build offer ingestion and normalization pipeline
-- [ ] Implement keyword research and SERP analysis
-- [ ] Build offer scoring algorithm
-- [ ] Create research agent
+## Phase 1 — Local DRY_RUN MVP
+- Implement orchestrator/scheduler/queue
+- Implement agents with stub integrations
+- Implement SQLite storage and artifact exporting
+- Add CLI commands: init/run/status
+- Add smoke tests
 
-## Phase 3: Content Pipeline
-- [ ] Build content outline generator
-- [ ] Implement draft generation with LLM integration
-- [ ] Add SEO optimization pass
-- [ ] Implement fact-checking pipeline step
-- [ ] Build internal linking engine
-- [ ] Create content generation agent
+## Phase 2 — SAFE_STAGING Publishing
+- Implement WordPress integration
+- Staging mode publishing gate (explicit env flag)
+- Publishing checklists + rollback guidance
+- Add analytics snapshots (Search Console / GA / basic rank checks if used)
 
-## Phase 4: Publishing Pipeline
-- [ ] Implement WordPress CMS integration
-- [ ] Build site builder / deploy pipeline
-- [ ] Add sitemap generation and indexing ping
-- [ ] Create publishing agent
-- [ ] Set up hosting integrations (Vercel, Cloudflare)
+## Phase 3 — Cluster Deployment
+- Add Docker + compose (local and cluster)
+- Add node bootstrap scripts
+- Define roles and networking templates
+- Implement health monitor checks for both nodes
+- Add backup/restore automation
 
-## Phase 5: Analytics & Optimization
-- [ ] Build click and conversion tracking
-- [ ] Implement attribution model
-- [ ] Create analytics dashboards
-- [ ] Build prune/scale optimization pipeline
-- [ ] Create analytics agent
+## Phase 4 — Production Launch
+- Create first production site from template
+- Run limited publishing cadence
+- Weekly review + tune content quality
+- Expand to additional sites
 
-## Phase 6: Operations
-- [ ] Set up monitoring and alerting (Grafana, alert rules)
-- [ ] Build health monitor agent
-- [ ] Implement error recovery agent
-- [ ] Create backup/restore scripts
-- [ ] Build admin API and health endpoints
-
-## Phase 7: Scale
-- [ ] Multi-node deployment (Mac Mini cluster)
-- [ ] Traffic routing agent
-- [ ] A/B testing framework
-- [ ] Performance tuning and optimization
+## Phase 5 — Scale
+- Add new nodes procedure
+- Improve queue (Redis) + DB (Postgres)
+- Add dashboards and alerting
+- Enhance internal linking and topical authority mapping

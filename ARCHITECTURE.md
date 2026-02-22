@@ -1,98 +1,72 @@
-# Architecture
+# ARCHITECTURE.md — OpenClaw Affiliate Bot
 
-## System Overview
+## 1. System Overview
+A queue-driven, agent-based automation system.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    ORCHESTRATOR                          │
-│  ┌──────────┐  ┌───────────┐  ┌────────┐  ┌─────────┐  │
-│  │Controller│  │ Scheduler │  │ Router │  │  State  │  │
-│  │          │  │           │  │        │  │ Machine │  │
-│  └────┬─────┘  └─────┬─────┘  └───┬────┘  └────┬────┘  │
-│       │              │             │             │       │
-│  ┌────┴──────────────┴─────────────┴─────────────┴────┐  │
-│  │                   POLICIES                         │  │
-│  │  ai_rules / posting_policy / risk_policy           │  │
-│  └────────────────────────────────────────────────────┘  │
-└────────────────────────┬────────────────────────────────┘
-                         │
-         ┌───────────────┼───────────────┐
-         │               │               │
-    ┌────┴────┐    ┌─────┴─────┐   ┌─────┴─────┐
-    │ AGENTS  │    │ PIPELINES │   │   TOOLS   │
-    │         │    │           │   │           │
-    │Research │    │Offer Disc.│   │Browser    │
-    │Content  │    │Content    │   │Scraper    │
-    │Publish  │    │Publishing │   │LLM        │
-    │Analytics│    │Optimiz.   │   │SEO        │
-    │Health   │    │           │   │CMS        │
-    │Recovery │    │           │   │Analytics  │
-    │Traffic  │    │           │   │           │
-    └────┬────┘    └─────┬─────┘   └─────┬─────┘
-         │               │               │
-         └───────────────┼───────────────┘
-                         │
-    ┌────────────────────┼────────────────────┐
-    │                    │                    │
-┌───┴────┐        ┌──────┴──────┐      ┌──────┴──────┐
-│DOMAINS │        │INTEGRATIONS │      │    DATA     │
-│        │        │             │      │             │
-│Offers  │        │Affiliates   │      │Database     │
-│Content │        │Hosting      │      │Migrations   │
-│SEO     │        │DNS          │      │Models       │
-│Publish │        │Email        │      │             │
-│Analyt. │        │Proxy        │      │             │
-│        │        │Storage      │      │             │
-└────────┘        └─────────────┘      └─────────────┘
-```
+High-level flow:
+1) Scheduler selects work
+2) Research generates briefs
+3) Content pipeline generates articles
+4) Publishing pipeline posts content (DRY_RUN by default)
+5) Analytics captures signals
+6) Health monitor ensures system stability
+7) Recovery agent retries/alerts
 
-## Design Principles
+## 2. Key Architectural Principles
+- Agents are modular and independently testable
+- Everything is observable (logs, metrics, audit events)
+- Job execution is idempotent (safe to retry)
+- Local-first development; cluster is deployment target, not dev requirement
 
-### 1. Single Point of Control
-All agent actions flow through `orchestrator/controller.py`. This enables:
-- Rate limiting per agent/action
-- Decision logging and audit trail
-- Kill switches and pause controls
-- Dry-run mode for testing
-- Risk policy enforcement
+## 3. Components
+### 3.1 Orchestrator
+Coordinates agent execution and state transitions.
 
-### 2. Agent Architecture
-Agents inherit from `base_agent.py` and implement:
-- `plan()` - Decide next actions based on state
-- `execute()` - Run actions through pipelines
-- `report()` - Log outcomes and metrics
+### 3.2 Scheduler
+Creates daily work plan and enqueues jobs.
 
-### 3. Pipeline Pattern
-Pipelines are composable step sequences:
-- Each step is a pure function: input -> output
-- Steps can be retried independently
-- Pipeline state is checkpointed for recovery
+### 3.3 Queue
+Interface-based queue:
+- start: in-process queue
+- later: Redis/RQ, Celery, etc.
 
-### 4. Integration Isolation
-External services are wrapped in integration modules:
-- Standardized interface per integration type
-- Credential management via vault
-- Circuit breaker pattern for resilience
-- Easy to swap providers
+### 3.4 Storage
+- default: SQLite for local development
+- upgrade path: Postgres for cluster
 
-## Node Topology
+### 3.5 Integrations (stubs first)
+- WordPress (REST API)
+- DNS/CDN providers (as needed)
+- Hosting provider API (as needed)
+- Analytics platforms
+- Affiliate networks
 
-```
-┌─────────────────────┐     ┌─────────────────────┐
-│   oc-core-01        │     │   oc-pub-01          │
-│   (Mac Mini #1)     │     │   (Mac Mini #2)      │
-│                     │     │                      │
-│ - Orchestrator      │────▶│ - Publishing pipeline│
-│ - Research agent    │     │ - CMS integrations   │
-│ - Content agent     │     │ - DNS management     │
-│ - Database          │     │ - Monitoring/alerts  │
-│ - Queue             │     │ - Backup runner      │
-└─────────────────────┘     └──────────────────────┘
-```
+## 4. Data Model (minimum)
+- Runs (timestamped executions)
+- Jobs (queued tasks)
+- Artifacts (outputs: briefs, drafts, metadata)
+- Sites (site configs)
+- Posts (post status, slug, publish state)
+- Metrics snapshots (traffic, ranking, conversions when available)
 
-## Data Flow
+## 5. Execution Modes
+- DRY_RUN: write artifacts only
+- SAFE_STAGING: publish to staging only
+- PRODUCTION: publish to production sites
 
-1. **Offer Discovery**: Network APIs → Ingest → Normalize → Score → DB
-2. **Content Creation**: Keywords → Outline → Draft → SEO → Links → DB
-3. **Publishing**: DB → Build → CMS → Sitemap → Index Ping
-4. **Optimization**: Analytics → Measure → Prune/Scale → Loop
+## 6. Cluster Topology (2-node)
+- Node A: Scheduler + Orchestrator primary + publishing (optional)
+- Node B: content generation + research + analytics (optional)
+Roles are configurable; both nodes can run workers.
+
+## 7. Observability
+- Structured logs (JSON recommended)
+- Audit log for site/domain affecting actions
+- Health endpoint + periodic health checks
+- Optional dashboard for status
+
+## 8. Failure Handling
+- Retries with backoff
+- Dead-letter queue (future)
+- Recovery agent to re-enqueue safe tasks
+- Hard stop on suspicious actions (e.g., repeated publishing failures)

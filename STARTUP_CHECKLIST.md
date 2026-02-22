@@ -1,60 +1,60 @@
-# Startup Checklist
+# STARTUP_CHECKLIST.md — OpenClaw Affiliate Bot (Cluster + Daily Start)
 
-## Pre-Launch
+## A) Before You Power Anything On (Physical)
+- [ ] Confirm UPS is connected and charged
+- [ ] Confirm switch is powered (UPS-backed)
+- [ ] Confirm router/modem is UPS-backed (recommended)
+- [ ] Confirm both Mac minis are plugged into UPS battery outlets (not surge-only)
+- [ ] Confirm SSD docks are connected and mounted
+- [ ] Confirm ethernet cables connected (router -> switch -> nodes)
+- [ ] Confirm ventilation is unobstructed
 
-### Infrastructure
-- [ ] Mac Mini #1 (oc-core-01) provisioned and networked
-- [ ] Mac Mini #2 (oc-pub-01) provisioned and networked
-- [ ] Static IPs assigned
-- [ ] UPS configured and tested
-- [ ] SSD docks connected and mounted
-- [ ] SSH keys exchanged between nodes
+## B) Boot Order (Standard)
+1) [ ] UPS on
+2) [ ] Router/modem on (wait for internet)
+3) [ ] Switch on
+4) [ ] Mac mini Node A boot
+5) [ ] Mac mini Node B boot
 
-### Software Setup
-- [ ] Python environment configured on both nodes
-- [ ] Dependencies installed (`pip install -r requirements.txt`)
-- [ ] Docker installed and running (optional)
-- [ ] Database initialized and migrations run
-- [ ] Redis/queue system running
+## C) Network + Node Checks
+- [ ] Confirm Node A has expected IP (static/reserved)
+- [ ] Confirm Node B has expected IP (static/reserved)
+- [ ] Confirm both can ping router/gateway
+- [ ] Confirm both can resolve DNS
+- [ ] Confirm both can reach GitHub (or repo host)
+- [ ] Confirm SSD mount paths are correct (e.g., /Volumes/OpenClawData or /data)
 
-### Secrets & Security
-- [ ] Vault initialized with master key
-- [ ] Affiliate network API keys stored in vault
-- [ ] CMS credentials stored in vault
-- [ ] DNS provider credentials stored in vault
-- [ ] Hosting provider credentials stored in vault
-- [ ] LLM API keys stored in vault
-- [ ] Key rotation schedule configured
+## D) Services Start (Local / Cluster)
+- [ ] Pull latest repo changes on both nodes
+- [ ] Load environment variables (never from git)
+- [ ] Start in DRY_RUN mode first
+- [ ] Verify logs are writing
+- [ ] Verify DB is reachable
+- [ ] Verify scheduler runs and enqueues jobs
+- [ ] Verify at least one agent completes a job
 
-### Configuration
-- [ ] `config/org.yaml` - Organization details filled in
-- [ ] `config/cluster.yaml` - Node details configured
-- [ ] `config/agents.yaml` - Agent settings reviewed
-- [ ] `config/pipelines.yaml` - Pipeline steps configured
-- [ ] `config/niches.yaml` - Target niches defined
-- [ ] `config/sites.yaml` - Sites and CMS credentials mapped
-- [ ] `config/providers.yaml` - LLM and service providers configured
-- [ ] `config/schedules.yaml` - Run schedules set
-- [ ] `config/thresholds.yaml` - Kill switch and alert thresholds set
+## E) Daily Health Checks (10 min)
+- [ ] Disk space OK on SSD
+- [ ] Queue not stuck (depth not growing forever)
+- [ ] Last successful run within last 24h
+- [ ] No repeated failures on publishing (even staging)
+- [ ] Backups exist and are recent
 
-### Observability
-- [ ] Grafana dashboards imported
-- [ ] Alert rules configured
-- [ ] Log rotation set up
-- [ ] Metrics collection running
+## F) Safe Shutdown
+- [ ] Stop workers gracefully
+- [ ] Confirm DB closed cleanly
+- [ ] Run backup_now script (if needed)
+- [ ] Shut down Node B
+- [ ] Shut down Node A
+- [ ] Switch off (optional)
+- [ ] Router off (optional)
+- [ ] UPS remains on if you want brownout protection; otherwise safe power down
 
-### First Run
-- [ ] Run system in dry-run mode
-- [ ] Verify offer discovery pipeline
-- [ ] Verify content generation pipeline
-- [ ] Verify publishing pipeline (to staging)
-- [ ] Verify analytics collection
-- [ ] Verify alerting triggers
-- [ ] Review all logs for errors
-
-### Go Live
-- [ ] Switch from dry-run to live mode
-- [ ] Monitor first 24 hours closely
-- [ ] Verify first affiliate links are tracking
-- [ ] Confirm indexing requests are being accepted
-- [ ] Set up daily check-in schedule
+## G) Emergency Recovery (Power Loss)
+- [ ] Restore power
+- [ ] Boot in standard order
+- [ ] Run health check command
+- [ ] Start only DRY_RUN
+- [ ] Inspect logs for DB corruption or partial jobs
+- [ ] Run restore_from_backup if DB is corrupted
+- [ ] Resume pipelines

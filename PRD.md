@@ -1,55 +1,80 @@
-# Product Requirements Document (PRD)
+# PRD.md — OpenClaw Affiliate Marketing Automation Bot
 
-## Product Name
-OpenClaw - Affiliate Marketing Automation System
+## 1. Product Overview
+OpenClaw Affiliate Bot is an automated system that:
+- researches niches/products
+- generates high-quality, SEO-structured content
+- publishes and maintains niche blog sites
+- tracks performance and revenue signals
+- iterates based on analytics
 
-## Vision
-A fully automated, multi-agent system that discovers affiliate offers, generates optimized content, publishes to managed sites, and continuously optimizes for revenue.
+Goal: build a stable, scalable pipeline capable of producing substantial affiliate revenue over time.
 
-## Goals
-1. Automate end-to-end affiliate marketing workflow
-2. Scale content production across multiple niches and sites
-3. Maintain compliance and quality through policy enforcement
-4. Provide full observability into system performance and revenue
+## 2. Users
+Primary users are the operator team:
+- Corey, DA/Don Anthony, Fern, David, Jamie
 
-## Core Capabilities
+## 3. Outcomes
+- Consistent production of publish-ready articles
+- Repeatable site deployment
+- Internal linking updates
+- Performance monitoring and basic ROI tracking
+- Automated health monitoring and recovery
 
-### Offer Discovery
-- Ingest offers from affiliate networks (Amazon Associates, Impact, CJ, ShareASale)
-- Normalize and score offers by potential value
-- Track offer availability and commission changes
+## 4. Hardware Context (Current)
+Cluster hardware dedicated to this project:
+- 2× Mac minis (Node A, Node B)
+- 2× docking stations with SSD storage
+- Netgear 16-port PoE gigabit switch
+- CyberPower CP1500AVRLCD3 UPS
+- Dedicated Spectrum router + dedicated 1Gbps internet for cluster
 
-### Content Generation
-- Research keywords and SERP competition
-- Generate SEO-optimized content (reviews, comparisons, roundups)
-- Apply internal linking strategy
-- Fact-check and compliance review
+## 5. Core Features (MVP)
+### 5.1 Orchestration
+- scheduler triggers jobs
+- queue executes jobs
+- persistent state tracking (jobs, runs, outputs)
 
-### Publishing
-- Build and deploy sites
-- Publish posts to CMS (WordPress, headless)
-- Manage sitemaps and indexing
-- Handle images and media
+### 5.2 Agents
+- Master Scheduler Agent: builds daily/weekly plan and enqueues work
+- Research Agent: niche/product research and brief creation
+- Content Generation Agent: outlines + draft + SEO metadata
+- Publishing Agent: DRY_RUN default; SAFE_STAGING supported
+- Analytics Agent: fetches key signals and stores snapshots
+- Health Monitor Agent: checks disk/queue/db/connectivity
+- Error Recovery Agent: retries/resumes/alerts
+- Traffic Routing Agent: placeholder for future expansion (e.g., CDN/edge rules, routing experiments)
 
-### Analytics & Optimization
-- Track clicks, CTR, EPC, conversion value
-- Attribution modeling
-- Prune underperforming content
-- Scale winning content/niches
+### 5.3 Site Engine
+- site "factory" blueprint (structure, categories, tags)
+- internal link suggestions
+- SEO structure blueprint (slugs, headings, schema placeholders)
 
-### Operations
-- Health monitoring and alerting
-- Error recovery and rollback
-- Key rotation and security
-- Backup and restore
+### 5.4 Revenue Tracking
+- basic affiliate click/conversion tracking plan (config + analytics hooks)
+- ROI dashboard placeholders
 
-## Non-Goals (v1)
-- Real-time bidding or paid traffic
-- Social media automation
-- Email marketing campaigns
+## 6. Non-Goals (for now)
+- No paid ad arbitrage automation
+- No black-hat SEO
+- No massive web scraping
+- No automated creation of accounts that violates Terms
 
-## Success Metrics
-- Revenue per site per month
-- Content publish rate
-- Indexing success rate
-- System uptime
+## 7. Success Metrics
+- System uptime and job completion rate
+- Number of publish-ready articles generated per week
+- Indexation and traffic growth
+- Affiliate clicks and conversions
+- Time-to-recover from failures
+
+## 8. Risks
+- Platform policy violations (mitigated by compliance policies)
+- Content quality and duplication risks (mitigated by quality policy and review gates)
+- Credential leaks (mitigated by security runbook + least privilege)
+
+## 9. Milestones
+- MVP local DRY_RUN working
+- SAFE_STAGING publishing to staging WP site
+- Cluster deployment
+- First production site deployed
+- Weekly ops cadence (health checks + performance review)

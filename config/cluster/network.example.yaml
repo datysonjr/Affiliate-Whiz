@@ -1,0 +1,27 @@
+# config/cluster/network.example.yaml
+# Network configuration for the OpenClaw cluster
+# Copy to network.yaml and fill in actual values
+
+network:
+  lan:
+    subnet: "192.168.1.0/24"      # Replace with actual subnet
+    gateway: "192.168.1.1"        # Replace with router IP
+    dns_primary: "8.8.8.8"
+    dns_secondary: "8.8.4.4"
+    
+  reserved_ips:
+    router: "192.168.1.1"
+    switch: "192.168.1.2"         # If managed switch has IP
+    node_a: "192.168.1.100"
+    node_b: "192.168.1.101"
+    # Reserve range 192.168.1.100-110 for cluster nodes
+
+  hardware:
+    router: "Spectrum router (dedicated 1Gbps)"
+    switch: "Netgear 16-port PoE gigabit"
+    ups: "CyberPower CP1500AVRLCD3"
+
+  internet:
+    provider: "Spectrum"
+    speed: "1Gbps dedicated"
+    purpose: "OpenClaw cluster only"

@@ -1,49 +1,71 @@
-# AI Rules
+# AI_RULES.md — OpenClaw Affiliate Marketing Automation Bot (Friend Group)
 
-## Core Constraints
+## Purpose
+This repository powers an OpenClaw-driven automation system that builds and maintains SEO-optimized niche content sites to earn affiliate revenue.
 
-1. **No agent runs unsupervised** - All actions route through the orchestrator controller
-2. **Dry-run by default** - New pipelines and agents start in dry-run mode until validated
-3. **Rate limits are mandatory** - Every agent has configurable rate limits in `config/agents.yaml`
-4. **Kill switch always available** - Controller can halt any agent or the entire system instantly
-5. **Audit everything** - All decisions, actions, and outcomes are logged
+This project is owned/operated by a friend group:
+- Corey
+- DA / Don Anthony
+- Fern
+- David
+- Jamie
 
-## Content Rules
+## Non-Negotiables (Hard Rules)
+1. **Project Scope**
+   - This repo is ONLY for the affiliate marketing automation bot and its cluster.
+   - Do not reference any other projects, brands, or businesses.
 
-1. **No false claims** - Content must be fact-checkable; no fabricated reviews or testimonials
-2. **FTC compliance** - All affiliate content must include proper disclosures
-3. **No black-hat SEO** - No keyword stuffing, cloaking, hidden text, or link schemes
-4. **Quality floor** - Content below quality threshold is blocked from publishing
-5. **Duplicate check** - No publishing substantially duplicate content across sites
+2. **Compliance & Ethics**
+   - No cloaking, no misleading claims, no fake reviews, no scraped copyrighted content.
+   - Always include proper affiliate disclosures.
+   - Follow platform policies (affiliate networks, WordPress hosts, analytics tools).
+   - Prefer white-hat SEO techniques: strong content, internal linking, topical authority, technical SEO.
 
-## Publishing Rules
+3. **Security**
+   - Secrets never committed to git.
+   - All credentials stored in an approved secrets manager or environment variables.
+   - Least-privilege access for all accounts.
+   - Audit logging required for any actions affecting domains/sites/publishing.
 
-1. **Cadence limits** - Respect per-site posting frequency limits in `config/sites.yaml`
-2. **Domain reputation** - New domains start with conservative posting cadence
-3. **No spam patterns** - Posting patterns must appear natural
-4. **Image compliance** - Only use properly licensed or generated images
-5. **Link validation** - All affiliate links must be verified before publishing
+4. **Operational Reliability**
+   - DRY_RUN mode must exist and be the default.
+   - Every pipeline step must be resumable (idempotent).
+   - Fail safely: if uncertain, halt and alert.
 
-## Risk Management
+5. **System Design**
+   - Modular agents with clear interfaces.
+   - Queue-based execution (even if local queue starts simple).
+   - Observable: structured logs + metrics + health checks.
+   - Replaceable components: queue, DB, CMS integration, analytics.
 
-1. **Blacklist enforcement** - Never promote blacklisted products, niches, or merchants
-2. **Claim filtering** - Health, financial, and legal claims require extra review
-3. **Revenue anomaly detection** - Alert on sudden revenue drops or spikes
-4. **Network TOS compliance** - Respect each affiliate network's terms of service
-5. **Rollback capability** - Any published content can be unpublished within minutes
+## Definitions
+- **Cluster**: Two Mac minis connected via gigabit switch and UPS, on dedicated Spectrum router/internet.
+- **Node**: A machine in the cluster (Mac mini A, Mac mini B).
+- **Agent**: A discrete worker that performs a job (research, content, publishing, analytics, etc.).
+- **Pipeline**: A series of jobs that produce an outcome (site creation, article publishing, link updates).
 
-## LLM Usage Rules
+## Modes
+- **DRY_RUN (default)**: Generates artifacts locally; never publishes externally.
+- **SAFE_STAGING**: Can publish to a staging WordPress site only.
+- **PRODUCTION**: Publishing enabled for production sites only when explicitly approved.
 
-1. **Provider agnostic** - LLM calls go through `agents/tools/llm_tool.py` abstraction
-2. **Cost tracking** - All LLM API calls are logged with token counts and costs
-3. **Fallback chain** - If primary LLM fails, fall back to secondary provider
-4. **Output validation** - All LLM outputs are validated before use
-5. **No PII in prompts** - Never send personally identifiable information to LLM APIs
+## Quality Bar
+Content must be:
+- Helpful and original
+- Clear about sources and uncertainty
+- Structured for readability (headings, bullets, tables)
+- Not stuffed with keywords
+- Not auto-generated fluff
 
-## Operational Rules
+## "Do Not Do"
+- Do not use black-hat SEO tactics.
+- Do not create deceptive landing pages.
+- Do not impersonate brands or medical/legal professionals.
+- Do not bypass affiliate network rules.
+- Do not automate account creation in a way that violates Terms.
 
-1. **Secrets in vault only** - No credentials in code, config files, or logs
-2. **Key rotation schedule** - Rotate all API keys on a defined schedule
-3. **Backup before destructive ops** - Always backup before delete/update operations
-4. **Alerting required** - No pipeline runs without alerting configured
-5. **Incident response** - Follow `docs/runbooks/incident_response.md` for all incidents
+## Change Management
+- Any config changes to domains/sites/credentials require:
+  - a PR or review step (even if informal)
+  - a changelog entry
+  - a rollback plan

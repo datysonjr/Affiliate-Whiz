@@ -1,0 +1,33 @@
+# config/cluster/nodes.example.yaml
+# Node definitions for the OpenClaw cluster
+# Copy to nodes.yaml and fill in actual values
+
+nodes:
+  node_a:
+    hostname: "oc-node-a"          # Replace with actual hostname
+    ip: "192.168.1.100"            # Replace with reserved/static IP
+    mac: "AA:BB:CC:DD:EE:01"      # Replace with actual MAC
+    role: primary
+    agents:
+      - master_scheduler
+      - publishing
+      - health_monitor
+    hardware:
+      model: "Mac mini"
+      ssd_mount: "/Volumes/OpenClawData"  # Replace with actual path
+      ram_gb: 16                          # Replace with actual
+
+  node_b:
+    hostname: "oc-node-b"          # Replace with actual hostname
+    ip: "192.168.1.101"            # Replace with reserved/static IP
+    mac: "AA:BB:CC:DD:EE:02"      # Replace with actual MAC
+    role: worker
+    agents:
+      - research
+      - content_generation
+      - analytics
+      - error_recovery
+    hardware:
+      model: "Mac mini"
+      ssd_mount: "/Volumes/OpenClawData"  # Replace with actual path
+      ram_gb: 16                          # Replace with actual
