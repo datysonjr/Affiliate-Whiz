@@ -12,6 +12,10 @@ Required blocks (from docs/seo/README_SEO_SYSTEM.md):
     4. At least 5 internal links
     5. At least 3 product verdict statements
 
+Also computes the **AI Domination Score** (0-10) from
+``docs/seo/OPENCLAW_AI_DOMINATION_PROTOCOL.md``.  Articles scoring
+below 8 are rejected or flagged for refresh.
+
 If any required block is missing the validator returns a structured failure
 report and raises ``ContentValidationError``.
 
@@ -19,6 +23,7 @@ Design references:
     - docs/seo/README_SEO_SYSTEM.md
     - docs/seo/TLDR_BLOCK_STANDARD.md
     - docs/seo/SEO_AGENT_KNOWLEDGE_BASE.md
+    - docs/seo/OPENCLAW_AI_DOMINATION_PROTOCOL.md
     - docs/seo/PROMPTS_CLAUDE_CODE_SEO.md
 """
 
@@ -41,6 +46,12 @@ logger = get_logger("domains.seo.validator")
 MIN_INTERNAL_LINKS: int = 5
 MIN_VERDICT_STATEMENTS: int = 3
 TLDR_MUST_APPEAR_WITHIN_WORDS: int = 200
+
+# AI Domination Score thresholds (from OPENCLAW_AI_DOMINATION_PROTOCOL.md)
+# +2 TLDR present, +2 comparison table, +2 FAQ structured,
+# +2 verdict sentences, +1 internal linking cluster, +1 updated within 60d
+AI_DOMINATION_SCORE_MIN: int = 8
+AI_DOMINATION_SCORE_MAX: int = 10
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +105,7 @@ class SEOValidationResult:
     has_faq: bool = False
     internal_link_count: int = 0
     verdict_count: int = 0
+    ai_domination_score: int = 0
     failures: List[str] = field(default_factory=list)
 
 
@@ -207,16 +219,80 @@ def _count_verdict_statements(content: str) -> int:
 
 
 # ---------------------------------------------------------------------------
+# AI Domination Score
+# ---------------------------------------------------------------------------
+
+def compute_ai_domination_score(
+    *,
+    has_tldr: bool,
+    has_comparison_table: bool,
+    has_faq: bool,
+    has_verdicts: bool,
+    has_internal_links: bool,
+    is_fresh: bool = True,
+) -> int:
+    """Compute the AI Domination Score (0-10).
+
+    Scoring from ``docs/seo/OPENCLAW_AI_DOMINATION_PROTOCOL.md``::
+
+        +2  TLDR present
+        +2  comparison table present
+        +2  FAQ structured
+        +2  verdict sentences included
+        +1  internal linking cluster present
+        +1  updated within 60 days
+
+    Parameters
+    ----------
+    has_tldr:
+        TLDR block detected at top.
+    has_comparison_table:
+        Comparison table detected.
+    has_faq:
+        FAQ section detected.
+    has_verdicts:
+        Minimum verdict statements met.
+    has_internal_links:
+        Minimum internal links met.
+    is_fresh:
+        Whether the article was updated within the last 60 days.
+        Defaults to ``True`` for new articles.
+
+    Returns
+    -------
+    int
+        Score between 0 and 10.
+    """
+    score = 0
+    if has_tldr:
+        score += 2
+    if has_comparison_table:
+        score += 2
+    if has_faq:
+        score += 2
+    if has_verdicts:
+        score += 2
+    if has_internal_links:
+        score += 1
+    if is_fresh:
+        score += 1
+    return score
+
+
+# ---------------------------------------------------------------------------
 # Main validator
 # ---------------------------------------------------------------------------
 
-def validate_seo(content: str) -> SEOValidationResult:
+def validate_seo(content: str, *, is_fresh: bool = True) -> SEOValidationResult:
     """Run all OpenClaw SEO validation checks on article content.
 
     Parameters
     ----------
     content:
         The full article content (Markdown or HTML).
+    is_fresh:
+        Whether the article was created/updated within the last 60 days.
+        Defaults to ``True`` for new content.
 
     Returns
     -------
@@ -228,6 +304,9 @@ def validate_seo(content: str) -> SEOValidationResult:
     has_faq = _check_faq(content)
     link_count = _count_internal_links(content)
     verdict_count = _count_verdict_statements(content)
+
+    has_enough_links = link_count >= MIN_INTERNAL_LINKS
+    has_enough_verdicts = verdict_count >= MIN_VERDICT_STATEMENTS
 
     failures: list[str] = []
 
@@ -243,16 +322,32 @@ def validate_seo(content: str) -> SEOValidationResult:
     if not has_faq:
         failures.append("FAQ section missing — article needs an FAQ heading with questions")
 
-    if link_count < MIN_INTERNAL_LINKS:
+    if not has_enough_links:
         failures.append(
             f"Internal links insufficient — found {link_count}, "
             f"minimum is {MIN_INTERNAL_LINKS}"
         )
 
-    if verdict_count < MIN_VERDICT_STATEMENTS:
+    if not has_enough_verdicts:
         failures.append(
             f"Verdict statements insufficient — found {verdict_count}, "
             f"minimum is {MIN_VERDICT_STATEMENTS}"
+        )
+
+    # Compute AI Domination Score
+    ai_score = compute_ai_domination_score(
+        has_tldr=has_tldr,
+        has_comparison_table=has_table,
+        has_faq=has_faq,
+        has_verdicts=has_enough_verdicts,
+        has_internal_links=has_enough_links,
+        is_fresh=is_fresh,
+    )
+
+    if ai_score < AI_DOMINATION_SCORE_MIN:
+        failures.append(
+            f"AI Domination Score too low — scored {ai_score}/{AI_DOMINATION_SCORE_MAX}, "
+            f"minimum is {AI_DOMINATION_SCORE_MIN}"
         )
 
     passed = len(failures) == 0
@@ -264,6 +359,7 @@ def validate_seo(content: str) -> SEOValidationResult:
         has_faq=has_faq,
         internal_link_count=link_count,
         verdict_count=verdict_count,
+        ai_domination_score=ai_score,
         failures=failures,
     )
 
@@ -271,6 +367,7 @@ def validate_seo(content: str) -> SEOValidationResult:
         logger,
         "seo.validation.complete",
         passed=passed,
+        ai_domination_score=ai_score,
         failures=len(failures),
         links=link_count,
         verdicts=verdict_count,
@@ -279,7 +376,7 @@ def validate_seo(content: str) -> SEOValidationResult:
     return result
 
 
-def enforce_seo(content: str) -> SEOValidationResult:
+def enforce_seo(content: str, *, is_fresh: bool = True) -> SEOValidationResult:
     """Validate and raise on failure.
 
     Convenience wrapper that calls :func:`validate_seo` and raises
@@ -289,6 +386,8 @@ def enforce_seo(content: str) -> SEOValidationResult:
     ----------
     content:
         The full article content.
+    is_fresh:
+        Whether the article was created/updated within the last 60 days.
 
     Returns
     -------
@@ -298,9 +397,9 @@ def enforce_seo(content: str) -> SEOValidationResult:
     Raises
     ------
     ContentValidationError
-        If any required SEO block is missing.
+        If any required SEO block is missing or AI Domination Score < 8.
     """
-    result = validate_seo(content)
+    result = validate_seo(content, is_fresh=is_fresh)
 
     if not result.passed:
         detail_lines = "\n".join(f"  - {f}" for f in result.failures)
@@ -312,6 +411,7 @@ def enforce_seo(content: str) -> SEOValidationResult:
                 "has_faq": result.has_faq,
                 "internal_link_count": result.internal_link_count,
                 "verdict_count": result.verdict_count,
+                "ai_domination_score": result.ai_domination_score,
                 "failures": result.failures,
             },
         )
