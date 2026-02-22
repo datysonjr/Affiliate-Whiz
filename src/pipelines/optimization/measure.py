@@ -2,15 +2,15 @@
 pipelines.optimization.measure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Measure the performance of published affiliate content to drive
-data-driven optimization decisions.  Collects traffic metrics, revenue
-data, click-through rates, and computes ROI for each content piece.
+Measure the performance of published affiliate content.  Aggregates
+traffic, engagement, conversion, and revenue data to produce actionable
+performance snapshots that drive the prune and scale stages.
 
-The measurement stage feeds both the ``prune`` stage (underperformers)
-and the ``scale`` stage (winners).
+Metrics and lookback period are configured via ``config/pipelines.yaml``
+under ``optimization.steps[0]`` (metrics list, lookback_days).
 
 Design references:
-    - config/pipelines.yaml  ``optimization.steps[0]``  (metrics, lookback_days)
+    - config/pipelines.yaml  ``optimization.steps[0]``
     - ARCHITECTURE.md  Section 3 (Optimization Pipeline)
 """
 
@@ -38,55 +38,61 @@ class ContentMetrics:
     Attributes
     ----------
     post_id:
-        Identifier of the measured post.
-    title:
-        Post title.
+        Internal identifier of the post.
     url:
-        Post URL.
-    pageviews:
-        Total pageviews in the measurement period.
-    unique_visitors:
-        Unique visitors in the period.
-    avg_time_on_page_s:
-        Average time on page in seconds.
-    bounce_rate:
-        Bounce rate as a decimal (0.0-1.0).
+        Live URL of the post.
+    title:
+        Article title.
+    published_at:
+        UTC datetime when the post was published.
+    age_days:
+        Days since publication.
     clicks:
-        Total affiliate link clicks.
+        Total affiliate link clicks in the measurement period.
+    pageviews:
+        Total pageviews.
+    unique_visitors:
+        Unique visitor count.
     ctr:
         Click-through rate (clicks / pageviews).
+    epc:
+        Earnings per click (revenue / clicks).
     conversions:
         Number of affiliate conversions.
     revenue:
         Total affiliate revenue in USD.
-    epc:
-        Earnings per click (revenue / clicks).
+    bounce_rate:
+        Bounce rate as a decimal (0.0-1.0).
+    avg_time_on_page:
+        Average time on page in seconds.
     organic_traffic_pct:
         Fraction of traffic from organic search.
     top_keywords:
         Top organic keywords driving traffic.
+    roi:
+        Return on investment for this content.
     measured_at:
-        UTC timestamp of measurement.
-    period_days:
-        Number of days in the measurement window.
+        UTC timestamp of this measurement.
     """
 
     post_id: str
-    title: str = ""
     url: str = ""
+    title: str = ""
+    published_at: Optional[datetime] = None
+    age_days: int = 0
+    clicks: int = 0
     pageviews: int = 0
     unique_visitors: int = 0
-    avg_time_on_page_s: float = 0.0
-    bounce_rate: float = 0.0
-    clicks: int = 0
     ctr: float = 0.0
+    epc: float = 0.0
     conversions: int = 0
     revenue: float = 0.0
-    epc: float = 0.0
+    bounce_rate: float = 0.0
+    avg_time_on_page: float = 0.0
     organic_traffic_pct: float = 0.0
     top_keywords: List[str] = field(default_factory=list)
+    roi: float = 0.0
     measured_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    period_days: int = 30
 
 
 @dataclass
@@ -96,106 +102,95 @@ class SiteMetrics:
     Attributes
     ----------
     site_id:
-        Identifier of the measured site.
+        Internal identifier of the site.
+    period:
+        Measurement period identifier (e.g. "30d").
     total_pageviews:
-        Aggregate pageviews across all content.
-    total_revenue:
-        Aggregate affiliate revenue.
+        Total pageviews across all content.
     total_clicks:
-        Aggregate affiliate link clicks.
+        Total affiliate link clicks.
+    total_revenue:
+        Total affiliate revenue in USD.
+    total_conversions:
+        Total conversions.
     avg_epc:
-        Site-wide average earnings per click.
+        Average earnings per click across the site.
     avg_ctr:
-        Site-wide average click-through rate.
-    content_count:
-        Number of published content pieces.
+        Average click-through rate.
     top_performers:
-        Post IDs of the best-performing content.
-    period_days:
-        Measurement window in days.
+        List of top-performing content pieces.
+    underperformers:
+        List of underperforming content pieces.
     measured_at:
         UTC timestamp.
     """
 
     site_id: str
+    period: str = "30d"
     total_pageviews: int = 0
-    total_revenue: float = 0.0
     total_clicks: int = 0
+    total_revenue: float = 0.0
+    total_conversions: int = 0
     avg_epc: float = 0.0
     avg_ctr: float = 0.0
-    content_count: int = 0
-    top_performers: List[str] = field(default_factory=list)
-    period_days: int = 30
+    top_performers: List[ContentMetrics] = field(default_factory=list)
+    underperformers: List[ContentMetrics] = field(default_factory=list)
     measured_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-@dataclass
-class ROIResult:
-    """Return on investment calculation for a content piece.
-
-    Attributes
-    ----------
-    post_id:
-        The content piece identifier.
-    revenue:
-        Total revenue generated.
-    estimated_cost:
-        Estimated production and maintenance cost.
-    roi:
-        Computed ROI ratio ((revenue - cost) / cost).
-    profitable:
-        Whether the content is profitable (ROI > 0).
-    """
-
-    post_id: str
-    revenue: float = 0.0
-    estimated_cost: float = 0.0
-    roi: float = 0.0
-    profitable: bool = False
-
-
 # ---------------------------------------------------------------------------
-# Cost estimation
+# Period parsing
 # ---------------------------------------------------------------------------
 
-# Default cost assumptions per content piece (in USD)
-_DEFAULT_CONTENT_COSTS = {
-    "creation": 25.0,       # LLM API costs for generation
-    "seo_optimization": 5.0,  # SEO tools API costs
-    "hosting_share": 2.0,   # Monthly hosting cost share per page
-    "maintenance": 3.0,     # Monthly refresh/monitoring cost
-}
+def _parse_period(period: str) -> tuple[datetime, datetime]:
+    """Parse a period string into start and end datetimes.
 
-
-def _estimate_content_cost(
-    age_days: int,
-    *,
-    cost_overrides: Optional[Dict[str, float]] = None,
-) -> float:
-    """Estimate the total cost of a content piece including ongoing costs.
+    Supports shorthand like ``"7d"``, ``"30d"``, ``"90d"``, ``"ytd"``
+    and explicit ranges like ``"2025-01-01:2025-01-31"``.
 
     Parameters
     ----------
-    age_days:
-        Number of days since the content was published.
-    cost_overrides:
-        Optional custom cost assumptions.
+    period:
+        Period specification.
 
     Returns
     -------
-    float
-        Total estimated cost in USD.
+    tuple[datetime, datetime]
+        (start, end) datetimes in UTC.
+
+    Raises
+    ------
+    PipelineStepError
+        If the period format is not recognized.
     """
-    costs = {**_DEFAULT_CONTENT_COSTS, **(cost_overrides or {})}
+    now = datetime.now(timezone.utc)
 
-    # One-time costs
-    upfront = costs.get("creation", 25.0) + costs.get("seo_optimization", 5.0)
+    if period.endswith("d") and period[:-1].isdigit():
+        days = int(period[:-1])
+        return (now - timedelta(days=days), now)
 
-    # Recurring monthly costs
-    months = max(age_days / 30.0, 1.0)
-    recurring = months * (costs.get("hosting_share", 2.0) + costs.get("maintenance", 3.0))
+    if period == "ytd":
+        return (datetime(now.year, 1, 1, tzinfo=timezone.utc), now)
 
-    return round(upfront + recurring, 2)
+    if ":" in period:
+        parts = period.split(":")
+        if len(parts) == 2:
+            try:
+                start = datetime.fromisoformat(parts[0]).replace(tzinfo=timezone.utc)
+                end = datetime.fromisoformat(parts[1]).replace(tzinfo=timezone.utc)
+                return (start, end)
+            except ValueError as exc:
+                raise PipelineStepError(
+                    f"Invalid date range: {period}",
+                    step_name="measure",
+                    cause=exc,
+                ) from exc
+
+    raise PipelineStepError(
+        f"Unrecognized period format: {period!r}. "
+        f"Use '7d', '30d', '90d', 'ytd', or 'YYYY-MM-DD:YYYY-MM-DD'.",
+        step_name="measure",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -205,75 +200,102 @@ def _estimate_content_cost(
 def measure_content_performance(
     post_id: str,
     *,
-    title: str = "",
-    url: str = "",
+    post_data: Optional[Dict[str, Any]] = None,
     analytics_data: Optional[Dict[str, Any]] = None,
-    affiliate_data: Optional[Dict[str, Any]] = None,
-    period_days: int = 30,
+    revenue_data: Optional[Dict[str, Any]] = None,
+    lookback_days: int = 30,
+    estimated_cost: float = 50.0,
 ) -> ContentMetrics:
-    """Measure the overall performance of a single content piece.
+    """Measure the overall performance of a single piece of content.
 
-    Aggregates traffic data from analytics and revenue data from
-    affiliate networks into a unified :class:`ContentMetrics` record.
+    Aggregates traffic, engagement, and revenue data to produce a
+    comprehensive :class:`ContentMetrics` snapshot.  When analytics or
+    revenue data providers are not available, uses the provided dicts.
 
     Parameters
     ----------
     post_id:
-        Identifier of the post to measure.
-    title:
-        Post title (for reporting).
-    url:
-        Post URL (for reporting).
+        Internal identifier of the post to measure.
+    post_data:
+        Optional dict with post metadata (``url``, ``title``,
+        ``published_at``).
     analytics_data:
-        Pre-fetched analytics dict with keys: ``pageviews``,
-        ``unique_visitors``, ``avg_time_on_page``, ``bounce_rate``,
-        ``organic_traffic_pct``, ``top_keywords``.  If ``None``, zeros
-        are used (analytics integration not yet connected).
-    affiliate_data:
-        Pre-fetched affiliate dict with keys: ``clicks``,
-        ``conversions``, ``revenue``.  If ``None``, zeros are used.
-    period_days:
-        Number of days in the measurement lookback window.
+        Optional dict with traffic metrics (``pageviews``,
+        ``unique_visitors``, ``bounce_rate``, ``avg_time_on_page``,
+        ``organic_traffic_pct``, ``top_keywords``).
+    revenue_data:
+        Optional dict with revenue metrics (``clicks``, ``conversions``,
+        ``revenue``).
+    lookback_days:
+        Number of days to look back for metrics.
+    estimated_cost:
+        Estimated cost of producing this content (for ROI calculation).
 
     Returns
     -------
     ContentMetrics
         Comprehensive performance snapshot.
     """
-    log_event(
-        logger,
-        "measure.content.start",
-        post_id=post_id,
-        period_days=period_days,
-    )
+    log_event(logger, "measure.content.start", post_id=post_id, lookback_days=lookback_days)
 
+    post = post_data or {}
     analytics = analytics_data or {}
-    affiliate = affiliate_data or {}
+    revenue = revenue_data or {}
 
-    pageviews = analytics.get("pageviews", 0)
-    clicks = affiliate.get("clicks", 0)
-    revenue = affiliate.get("revenue", 0.0)
+    now = datetime.now(timezone.utc)
 
-    # Compute derived metrics
-    ctr = clicks / pageviews if pageviews > 0 else 0.0
-    epc = revenue / clicks if clicks > 0 else 0.0
+    # Parse publication date
+    published_at = None
+    age_days = 0
+    pub_str = post.get("published_at")
+    if pub_str:
+        try:
+            if isinstance(pub_str, datetime):
+                published_at = pub_str
+            else:
+                published_at = datetime.fromisoformat(str(pub_str)).replace(tzinfo=timezone.utc)
+            age_days = (now - published_at).days
+        except (ValueError, TypeError):
+            logger.debug("Could not parse published_at for %s: %r", post_id, pub_str)
+
+    # Extract traffic metrics
+    pageviews = int(analytics.get("pageviews", 0))
+    unique_visitors = int(analytics.get("unique_visitors", 0))
+    bounce_rate = float(analytics.get("bounce_rate", 0.0))
+    avg_time_on_page = float(analytics.get("avg_time_on_page", 0.0))
+    organic_traffic_pct = float(analytics.get("organic_traffic_pct", 0.0))
+    top_keywords = list(analytics.get("top_keywords", []))
+
+    # Extract revenue metrics
+    clicks = int(revenue.get("clicks", 0))
+    conversions = int(revenue.get("conversions", 0))
+    total_revenue = float(revenue.get("revenue", 0.0))
+
+    # Calculate derived metrics
+    ctr = (clicks / pageviews) if pageviews > 0 else 0.0
+    epc = (total_revenue / clicks) if clicks > 0 else 0.0
+
+    # Calculate ROI
+    roi = calculate_roi(total_revenue, estimated_cost)
 
     metrics = ContentMetrics(
         post_id=post_id,
-        title=title,
-        url=url,
-        pageviews=pageviews,
-        unique_visitors=analytics.get("unique_visitors", 0),
-        avg_time_on_page_s=analytics.get("avg_time_on_page", 0.0),
-        bounce_rate=analytics.get("bounce_rate", 0.0),
+        url=post.get("url", ""),
+        title=post.get("title", ""),
+        published_at=published_at,
+        age_days=age_days,
         clicks=clicks,
+        pageviews=pageviews,
+        unique_visitors=unique_visitors,
         ctr=round(ctr, 4),
-        conversions=affiliate.get("conversions", 0),
-        revenue=round(revenue, 2),
         epc=round(epc, 4),
-        organic_traffic_pct=analytics.get("organic_traffic_pct", 0.0),
-        top_keywords=analytics.get("top_keywords", []),
-        period_days=period_days,
+        conversions=conversions,
+        revenue=round(total_revenue, 2),
+        bounce_rate=round(bounce_rate, 4),
+        avg_time_on_page=round(avg_time_on_page, 1),
+        organic_traffic_pct=round(organic_traffic_pct, 4),
+        top_keywords=top_keywords,
+        roi=round(roi, 4),
     )
 
     log_event(
@@ -282,184 +304,164 @@ def measure_content_performance(
         post_id=post_id,
         pageviews=pageviews,
         clicks=clicks,
-        revenue=revenue,
-        ctr=round(ctr, 4),
-        epc=round(epc, 4),
+        revenue=total_revenue,
+        roi=round(roi, 4),
     )
     return metrics
 
 
 def calculate_roi(
-    post_id: str,
     revenue: float,
-    *,
-    age_days: int = 30,
-    cost_overrides: Optional[Dict[str, float]] = None,
-) -> ROIResult:
+    cost: float,
+) -> float:
     """Calculate return on investment for a content piece.
 
-    ROI = (revenue - estimated_cost) / estimated_cost.
-    A value of 1.0 means the content doubled its investment; 0.0 means
-    break-even; negative values mean a net loss.
+    Uses the formula: ``ROI = (revenue - cost) / cost``.
+
+    A value of 1.0 means 100% return (revenue doubled the investment).
+    Zero means breakeven.  Negative means net loss.
 
     Parameters
     ----------
-    post_id:
-        Content piece identifier.
     revenue:
-        Total revenue generated in USD.
-    age_days:
-        Number of days since publication (for cost estimation).
-    cost_overrides:
-        Optional custom cost assumptions.
+        Total revenue generated by the content (USD).
+    cost:
+        Total cost of producing the content (USD).
 
     Returns
     -------
-    ROIResult
-        ROI calculation result.
+    float
+        ROI as a decimal.  Returns ``-1.0`` if cost is zero.
     """
-    cost = _estimate_content_cost(age_days, cost_overrides=cost_overrides)
-
     if cost <= 0:
-        roi = 0.0 if revenue == 0 else float("inf")
-    else:
-        roi = round((revenue - cost) / cost, 4)
+        logger.debug("Cannot calculate ROI: cost is zero or negative")
+        return -1.0 if revenue <= 0 else float("inf")
 
-    result = ROIResult(
-        post_id=post_id,
-        revenue=revenue,
-        estimated_cost=cost,
-        roi=roi,
-        profitable=roi > 0,
-    )
-
-    log_event(
-        logger,
-        "measure.roi.ok",
-        post_id=post_id,
-        revenue=revenue,
-        cost=cost,
-        roi=roi,
-        profitable=result.profitable,
-    )
-    return result
+    roi = (revenue - cost) / cost
+    return round(roi, 4)
 
 
 def get_traffic_metrics(
     site_id: str,
+    period: str,
     *,
-    period_days: int = 30,
     analytics_data: Optional[Dict[str, Any]] = None,
-) -> SiteMetrics:
-    """Retrieve aggregate traffic metrics for an entire site.
+) -> Dict[str, Any]:
+    """Retrieve aggregate traffic metrics for a site.
 
-    Provides a site-wide view of performance to contextualize individual
-    content metrics.
+    Fetches or computes pageviews, sessions, users, traffic sources,
+    and top pages for the specified period.
 
     Parameters
     ----------
     site_id:
-        Internal identifier of the site.
-    period_days:
-        Number of days in the lookback window.
+        Internal site identifier.
+    period:
+        Time period (e.g. ``"7d"``, ``"30d"``, ``"90d"``).
     analytics_data:
-        Pre-fetched site-level analytics dict.  If ``None``, a stub
-        response is returned (analytics integration not yet connected).
+        Optional pre-fetched analytics data dict.
 
     Returns
     -------
-    SiteMetrics
-        Aggregate site-level metrics.
+    dict[str, Any]
+        Traffic metrics dict with keys: ``site_id``, ``period``,
+        ``total_pageviews``, ``total_sessions``, ``total_users``,
+        ``pages_per_session``, ``avg_session_duration``, ``bounce_rate``,
+        ``traffic_sources``, ``top_pages``.
     """
-    log_event(
-        logger,
-        "measure.traffic.start",
-        site_id=site_id,
-        period_days=period_days,
-    )
+    log_event(logger, "measure.traffic.start", site_id=site_id, period=period)
 
+    start_dt, end_dt = _parse_period(period)
     data = analytics_data or {}
 
-    metrics = SiteMetrics(
-        site_id=site_id,
-        total_pageviews=data.get("total_pageviews", 0),
-        total_revenue=data.get("total_revenue", 0.0),
-        total_clicks=data.get("total_clicks", 0),
-        content_count=data.get("content_count", 0),
-        period_days=period_days,
+    total_pageviews = int(data.get("total_pageviews", 0))
+    total_sessions = int(data.get("total_sessions", 0))
+    total_users = int(data.get("total_users", 0))
+
+    pages_per_session = (
+        total_pageviews / total_sessions if total_sessions > 0 else 0.0
     )
 
-    # Compute averages
-    if metrics.total_clicks > 0:
-        metrics.avg_epc = round(metrics.total_revenue / metrics.total_clicks, 4)
-    if metrics.total_pageviews > 0:
-        metrics.avg_ctr = round(metrics.total_clicks / metrics.total_pageviews, 4)
-
-    metrics.top_performers = data.get("top_performers", [])
+    result: Dict[str, Any] = {
+        "site_id": site_id,
+        "period": period,
+        "start_date": start_dt.strftime("%Y-%m-%d"),
+        "end_date": end_dt.strftime("%Y-%m-%d"),
+        "total_pageviews": total_pageviews,
+        "total_sessions": total_sessions,
+        "total_users": total_users,
+        "pages_per_session": round(pages_per_session, 2),
+        "avg_session_duration": float(data.get("avg_session_duration", 0.0)),
+        "bounce_rate": float(data.get("bounce_rate", 0.0)),
+        "traffic_sources": data.get("traffic_sources", {
+            "organic": 0,
+            "direct": 0,
+            "referral": 0,
+            "social": 0,
+            "paid": 0,
+        }),
+        "top_pages": data.get("top_pages", []),
+    }
 
     log_event(
         logger,
         "measure.traffic.ok",
         site_id=site_id,
-        total_pageviews=metrics.total_pageviews,
-        total_revenue=metrics.total_revenue,
-        content_count=metrics.content_count,
+        period=period,
+        pageviews=total_pageviews,
     )
-    return metrics
+    return result
 
 
 def get_revenue_metrics(
     site_id: str,
+    period: str,
     *,
-    period_days: int = 30,
-    affiliate_data: Optional[Dict[str, Any]] = None,
+    revenue_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Retrieve revenue metrics for a site across all affiliate networks.
+    """Retrieve aggregate revenue metrics for a site.
 
-    Breaks down earnings by network, identifies top-performing products,
-    and computes trend data.
+    Fetches affiliate revenue, click counts, conversion rates, and
+    per-network breakdowns for the specified period.
 
     Parameters
     ----------
     site_id:
-        Internal identifier of the site.
-    period_days:
-        Number of days in the lookback window.
-    affiliate_data:
-        Pre-fetched revenue data dict.  If ``None``, a stub response is
-        returned.
+        Internal site identifier.
+    period:
+        Time period (e.g. ``"7d"``, ``"30d"``, ``"90d"``).
+    revenue_data:
+        Optional pre-fetched revenue data dict.
 
     Returns
     -------
     dict[str, Any]
-        Revenue metrics dict with keys: ``site_id``, ``period_days``,
+        Revenue metrics dict with keys: ``site_id``, ``period``,
         ``total_revenue``, ``total_clicks``, ``total_conversions``,
-        ``epc``, ``conversion_rate``, ``revenue_by_network``,
-        ``top_products``, ``revenue_trend``.
+        ``earnings_per_click``, ``conversion_rate``,
+        ``revenue_by_network``, ``top_products``, ``revenue_trend``.
     """
-    log_event(
-        logger,
-        "measure.revenue.start",
-        site_id=site_id,
-        period_days=period_days,
-    )
+    log_event(logger, "measure.revenue.start", site_id=site_id, period=period)
 
-    data = affiliate_data or {}
+    start_dt, end_dt = _parse_period(period)
+    data = revenue_data or {}
 
-    total_revenue = data.get("total_revenue", 0.0)
-    total_clicks = data.get("total_clicks", 0)
-    total_conversions = data.get("total_conversions", 0)
+    total_revenue = float(data.get("total_revenue", 0.0))
+    total_clicks = int(data.get("total_clicks", 0))
+    total_conversions = int(data.get("total_conversions", 0))
 
     epc = total_revenue / total_clicks if total_clicks > 0 else 0.0
     conversion_rate = total_conversions / total_clicks if total_clicks > 0 else 0.0
 
     result: Dict[str, Any] = {
         "site_id": site_id,
-        "period_days": period_days,
+        "period": period,
+        "start_date": start_dt.strftime("%Y-%m-%d"),
+        "end_date": end_dt.strftime("%Y-%m-%d"),
         "total_revenue": round(total_revenue, 2),
         "total_clicks": total_clicks,
         "total_conversions": total_conversions,
-        "epc": round(epc, 4),
+        "earnings_per_click": round(epc, 4),
         "conversion_rate": round(conversion_rate, 4),
         "revenue_by_network": data.get("revenue_by_network", {}),
         "top_products": data.get("top_products", []),
@@ -470,8 +472,8 @@ def get_revenue_metrics(
         logger,
         "measure.revenue.ok",
         site_id=site_id,
-        total_revenue=round(total_revenue, 2),
-        total_clicks=total_clicks,
+        period=period,
+        revenue=total_revenue,
         epc=round(epc, 4),
     )
     return result

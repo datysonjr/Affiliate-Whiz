@@ -2,16 +2,15 @@
 pipelines.optimization.prune
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Identify and prune underperforming affiliate content.  Content that
-fails to generate meaningful traffic or revenue after a minimum age
-threshold is moved to draft status (not deleted) to preserve the option
-of refreshing it later.
+Identify and remove or demote underperforming content.  Pruning improves
+overall site quality, concentrates link equity, and frees resources for
+scaling winning content.
 
-Pruning thresholds and actions are configured in ``config/pipelines.yaml``
-under ``optimization.steps[1]``.
+Pruning thresholds are configured via ``config/pipelines.yaml`` under
+``optimization.steps[1]`` (min_age_days, min_clicks, action).
 
 Design references:
-    - config/pipelines.yaml  ``optimization.steps[1]``  (min_age_days, min_clicks, action)
+    - config/pipelines.yaml  ``optimization.steps[1]``
     - ARCHITECTURE.md  Section 3 (Optimization Pipeline)
 """
 
@@ -35,25 +34,27 @@ logger = get_logger("pipelines.optimization.prune")
 
 @dataclass
 class PruneCandidate:
-    """A content piece identified as a candidate for pruning.
+    """A content piece flagged for potential pruning.
 
     Attributes
     ----------
     post_id:
-        Identifier of the underperforming post.
+        Internal identifier of the post.
     title:
-        Post title.
+        Article title.
     url:
-        Post URL.
+        Live URL of the post.
     reason:
-        Why this post was flagged for pruning.
+        Why this post was flagged (e.g. "below_min_clicks",
+        "low_revenue", "thin_content").
     metrics:
-        Performance metrics that triggered the flag.
-    age_days:
-        Number of days since publication.
+        The :class:`ContentMetrics` that triggered the flag.
     recommended_action:
-        Suggested action: ``"draft"``, ``"noindex"``, ``"redirect"``,
-        ``"refresh"``.
+        Suggested action: ``"draft"`` (unpublish), ``"noindex"``,
+        ``"redirect"``, ``"merge"``, ``"refresh"``, or ``"delete"``.
+    severity:
+        How underperforming the content is: ``"low"``, ``"medium"``,
+        ``"high"``.
     """
 
     post_id: str
@@ -61,40 +62,71 @@ class PruneCandidate:
     url: str = ""
     reason: str = ""
     metrics: Optional[ContentMetrics] = None
-    age_days: int = 0
     recommended_action: str = "draft"
+    severity: str = "low"
 
 
 @dataclass
 class PruneResult:
-    """Result of executing pruning actions on content.
+    """Result of a pruning operation on a single post.
 
     Attributes
     ----------
-    action:
-        The action that was applied.
-    total:
-        Number of posts targeted.
-    succeeded:
-        Number of posts successfully pruned.
-    failed:
-        Number of posts where pruning failed.
-    details:
-        Per-post outcome details.
-    executed_at:
-        UTC timestamp of execution.
+    post_id:
+        Identifier of the pruned post.
+    action_taken:
+        What was done (e.g. ``"moved_to_draft"``).
+    success:
+        Whether the action succeeded.
+    error:
+        Error message if the action failed.
+    archived:
+        Whether the content was archived before pruning.
     """
 
+    post_id: str
+    action_taken: str = ""
+    success: bool = False
+    error: str = ""
+    archived: bool = False
+
+
+@dataclass
+class PruneReport:
+    """Aggregate report from a pruning run.
+
+    Attributes
+    ----------
+    total_candidates:
+        Number of posts identified for pruning.
+    pruned_count:
+        Number of posts actually pruned.
+    skipped_count:
+        Number of candidates that were skipped.
+    failed_count:
+        Number of candidates where pruning failed.
+    results:
+        Per-post :class:`PruneResult` entries.
+    action:
+        The pruning action that was applied.
+    report_text:
+        Human-readable Markdown summary.
+    generated_at:
+        UTC timestamp.
+    """
+
+    total_candidates: int = 0
+    pruned_count: int = 0
+    skipped_count: int = 0
+    failed_count: int = 0
+    results: List[PruneResult] = field(default_factory=list)
     action: str = "draft"
-    total: int = 0
-    succeeded: int = 0
-    failed: int = 0
-    details: List[Dict[str, Any]] = field(default_factory=list)
-    executed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    report_text: str = ""
+    generated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ---------------------------------------------------------------------------
-# Identification
+# Candidate identification
 # ---------------------------------------------------------------------------
 
 def identify_prune_candidates(
@@ -104,30 +136,29 @@ def identify_prune_candidates(
     min_clicks: int = 5,
     min_pageviews: int = 10,
     min_revenue: float = 0.0,
-    action: str = "draft",
+    max_bounce_rate: float = 0.95,
 ) -> List[PruneCandidate]:
     """Identify content that should be considered for pruning.
 
-    Applies threshold checks to each content piece's metrics.  Content
-    must be older than *min_age_days* and fail at least one performance
-    threshold to be flagged.
+    Evaluates each content piece against performance thresholds.  Only
+    content older than *min_age_days* is considered (new content needs
+    time to rank).
 
     Parameters
     ----------
     content_metrics:
         List of :class:`ContentMetrics` for all published content.
     min_age_days:
-        Minimum age in days before content is eligible for pruning.
-        This prevents pruning of newly published content that has not
-        had time to index and rank.
+        Minimum days since publication before content is eligible for
+        pruning.
     min_clicks:
-        Minimum affiliate link clicks in the measurement period.
+        Posts with fewer clicks than this are flagged.
     min_pageviews:
-        Minimum pageviews in the measurement period.
+        Posts with fewer pageviews than this are flagged.
     min_revenue:
-        Minimum revenue generated in the measurement period.
-    action:
-        Default recommended action for flagged content.
+        Posts generating less revenue than this are flagged.
+    max_bounce_rate:
+        Posts with a bounce rate above this are flagged.
 
     Returns
     -------
@@ -139,102 +170,89 @@ def identify_prune_candidates(
         "prune.identify.start",
         total_content=len(content_metrics),
         min_age_days=min_age_days,
-        min_clicks=min_clicks,
     )
 
     candidates: List[PruneCandidate] = []
 
     for metrics in content_metrics:
-        # Calculate age (approximate from measurement period)
-        age_days = metrics.period_days  # In production, compute from publish date
-
-        # Skip content that is too young
-        if age_days < min_age_days:
+        # Skip content that is too new
+        if metrics.age_days < min_age_days:
             continue
 
         reasons: List[str] = []
+        severity_score = 0
 
-        if metrics.pageviews < min_pageviews:
-            reasons.append(
-                f"Low traffic: {metrics.pageviews} pageviews "
-                f"(threshold: {min_pageviews})"
-            )
-
+        # Check clicks
         if metrics.clicks < min_clicks:
-            reasons.append(
-                f"Low engagement: {metrics.clicks} clicks "
-                f"(threshold: {min_clicks})"
-            )
+            reasons.append(f"below_min_clicks ({metrics.clicks} < {min_clicks})")
+            severity_score += 2
 
-        if min_revenue > 0 and metrics.revenue < min_revenue:
-            reasons.append(
-                f"Low revenue: ${metrics.revenue:.2f} "
-                f"(threshold: ${min_revenue:.2f})"
-            )
+        # Check pageviews
+        if metrics.pageviews < min_pageviews:
+            reasons.append(f"below_min_pageviews ({metrics.pageviews} < {min_pageviews})")
+            severity_score += 2
+
+        # Check revenue
+        if metrics.revenue < min_revenue:
+            reasons.append(f"below_min_revenue (${metrics.revenue:.2f} < ${min_revenue:.2f})")
+            severity_score += 1
+
+        # Check bounce rate
+        if metrics.bounce_rate > max_bounce_rate:
+            reasons.append(f"high_bounce_rate ({metrics.bounce_rate:.2%} > {max_bounce_rate:.2%})")
+            severity_score += 1
+
+        # Check negative ROI
+        if metrics.roi < 0 and metrics.roi != -1.0:
+            reasons.append(f"negative_roi ({metrics.roi:.2f})")
+            severity_score += 2
 
         if not reasons:
             continue
 
+        # Determine severity
+        if severity_score >= 5:
+            severity = "high"
+        elif severity_score >= 3:
+            severity = "medium"
+        else:
+            severity = "low"
+
         # Determine recommended action based on severity
-        recommended = _determine_prune_action(metrics, action)
+        if severity == "high":
+            recommended_action = "draft"
+        elif severity == "medium" and metrics.pageviews > 0:
+            recommended_action = "refresh"
+        else:
+            recommended_action = "noindex"
 
-        candidate = PruneCandidate(
-            post_id=metrics.post_id,
-            title=metrics.title,
-            url=metrics.url,
-            reason="; ".join(reasons),
-            metrics=metrics,
-            age_days=age_days,
-            recommended_action=recommended,
+        candidates.append(
+            PruneCandidate(
+                post_id=metrics.post_id,
+                title=metrics.title,
+                url=metrics.url,
+                reason="; ".join(reasons),
+                metrics=metrics,
+                recommended_action=recommended_action,
+                severity=severity,
+            )
         )
-        candidates.append(candidate)
 
-    # Sort by revenue (ascending) -- worst performers first
-    candidates.sort(key=lambda c: (c.metrics.revenue if c.metrics else 0, c.metrics.pageviews if c.metrics else 0))
+    # Sort by severity (high first), then by lowest pageviews
+    severity_order = {"high": 0, "medium": 1, "low": 2}
+    candidates.sort(
+        key=lambda c: (severity_order.get(c.severity, 3), c.metrics.pageviews if c.metrics else 0)
+    )
 
     log_event(
         logger,
         "prune.identify.ok",
         candidates_found=len(candidates),
-        total_evaluated=len(content_metrics),
+        high=sum(1 for c in candidates if c.severity == "high"),
+        medium=sum(1 for c in candidates if c.severity == "medium"),
+        low=sum(1 for c in candidates if c.severity == "low"),
     )
     return candidates
-
-
-def _determine_prune_action(
-    metrics: ContentMetrics,
-    default_action: str,
-) -> str:
-    """Determine the best pruning action based on metric severity.
-
-    Parameters
-    ----------
-    metrics:
-        The content's performance metrics.
-    default_action:
-        The default action from config.
-
-    Returns
-    -------
-    str
-        Recommended action: ``"draft"``, ``"noindex"``, ``"redirect"``,
-        or ``"refresh"``.
-    """
-    # If the content has some traffic but no conversions, it might
-    # benefit from a refresh rather than removal
-    if metrics.pageviews > 50 and metrics.clicks == 0:
-        return "refresh"
-
-    # If there is some organic traffic, preserve the URL via noindex
-    # to avoid losing any link equity
-    if metrics.organic_traffic_pct > 0.3 and metrics.pageviews > 20:
-        return "noindex"
-
-    # For content with zero traffic, move to draft status
-    if metrics.pageviews == 0:
-        return "draft"
-
-    return default_action
 
 
 # ---------------------------------------------------------------------------
@@ -244,132 +262,134 @@ def _determine_prune_action(
 def prune_content(
     candidates: List[PruneCandidate],
     *,
-    action_override: Optional[str] = None,
+    action: str = "draft",
     dry_run: bool = False,
-) -> PruneResult:
-    """Execute pruning actions on the identified candidates.
+) -> List[PruneResult]:
+    """Execute pruning on the identified candidates.
 
-    For each candidate, applies the recommended action (or the
-    *action_override*).  Archives content before any destructive
-    operation.
+    Applies the specified action to each candidate.  In ``dry_run``
+    mode, no changes are made but the planned actions are logged.
 
     Parameters
     ----------
     candidates:
-        List of :class:`PruneCandidate` objects to process.
-    action_override:
-        If provided, overrides each candidate's recommended action.
+        List of :class:`PruneCandidate` to prune.
+    action:
+        The pruning action to apply: ``"draft"`` (move to draft status),
+        ``"noindex"``, ``"redirect"``, ``"delete"``.
     dry_run:
-        If ``True``, log what would be done without executing.
+        If ``True``, log planned actions without executing them.
 
     Returns
     -------
-    PruneResult
-        Summary of pruning operations.
+    list[PruneResult]
+        Per-candidate results.
     """
     log_event(
         logger,
         "prune.execute.start",
         candidates=len(candidates),
+        action=action,
         dry_run=dry_run,
     )
 
-    result = PruneResult(
-        action=action_override or "mixed",
-        total=len(candidates),
-    )
+    valid_actions = {"draft", "noindex", "redirect", "delete", "merge", "refresh"}
+    if action not in valid_actions:
+        raise PipelineStepError(
+            f"Invalid prune action: {action!r}. Must be one of {valid_actions}",
+            step_name="prune",
+        )
+
+    results: List[PruneResult] = []
 
     for candidate in candidates:
-        action = action_override or candidate.recommended_action
-        post_id = candidate.post_id
-
         if dry_run:
-            result.details.append({
-                "post_id": post_id,
-                "title": candidate.title,
-                "action": action,
-                "success": True,
-                "dry_run": True,
-                "reason": candidate.reason,
-            })
-            result.succeeded += 1
-            log_event(
-                logger,
-                "prune.dry_run",
-                post_id=post_id,
-                action=action,
-                reason=candidate.reason,
+            results.append(
+                PruneResult(
+                    post_id=candidate.post_id,
+                    action_taken=f"dry_run:{action}",
+                    success=True,
+                    archived=False,
+                )
+            )
+            logger.info(
+                "[DRY RUN] Would %s post '%s' (%s) -- reason: %s",
+                action,
+                candidate.title,
+                candidate.post_id,
+                candidate.reason,
             )
             continue
 
+        # Archive before pruning
+        archived = archive_content(candidate.post_id, candidate.title, candidate.url)
+
+        # Apply the action
         try:
-            # Archive before pruning
-            archive_content([post_id])
-
-            # Execute the action
-            _execute_prune_action(post_id, action)
-
-            result.details.append({
-                "post_id": post_id,
-                "title": candidate.title,
-                "action": action,
-                "success": True,
-                "reason": candidate.reason,
-            })
-            result.succeeded += 1
-
+            _apply_prune_action(candidate.post_id, action)
+            results.append(
+                PruneResult(
+                    post_id=candidate.post_id,
+                    action_taken=action,
+                    success=True,
+                    archived=archived,
+                )
+            )
+            log_event(
+                logger,
+                "prune.post.ok",
+                post_id=candidate.post_id,
+                action=action,
+            )
         except Exception as exc:
-            result.details.append({
-                "post_id": post_id,
-                "title": candidate.title,
-                "action": action,
-                "success": False,
-                "error": str(exc),
-                "reason": candidate.reason,
-            })
-            result.failed += 1
-            logger.error("Failed to prune %s: %s", post_id, exc)
+            results.append(
+                PruneResult(
+                    post_id=candidate.post_id,
+                    action_taken=action,
+                    success=False,
+                    error=str(exc),
+                    archived=archived,
+                )
+            )
+            logger.error(
+                "Failed to %s post '%s': %s",
+                action,
+                candidate.post_id,
+                exc,
+            )
 
     log_event(
         logger,
         "prune.execute.ok",
-        total=result.total,
-        succeeded=result.succeeded,
-        failed=result.failed,
+        total=len(results),
+        succeeded=sum(1 for r in results if r.success),
+        failed=sum(1 for r in results if not r.success),
     )
-    return result
+    return results
 
 
-def _execute_prune_action(post_id: str, action: str) -> None:
-    """Execute a single pruning action on a post.
+def _apply_prune_action(post_id: str, action: str) -> None:
+    """Apply a specific prune action to a post.
 
-    Stub for CMS integration.  In production, this calls the appropriate
-    CMS API to change post status, add noindex, or create a redirect.
+    Stub for CMS integration.  In production, this calls the
+    appropriate CMS API to update or remove the post.
 
     Parameters
     ----------
     post_id:
-        The post to modify.
+        The post to act on.
     action:
-        The action to take: ``"draft"``, ``"noindex"``, ``"redirect"``,
-        ``"refresh"``.
+        The action to apply.
     """
-    action_handlers = {
-        "draft": lambda pid: logger.info("Moving post %s to draft status", pid),
-        "noindex": lambda pid: logger.info("Adding noindex to post %s", pid),
-        "redirect": lambda pid: logger.info("Setting up redirect for post %s", pid),
-        "refresh": lambda pid: logger.info("Queuing post %s for content refresh", pid),
+    action_descriptions = {
+        "draft": f"Moving post {post_id} to draft status",
+        "noindex": f"Adding noindex to post {post_id}",
+        "redirect": f"Setting up 301 redirect for post {post_id}",
+        "delete": f"Deleting post {post_id}",
+        "merge": f"Merging post {post_id} into target",
+        "refresh": f"Queuing post {post_id} for content refresh",
     }
-
-    handler = action_handlers.get(action)
-    if handler is None:
-        raise PipelineStepError(
-            f"Unknown prune action: {action!r}",
-            step_name="prune",
-            details={"post_id": post_id, "action": action},
-        )
-
-    handler(post_id)
+    logger.info(action_descriptions.get(action, f"Applying {action} to {post_id}"))
 
 
 # ---------------------------------------------------------------------------
@@ -377,121 +397,149 @@ def _execute_prune_action(post_id: str, action: str) -> None:
 # ---------------------------------------------------------------------------
 
 def archive_content(
-    post_ids: List[str],
-    *,
-    archive_store: Optional[Any] = None,
-) -> Dict[str, bool]:
-    """Archive content before pruning for potential future recovery.
+    post_id: str,
+    title: str = "",
+    url: str = "",
+) -> bool:
+    """Archive a post's content before pruning.
 
-    Saves a full snapshot of each post's content and metadata to
-    long-term storage.  This ensures content can be restored if a
-    pruning decision is later reversed.
+    Saves a snapshot of the post content, metadata, and affiliate links
+    to storage so the content can be recovered if the pruning decision
+    is later reversed.
 
     Parameters
     ----------
-    post_ids:
-        List of post identifiers to archive.
-    archive_store:
-        Optional storage backend.  If ``None``, archival is logged but
-        no persistent storage occurs (stub mode).
+    post_id:
+        The post identifier.
+    title:
+        Article title (for the archive record).
+    url:
+        Live URL (for the archive record).
 
     Returns
     -------
-    dict[str, bool]
-        Mapping of post_id to success status.
+    bool
+        ``True`` if archiving succeeded.
     """
-    results: Dict[str, bool] = {}
+    archive_record = {
+        "post_id": post_id,
+        "title": title,
+        "url": url,
+        "archived_at": datetime.now(timezone.utc).isoformat(),
+        "status": "archived",
+    }
 
-    for post_id in post_ids:
-        try:
-            # Stub: in production, this fetches content from CMS and saves
-            # to S3, GCS, or local archive storage
-            logger.info("Archiving content for post %s", post_id)
-            results[post_id] = True
-        except Exception as exc:
-            logger.error("Failed to archive post %s: %s", post_id, exc)
-            results[post_id] = False
-
-    log_event(
-        logger,
-        "prune.archive.ok",
-        total=len(post_ids),
-        archived=sum(1 for v in results.values() if v),
-    )
-    return results
+    # Stub: in production, this writes to a database or object storage
+    logger.info("Archived post %s (%s) for recovery", post_id, title)
+    log_event(logger, "prune.archive.ok", post_id=post_id)
+    return True
 
 
 # ---------------------------------------------------------------------------
-# Reporting
+# Report generation
 # ---------------------------------------------------------------------------
 
 def generate_prune_report(
-    result: PruneResult,
-    candidates: Optional[List[PruneCandidate]] = None,
-) -> str:
-    """Generate a human-readable report from pruning results.
+    candidates: List[PruneCandidate],
+    results: List[PruneResult],
+    *,
+    action: str = "draft",
+) -> PruneReport:
+    """Generate a comprehensive pruning report.
 
-    Produces a Markdown-formatted report suitable for logging, email
-    notifications, or dashboard display.
+    Combines candidate analysis with execution results into a
+    :class:`PruneReport` with a human-readable Markdown summary.
 
     Parameters
     ----------
-    result:
-        The :class:`PruneResult` from the pruning operation.
     candidates:
-        Optional original candidate list for additional context.
+        The prune candidates that were identified.
+    results:
+        The execution results from :func:`prune_content`.
+    action:
+        The pruning action that was applied.
 
     Returns
     -------
-    str
-        Markdown-formatted report string.
+    PruneReport
+        Complete report with statistics and Markdown text.
     """
+    pruned = sum(1 for r in results if r.success)
+    failed = sum(1 for r in results if not r.success)
+    skipped = len(candidates) - len(results)
+
+    # Build Markdown report
     lines = [
         f"# Content Pruning Report",
-        "",
-        f"**Date**: {result.executed_at.strftime('%Y-%m-%d %H:%M UTC')}",
-        f"**Action**: {result.action}",
-        "",
-        "## Summary",
-        "",
+        f"",
+        f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        f"",
+        f"## Summary",
+        f"",
         f"| Metric | Value |",
         f"|--------|-------|",
-        f"| Total targeted | {result.total} |",
-        f"| Succeeded | {result.succeeded} |",
-        f"| Failed | {result.failed} |",
-        f"| Success rate | {(result.succeeded / result.total * 100) if result.total > 0 else 0:.1f}% |",
-        "",
+        f"| Candidates identified | {len(candidates)} |",
+        f"| Successfully pruned | {pruned} |",
+        f"| Failed | {failed} |",
+        f"| Skipped | {skipped} |",
+        f"| Action applied | {action} |",
+        f"",
+        f"## Candidate Breakdown by Severity",
+        f"",
+        f"| Severity | Count |",
+        f"|----------|-------|",
+        f"| High | {sum(1 for c in candidates if c.severity == 'high')} |",
+        f"| Medium | {sum(1 for c in candidates if c.severity == 'medium')} |",
+        f"| Low | {sum(1 for c in candidates if c.severity == 'low')} |",
+        f"",
     ]
 
-    if result.details:
+    if candidates:
         lines.extend([
-            "## Details",
-            "",
-            "| Post ID | Title | Action | Status | Reason |",
-            "|---------|-------|--------|--------|--------|",
+            f"## Details",
+            f"",
+            f"| Post | Reason | Severity | Action | Result |",
+            f"|------|--------|----------|--------|--------|",
         ])
-        for detail in result.details:
-            status = "OK" if detail.get("success") else f"FAILED: {detail.get('error', 'unknown')}"
-            dry = " (dry run)" if detail.get("dry_run") else ""
+        results_by_id = {r.post_id: r for r in results}
+        for candidate in candidates:
+            result = results_by_id.get(candidate.post_id)
+            status = "OK" if result and result.success else ("FAILED" if result else "SKIPPED")
+            title_short = candidate.title[:40] + "..." if len(candidate.title) > 40 else candidate.title
+            reason_short = candidate.reason[:50] + "..." if len(candidate.reason) > 50 else candidate.reason
             lines.append(
-                f"| {detail.get('post_id', '')} "
-                f"| {detail.get('title', '')[:30]} "
-                f"| {detail.get('action', '')} "
-                f"| {status}{dry} "
-                f"| {detail.get('reason', '')[:50]} |"
+                f"| {title_short} | {reason_short} | {candidate.severity} | "
+                f"{candidate.recommended_action} | {status} |"
             )
 
     lines.extend([
-        "",
-        "## Follow-up Actions",
-        "",
-        "- Update sitemap to remove pruned URLs",
-        "- Verify redirect rules are functioning correctly",
-        "- Update internal links pointing to pruned pages",
-        "- Monitor 404 errors for the next 7 days",
-        "- Review pruned content in 30 days for potential restoration",
+        f"",
+        f"## Follow-up Actions",
+        f"",
+        f"- Update sitemap to remove pruned URLs",
+        f"- Verify redirect rules are functioning correctly",
+        f"- Update internal links pointing to pruned pages",
+        f"- Monitor 404 errors over the next 7 days",
+        f"- Review analytics for traffic impact after 14 days",
     ])
 
-    report = "\n".join(lines)
-    log_event(logger, "prune.report.generated", length=len(report))
+    report_text = "\n".join(lines)
+
+    report = PruneReport(
+        total_candidates=len(candidates),
+        pruned_count=pruned,
+        skipped_count=skipped,
+        failed_count=failed,
+        results=results,
+        action=action,
+        report_text=report_text,
+    )
+
+    log_event(
+        logger,
+        "prune.report.generated",
+        candidates=len(candidates),
+        pruned=pruned,
+        failed=failed,
+    )
     return report
