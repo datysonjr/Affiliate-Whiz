@@ -2,56 +2,33 @@
 integrations.email.mailbox
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-SMTP-based email notifications for the OpenClaw system.
+Email notification and reporting integration for the OpenClaw system.
 
-Provides :class:`MailboxManager` which sends system alerts, periodic
-reports, and operational notifications via SMTP.  Designed for internal
-system communications (e.g. deployment failures, commission summaries,
-health-check alerts) rather than bulk marketing email.
+Provides the :class:`MailboxManager` class for sending alert emails,
+periodic performance reports, and general notifications.  Supports SMTP
+delivery with TLS, HTML/plain-text multipart messages, and template-based
+content rendering.
 
 Design references:
-    - config/providers.yaml  ``email`` section
     - ARCHITECTURE.md  Section 4 (Integration Layer)
-
-Usage::
-
-    from src.integrations.email.mailbox import MailboxManager
-
-    mailer = MailboxManager(
-        smtp_host="smtp.gmail.com",
-        smtp_port=587,
-        username="alerts@openclaw.example",
-        password="app-password",
-        from_address="alerts@openclaw.example",
-    )
-    await mailer.send_alert(
-        to="ops@openclaw.example",
-        subject="Deployment failed",
-        body="Site xyz failed to deploy. See logs for details.",
-    )
+    - config/providers.yaml  ``email`` section
 """
 
 from __future__ import annotations
 
+import logging
 import smtplib
-import ssl
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any, Dict, List, Optional
 
+from src.core.constants import DEFAULT_REQUEST_TIMEOUT
 from src.core.errors import IntegrationError
 from src.core.logger import get_logger, log_event
 
 logger = get_logger("integrations.email.mailbox")
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-_DEFAULT_SMTP_PORT = 587
-_DEFAULT_TIMEOUT = 30
 
 
 # ---------------------------------------------------------------------------
@@ -60,39 +37,37 @@ _DEFAULT_TIMEOUT = 30
 
 @dataclass
 class EmailMessage:
-    """Structured representation of an outgoing email.
+    """An email message ready for delivery.
 
     Attributes
     ----------
     to:
-        Recipient email addresses.
+        List of recipient email addresses.
     subject:
         Email subject line.
     body_text:
         Plain-text body content.
     body_html:
-        Optional HTML body content.
-    from_address:
-        Sender email address.
+        HTML body content (optional; if provided, the email is sent
+        as multipart/alternative).
     cc:
-        CC recipient addresses.
+        Carbon-copy recipients.
     bcc:
-        BCC recipient addresses.
+        Blind carbon-copy recipients.
     reply_to:
         Reply-to address.
     headers:
-        Additional email headers.
+        Additional custom email headers.
     sent_at:
-        UTC timestamp when the email was sent (set after sending).
+        UTC timestamp when the message was sent (populated after delivery).
     message_id:
-        SMTP message ID (set after sending).
+        SMTP message ID (populated after delivery).
     """
 
-    to: List[str]
-    subject: str
-    body_text: str
+    to: List[str] = field(default_factory=list)
+    subject: str = ""
+    body_text: str = ""
     body_html: str = ""
-    from_address: str = ""
     cc: List[str] = field(default_factory=list)
     bcc: List[str] = field(default_factory=list)
     reply_to: str = ""
@@ -102,31 +77,33 @@ class EmailMessage:
 
 
 @dataclass
-class SendResult:
-    """Result of an email send operation.
+class DeliveryResult:
+    """Result of an email delivery attempt.
 
     Attributes
     ----------
     success:
-        Whether the email was accepted by the SMTP server.
+        Whether the delivery was accepted by the SMTP server.
     message_id:
-        SMTP message ID (if available).
+        SMTP message ID.
     recipients_accepted:
-        List of recipients the server accepted.
+        Number of recipients the server accepted.
     recipients_rejected:
-        Dict of rejected recipients and their error messages.
+        Number of recipients the server rejected.
     error:
-        Error description if the send failed.
+        Error message if delivery failed.
     sent_at:
-        UTC timestamp when the send was attempted.
+        UTC timestamp of the delivery attempt.
     """
 
     success: bool = False
     message_id: str = ""
-    recipients_accepted: List[str] = field(default_factory=list)
-    recipients_rejected: Dict[str, str] = field(default_factory=dict)
+    recipients_accepted: int = 0
+    recipients_rejected: int = 0
     error: str = ""
-    sent_at: Optional[datetime] = None
+    sent_at: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -134,385 +111,320 @@ class SendResult:
 # ---------------------------------------------------------------------------
 
 class MailboxManager:
-    """SMTP email client for OpenClaw system notifications.
+    """Manages email delivery for alerts, reports, and notifications.
 
-    Supports TLS/STARTTLS connections and sends plain-text and HTML
-    multipart messages.  Connection pooling is not implemented; a new
-    SMTP session is opened for each send operation to keep the design
-    simple and robust for low-volume notification traffic.
+    Connects to an SMTP server with TLS and sends multipart emails.
+    Supports different message types (alerts, reports, notifications)
+    with appropriate formatting.
 
     Parameters
     ----------
     smtp_host:
         SMTP server hostname.
     smtp_port:
-        SMTP server port (587 for STARTTLS, 465 for implicit TLS).
+        SMTP server port (typically 587 for STARTTLS, 465 for SMTPS).
     username:
         SMTP authentication username.
     password:
-        SMTP authentication password or app-specific password.
+        SMTP authentication password.
     from_address:
-        Default sender address for all outgoing messages.
+        Default sender address.
+    from_name:
+        Default sender display name.
     use_tls:
-        Whether to use STARTTLS (port 587) or implicit TLS (port 465).
-        Defaults to ``True`` (STARTTLS).
+        Whether to use STARTTLS (default ``True``).
     timeout:
-        Connection timeout in seconds.
+        SMTP connection timeout in seconds.
+
+    Raises
+    ------
+    IntegrationError
+        If required parameters are missing.
     """
 
     def __init__(
         self,
         smtp_host: str,
-        smtp_port: int = _DEFAULT_SMTP_PORT,
+        smtp_port: int = 587,
         username: str = "",
         password: str = "",
         from_address: str = "",
+        from_name: str = "OpenClaw System",
         use_tls: bool = True,
-        timeout: int = _DEFAULT_TIMEOUT,
+        timeout: int = DEFAULT_REQUEST_TIMEOUT,
     ) -> None:
         if not smtp_host:
-            raise IntegrationError("SMTP host is required for email integration")
+            raise IntegrationError("smtp_host is required for MailboxManager")
         if not from_address:
-            raise IntegrationError("from_address is required for email integration")
+            raise IntegrationError("from_address is required for MailboxManager")
 
         self._smtp_host = smtp_host
         self._smtp_port = smtp_port
         self._username = username
         self._password = password
         self._from_address = from_address
+        self._from_name = from_name
         self._use_tls = use_tls
         self._timeout = timeout
         self._send_count: int = 0
-        self._error_count: int = 0
+        self.logger: logging.Logger = get_logger("integrations.email.mailbox")
 
         log_event(
-            logger,
-            "email.init",
-            smtp_host=smtp_host,
-            smtp_port=smtp_port,
+            logger, "mailbox.init",
+            smtp_host=smtp_host, smtp_port=smtp_port,
             from_address=from_address,
-            use_tls=use_tls,
         )
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _build_mime_message(self, message: EmailMessage) -> MIMEMultipart:
-        """Construct a MIME multipart email from an :class:`EmailMessage`.
+    def _build_mime(self, message: EmailMessage) -> MIMEMultipart:
+        """Build a MIME message from an EmailMessage.
 
         Parameters
         ----------
         message:
-            Structured email message.
+            The email message to convert.
 
         Returns
         -------
         MIMEMultipart
-            Ready-to-send MIME message.
+            A MIME-formatted email ready for SMTP delivery.
         """
-        msg = MIMEMultipart("alternative")
-        msg["From"] = message.from_address or self._from_address
-        msg["To"] = ", ".join(message.to)
-        msg["Subject"] = message.subject
+        mime = MIMEMultipart("alternative")
+        mime["From"] = f"{self._from_name} <{self._from_address}>"
+        mime["To"] = ", ".join(message.to)
+        mime["Subject"] = message.subject
 
         if message.cc:
-            msg["Cc"] = ", ".join(message.cc)
+            mime["Cc"] = ", ".join(message.cc)
         if message.reply_to:
-            msg["Reply-To"] = message.reply_to
+            mime["Reply-To"] = message.reply_to
 
-        # Custom headers
-        for header_name, header_value in message.headers.items():
-            msg[header_name] = header_value
+        for key, value in message.headers.items():
+            mime[key] = value
 
-        # Always attach plain text
-        msg.attach(MIMEText(message.body_text, "plain", "utf-8"))
+        # Attach plain-text body
+        if message.body_text:
+            mime.attach(MIMEText(message.body_text, "plain", "utf-8"))
 
-        # Optionally attach HTML
+        # Attach HTML body
         if message.body_html:
-            msg.attach(MIMEText(message.body_html, "html", "utf-8"))
+            mime.attach(MIMEText(message.body_html, "html", "utf-8"))
 
-        return msg
+        return mime
 
-    def _send_via_smtp(self, mime_msg: MIMEMultipart, all_recipients: List[str]) -> SendResult:
-        """Open an SMTP connection and send a MIME message.
+    def _deliver(self, message: EmailMessage) -> DeliveryResult:
+        """Send an email via SMTP.
 
         Parameters
         ----------
-        mime_msg:
-            Constructed MIME message.
-        all_recipients:
-            Complete list of recipients (to + cc + bcc).
+        message:
+            The message to deliver.
 
         Returns
         -------
-        SendResult
-            Outcome of the send operation.
+        DeliveryResult
+            Delivery status and metadata.
         """
-        result = SendResult(sent_at=datetime.now(timezone.utc))
-        context = ssl.create_default_context()
+        all_recipients = message.to + message.cc + message.bcc
+        if not all_recipients:
+            return DeliveryResult(
+                success=False, error="No recipients specified"
+            )
+
+        mime = self._build_mime(message)
 
         try:
             if self._smtp_port == 465:
-                # Implicit TLS
+                # Direct SSL connection
                 server = smtplib.SMTP_SSL(
-                    self._smtp_host,
-                    self._smtp_port,
-                    timeout=self._timeout,
-                    context=context,
+                    self._smtp_host, self._smtp_port, timeout=self._timeout
                 )
             else:
-                # STARTTLS
                 server = smtplib.SMTP(
-                    self._smtp_host,
-                    self._smtp_port,
-                    timeout=self._timeout,
+                    self._smtp_host, self._smtp_port, timeout=self._timeout
                 )
-                server.ehlo()
                 if self._use_tls:
-                    server.starttls(context=context)
-                    server.ehlo()
+                    server.starttls()
 
-            # Authenticate if credentials are provided
             if self._username and self._password:
                 server.login(self._username, self._password)
 
-            # Send the message
             rejected = server.sendmail(
-                from_addr=mime_msg["From"],
-                to_addrs=all_recipients,
-                msg=mime_msg.as_string(),
+                self._from_address,
+                all_recipients,
+                mime.as_string(),
             )
-
             server.quit()
 
-            # Determine accepted/rejected recipients
-            rejected_addrs = set(rejected.keys()) if rejected else set()
-            accepted_addrs = [r for r in all_recipients if r not in rejected_addrs]
-
-            result.success = len(accepted_addrs) > 0
-            result.recipients_accepted = accepted_addrs
-            result.recipients_rejected = {
-                addr: str(err) for addr, err in (rejected or {}).items()
-            }
-            result.message_id = mime_msg.get("Message-ID", "")
-
             self._send_count += 1
+            message.sent_at = datetime.now(timezone.utc)
 
-        except smtplib.SMTPAuthenticationError as exc:
-            result.error = f"SMTP authentication failed: {exc}"
-            self._error_count += 1
-            logger.error("SMTP auth error: %s", exc)
+            return DeliveryResult(
+                success=True,
+                recipients_accepted=len(all_recipients) - len(rejected),
+                recipients_rejected=len(rejected),
+                sent_at=message.sent_at,
+            )
 
-        except smtplib.SMTPException as exc:
-            result.error = f"SMTP error: {exc}"
-            self._error_count += 1
-            logger.error("SMTP error: %s", exc)
-
-        except (ConnectionError, TimeoutError, OSError) as exc:
-            result.error = f"Connection error: {exc}"
-            self._error_count += 1
-            logger.error("SMTP connection error: %s", exc)
-
-        return result
+        except Exception as exc:
+            self.logger.error(
+                "Email delivery failed: %s", str(exc), exc_info=True
+            )
+            return DeliveryResult(
+                success=False,
+                error=str(exc),
+            )
 
     # ------------------------------------------------------------------
-    # Public API methods
+    # Public API
     # ------------------------------------------------------------------
 
-    async def send_alert(
+    def send_alert(
         self,
-        to: str | List[str],
+        recipients: List[str],
         subject: str,
-        body: str,
+        alert_message: str,
         *,
         severity: str = "warning",
-        html_body: str = "",
-    ) -> SendResult:
-        """Send a system alert email.
-
-        Alert emails are prefixed with a severity tag in the subject line
-        and include a timestamp in the body for quick triage.
+        site_id: str = "",
+    ) -> DeliveryResult:
+        """Send an alert notification email.
 
         Parameters
         ----------
-        to:
-            Recipient address or list of addresses.
+        recipients:
+            Email addresses to send the alert to.
         subject:
             Alert subject line.
-        body:
-            Plain-text alert body.
+        alert_message:
+            Alert body text describing the issue.
         severity:
             Alert severity level (``"info"``, ``"warning"``, ``"critical"``).
-            Prepended to the subject as ``[SEVERITY]``.
-        html_body:
-            Optional HTML body.
+        site_id:
+            Identifier of the affected site (if applicable).
 
         Returns
         -------
-        SendResult
-            Outcome of the send operation.
+        DeliveryResult
+            Delivery status.
         """
-        recipients = [to] if isinstance(to, str) else list(to)
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        severity_emoji = {"info": "[INFO]", "warning": "[WARNING]", "critical": "[CRITICAL]"}
+        prefix = severity_emoji.get(severity, "[ALERT]")
 
-        prefixed_subject = f"[{severity.upper()}] {subject}"
-        enriched_body = (
-            f"OpenClaw System Alert\n"
-            f"Severity: {severity.upper()}\n"
-            f"Time: {timestamp}\n"
-            f"{'=' * 50}\n\n"
-            f"{body}"
+        body_text = (
+            f"{prefix} Alert for {site_id or 'system'}\n\n"
+            f"{alert_message}\n\n"
+            f"Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
+            f"Severity: {severity}\n"
+        )
+
+        body_html = (
+            f"<h2>{prefix} Alert</h2>"
+            f"<p><strong>Site:</strong> {site_id or 'system'}</p>"
+            f"<p><strong>Severity:</strong> {severity}</p>"
+            f"<p>{alert_message}</p>"
+            f"<p><em>{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}</em></p>"
         )
 
         message = EmailMessage(
             to=recipients,
-            subject=prefixed_subject,
-            body_text=enriched_body,
-            body_html=html_body,
-            headers={"X-OpenClaw-Alert-Severity": severity.upper()},
+            subject=f"{prefix} {subject}",
+            body_text=body_text,
+            body_html=body_html,
         )
 
         log_event(
-            logger,
-            "email.send_alert",
-            severity=severity,
-            recipient_count=len(recipients),
-            subject=prefixed_subject,
+            logger, "mailbox.send_alert",
+            recipients=len(recipients), severity=severity, site_id=site_id,
         )
 
-        mime_msg = self._build_mime_message(message)
-        return self._send_via_smtp(mime_msg, recipients)
+        return self._deliver(message)
 
-    async def send_report(
+    def send_report(
         self,
-        to: str | List[str],
+        recipients: List[str],
         subject: str,
-        body: str,
+        report_html: str,
         *,
-        report_type: str = "daily",
-        html_body: str = "",
-        cc: Optional[List[str]] = None,
-    ) -> SendResult:
-        """Send a periodic report email.
-
-        Report emails include a report-type header and are formatted for
-        readability with clear section breaks.
+        report_text: str = "",
+        period: str = "daily",
+    ) -> DeliveryResult:
+        """Send a performance report email.
 
         Parameters
         ----------
-        to:
-            Recipient address or list of addresses.
+        recipients:
+            Email addresses to send the report to.
         subject:
             Report subject line.
-        body:
-            Plain-text report body.
-        report_type:
-            Report classification (``"daily"``, ``"weekly"``, ``"monthly"``,
-            ``"commission"``, ``"performance"``).
-        html_body:
-            Optional HTML body with formatted tables/charts.
-        cc:
-            Optional CC recipients.
+        report_html:
+            HTML-formatted report body.
+        report_text:
+            Plain-text fallback of the report.
+        period:
+            Report period label for logging.
 
         Returns
         -------
-        SendResult
-            Outcome of the send operation.
+        DeliveryResult
+            Delivery status.
         """
-        recipients = [to] if isinstance(to, str) else list(to)
-        cc_list = cc or []
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-
-        prefixed_subject = f"[Report: {report_type.title()}] {subject}"
-        enriched_body = (
-            f"OpenClaw {report_type.title()} Report\n"
-            f"Generated: {timestamp}\n"
-            f"{'=' * 50}\n\n"
-            f"{body}\n\n"
-            f"{'=' * 50}\n"
-            f"This is an automated report from the OpenClaw system.\n"
-        )
-
         message = EmailMessage(
             to=recipients,
-            subject=prefixed_subject,
-            body_text=enriched_body,
-            body_html=html_body,
-            cc=cc_list,
-            headers={
-                "X-OpenClaw-Report-Type": report_type,
-            },
+            subject=subject,
+            body_text=report_text or f"Please view this report in an HTML-capable email client.",
+            body_html=report_html,
         )
 
         log_event(
-            logger,
-            "email.send_report",
-            report_type=report_type,
-            recipient_count=len(recipients),
-            subject=prefixed_subject,
+            logger, "mailbox.send_report",
+            recipients=len(recipients), period=period,
         )
 
-        mime_msg = self._build_mime_message(message)
-        all_recipients = recipients + cc_list
-        return self._send_via_smtp(mime_msg, all_recipients)
+        return self._deliver(message)
 
-    async def send_notification(
+    def send_notification(
         self,
-        to: str | List[str],
+        recipients: List[str],
         subject: str,
         body: str,
         *,
-        category: str = "system",
-        html_body: str = "",
-    ) -> SendResult:
-        """Send a general system notification email.
-
-        Notifications are less urgent than alerts and are used for
-        informational messages like successful deployments, new offers
-        discovered, or configuration changes.
+        body_html: str = "",
+    ) -> DeliveryResult:
+        """Send a general notification email.
 
         Parameters
         ----------
-        to:
-            Recipient address or list of addresses.
+        recipients:
+            Email addresses to send to.
         subject:
-            Notification subject line.
+            Email subject line.
         body:
-            Plain-text notification body.
-        category:
-            Notification category for filtering (``"system"``,
-            ``"deployment"``, ``"offers"``, ``"content"``).
-        html_body:
-            Optional HTML body.
+            Plain-text message body.
+        body_html:
+            Optional HTML version of the body.
 
         Returns
         -------
-        SendResult
-            Outcome of the send operation.
+        DeliveryResult
+            Delivery status.
         """
-        recipients = [to] if isinstance(to, str) else list(to)
-
         message = EmailMessage(
             to=recipients,
-            subject=f"[OpenClaw] {subject}",
+            subject=subject,
             body_text=body,
-            body_html=html_body,
-            headers={
-                "X-OpenClaw-Notification-Category": category,
-            },
+            body_html=body_html,
         )
 
         log_event(
-            logger,
-            "email.send_notification",
-            category=category,
-            recipient_count=len(recipients),
-            subject=subject,
+            logger, "mailbox.send_notification",
+            recipients=len(recipients),
         )
 
-        mime_msg = self._build_mime_message(message)
-        return self._send_via_smtp(mime_msg, recipients)
+        return self._deliver(message)
 
     # ------------------------------------------------------------------
     # Introspection
@@ -520,18 +432,11 @@ class MailboxManager:
 
     @property
     def send_count(self) -> int:
-        """Return the total number of successfully sent emails."""
+        """Return the total number of emails successfully sent."""
         return self._send_count
-
-    @property
-    def error_count(self) -> int:
-        """Return the total number of send failures."""
-        return self._error_count
 
     def __repr__(self) -> str:
         return (
             f"MailboxManager(host={self._smtp_host!r}, "
-            f"port={self._smtp_port}, "
-            f"from={self._from_address!r}, "
-            f"sent={self._send_count}, errors={self._error_count})"
+            f"port={self._smtp_port}, sent={self._send_count})"
         )
