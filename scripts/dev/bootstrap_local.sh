@@ -1,56 +1,42 @@
 #!/usr/bin/env bash
-# bootstrap_local.sh — Set up local dev environment for OpenClaw
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$REPO_ROOT"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT_DIR"
 
-echo "=== OpenClaw Local Bootstrap ==="
+echo "== OpenClaw: Local Bootstrap =="
 
-# 1) Check Python version
-PYTHON="${PYTHON:-python3}"
-REQUIRED_VERSION="3.11"
-PYTHON_VERSION=$($PYTHON --version 2>&1 | awk '{print $2}')
-echo "Python version: $PYTHON_VERSION (required: >= $REQUIRED_VERSION)"
-
-# 2) Create virtual environment if not present
-if [ ! -d ".venv" ]; then
-    echo "Creating virtual environment..."
-    $PYTHON -m venv .venv
+# 1) Ensure .env exists
+if [[ ! -f ".env" ]]; then
+  echo "No .env found. Copying from .env.example..."
+  cp .env.example .env
+  echo "Created .env (placeholders). Edit it before SAFE_STAGING/PRODUCTION."
 fi
-source .venv/bin/activate
-echo "Virtual environment activated: $(which python)"
 
-# 3) Install dependencies
-echo "Installing dependencies..."
-pip install --upgrade pip -q
-pip install -r requirements.txt -q
+# 2) Create local data dirs
+mkdir -p ./data/exports ./data/logs ./data/db
 
-# 4) Copy .env if not present
-if [ ! -f ".env" ]; then
-    if [ -f "ops/env/example.env" ]; then
-        cp ops/env/example.env .env
-        echo "Copied ops/env/example.env -> .env (fill in your secrets)"
-    elif [ -f ".env.example" ]; then
-        cp .env.example .env
-        echo "Copied .env.example -> .env (fill in your secrets)"
-    else
-        echo "WARNING: No .env template found. Create .env manually."
-    fi
+# 3) Create venv if missing
+if [[ ! -d ".venv" ]]; then
+  echo "Creating venv..."
+  python3 -m venv .venv
+fi
+
+# 4) Install deps (expects Claude Code to create pyproject.toml)
+echo "Upgrading pip..."
+./.venv/bin/pip install --upgrade pip >/dev/null
+
+if [[ -f "pyproject.toml" ]]; then
+  echo "Installing dependencies..."
+  ./.venv/bin/pip install -e .
 else
-    echo ".env already exists, skipping."
+  echo "pyproject.toml not found yet."
+  echo "That's OK if you haven't generated the Python scaffold with Claude Code yet."
+  echo "Once it exists, re-run: bash scripts/dev/bootstrap_local.sh"
 fi
 
-# 5) Create runtime directories
-mkdir -p data data/exports data/backups logs tmp
-echo "Runtime directories created."
-
-# 6) Initialize database
-echo "Initializing database..."
-python -m src.cli init
-
+echo "Bootstrap complete."
 echo ""
-echo "=== Bootstrap Complete ==="
-echo "To activate:  source .venv/bin/activate"
-echo "To run:       python -m src.cli run --dry-run --ticks 2"
-echo "To check:     python -m src.cli status"
+echo "Next:"
+echo "  1) Generate code scaffold with Claude Code (if not done)"
+echo "  2) Run DRY_RUN: bash scripts/dev/run_local_dry.sh"

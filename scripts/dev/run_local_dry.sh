@@ -1,20 +1,28 @@
 #!/usr/bin/env bash
-# run_local_dry.sh — Run OpenClaw in DRY_RUN mode locally
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$REPO_ROOT"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT_DIR"
 
-# Activate venv if present
-if [ -f ".venv/bin/activate" ]; then
-    source .venv/bin/activate
+# Load env if present
+if [[ -f ".env" ]]; then
+  set -a
+  source .env
+  set +a
 fi
 
-TICKS="${1:-3}"
-INTERVAL="${2:-10}"
+mkdir -p ./data/exports ./data/logs ./data/db
 
-echo "=== OpenClaw DRY_RUN (local) ==="
-echo "Ticks: $TICKS | Interval: ${INTERVAL}s"
+echo "== OpenClaw: DRY_RUN =="
+
+export OPENCLAW_MODE="DRY_RUN"
+export ALLOW_PUBLISHING="false"
+export STAGING_ONLY="true"
+
+# Run pipeline (Claude Code will implement flags/entrypoint)
+./.venv/bin/python -m src.main --dry-run
+
 echo ""
-
-python -m src.cli run --dry-run --ticks "$TICKS" --interval "$INTERVAL"
+echo "DRY_RUN complete."
+echo "Check outputs in: ./data/exports"
+echo "Check logs in:    ./data/logs"
