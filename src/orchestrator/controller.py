@@ -28,24 +28,24 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set
 
-from core.constants import (
+from src.core.constants import (
     DEFAULT_COOLDOWN_MINUTES,
     DEFAULT_MAX_POSTS_PER_DAY,
     RiskLevel,
     TaskStatus,
 )
-from core.errors import (
+from src.core.errors import (
     AgentNotRegisteredError,
     KillSwitchActiveError,
     OrchestratorError,
 )
-from core.logger import get_logger, log_event
+from src.core.logger import get_logger, log_event
 
-from orchestrator.state_machine import StateMachine, SystemState
+from src.orchestrator.state_machine import StateMachine, SystemState
 
 # Re-import so callers can use ``from orchestrator.controller import BaseAgent``
 # without touching the agents package directly.
-from agents.base_agent import BaseAgent, RunResult
+from src.agents.base_agent import BaseAgent, RunResult
 
 
 # ---------------------------------------------------------------------------

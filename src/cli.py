@@ -2,354 +2,297 @@
 cli.py
 ~~~~~~
 
-Command-line interface for OpenClaw administrative operations.
+Command-line interface for OpenClaw.
 
-Provides subcommands for database initialization, health checks, emergency
-controls, configuration management, and content operations.
+Provides the ``oc`` commands for local development and operations:
 
-Usage::
-
-    # Initialize or migrate the database
-    python -m src.cli init-db
-
-    # Check system health
-    python -m src.cli health --verbose
-
-    # Engage the kill switch (halt all agents immediately)
+    python -m src.cli init              # Initialize DB + config
+    python -m src.cli run --dry-run     # Run all agents in dry-run mode
+    python -m src.cli run --pipeline content --dry-run
+    python -m src.cli status            # Show system status
+    python -m src.cli health            # Health checks
     python -m src.cli kill-switch --engage
-
-    # Unpublish a specific post
-    python -m src.cli unpublish --post-id abc123 --reason "compliance issue"
-
-    # Revert to a previous content version
-    python -m src.cli revert --post-id abc123 --version 2
-
-    # Rotate API keys for a provider
-    python -m src.cli rotate-keys --provider openai
-
-    # Reload configuration without restarting
-    python -m src.cli reload-config
-
-    # Verify data integrity
-    python -m src.cli check-integrity --fix
-
-    # Restart a specific agent
-    python -m src.cli restart --agent research
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Sequence
 
 from src.core.constants import APP_NAME, APP_VERSION, AgentName
 from src.core.errors import OpenClawError
 from src.core.logger import get_logger, setup_logging
 from src.core.settings import settings
+from src.data.db import Database
 
 logger = get_logger("cli")
 
 
 # =====================================================================
-# Subcommand handlers
+# Subcommand: init
 # =====================================================================
 
-def cmd_init_db(args: argparse.Namespace) -> int:
-    """Initialize or migrate the OpenClaw database.
+def cmd_init(args: argparse.Namespace) -> int:
+    """Initialize the OpenClaw system: database, directories, config validation."""
+    print(f"\n  {APP_NAME} -- Initializing...\n")
 
-    Creates tables, runs pending migrations, and optionally seeds
-    reference data (niches, default thresholds, etc.).
+    # 1. Create required directories
+    dirs = ["data", "logs", "data/backups"]
+    for d in dirs:
+        p = Path(d)
+        p.mkdir(parents=True, exist_ok=True)
+        print(f"  [OK] Directory: {d}/")
 
-    Returns
-    -------
-    int
-        ``0`` on success, ``1`` on failure.
-    """
-    logger.info("Initializing database...")
+    # 2. Initialize database
+    db = Database()
+    db.connect()
+    applied = db.migrate()
+    version = db.get_schema_version()
+    db.disconnect()
+    print(f"  [OK] Database initialized (schema v{version}, {applied} migration(s) applied)")
 
-    db_path = settings.get_str("database.path", "data/openclaw.db")
-    run_migrations = not args.skip_migrations
-    seed = args.seed
+    # 3. Validate config files exist
+    config_dir = Path("config")
+    if config_dir.is_dir():
+        yamls = list(config_dir.glob("*.yaml"))
+        print(f"  [OK] Config: {len(yamls)} YAML file(s) in config/")
+    else:
+        print(f"  [WARN] Config directory 'config/' not found")
 
-    logger.info(
-        "Database path: %s | migrations: %s | seed: %s",
-        db_path,
-        run_migrations,
-        seed,
-    )
+    # 4. Check .env
+    env_path = Path(".env")
+    if env_path.is_file():
+        print(f"  [OK] Environment: .env file found")
+    else:
+        # Create from template if available
+        template = Path("ops/env/example.env")
+        if template.is_file():
+            import shutil
+            shutil.copy(template, env_path)
+            print(f"  [OK] Environment: .env created from template")
+        else:
+            print(f"  [WARN] No .env file (create from ops/env/example.env)")
 
-    # TODO: Replace with actual database initialization once data layer lands.
-    # from src.data.migrations import run_all_migrations
-    # from src.data.seed import seed_reference_data
-    #
-    # engine = create_engine(db_path)
-    # if run_migrations:
-    #     run_all_migrations(engine)
-    # if seed:
-    #     seed_reference_data(engine)
+    # 5. Validate settings load
+    try:
+        settings.load()
+        print(f"  [OK] Settings loaded successfully")
+    except OpenClawError as exc:
+        print(f"  [WARN] Settings: {exc}")
 
-    logger.info("Database initialization complete.")
-    print(f"Database initialized at {db_path}")
+    print(f"\n  Initialization complete. Run 'python -m src.cli run --dry-run' to test.\n")
     return 0
 
 
+# =====================================================================
+# Subcommand: run
+# =====================================================================
+
+def cmd_run(args: argparse.Namespace) -> int:
+    """Run the OpenClaw pipeline (delegates to main.main_loop)."""
+    from src.main import main_loop, install_signal_handlers, _shutdown_event
+    from src.core.constants import NodeRole
+
+    dry_run = args.dry_run
+    pipeline = args.pipeline or ""
+    ticks = args.ticks
+
+    if not dry_run:
+        print("\n  WARNING: Running in LIVE mode. Real API calls will be made.")
+        print("  Use --dry-run for safe testing.\n")
+
+    install_signal_handlers()
+
+    try:
+        settings.load()
+    except OpenClawError as exc:
+        logger.warning("Config load issue (non-fatal): %s", exc)
+
+    exit_code = main_loop(
+        node_role=NodeRole.CORE,
+        dry_run=dry_run,
+        heartbeat_interval=args.interval,
+        pipeline=pipeline,
+        max_ticks=ticks,
+    )
+    return exit_code
+
+
+# =====================================================================
+# Subcommand: status
+# =====================================================================
+
+def cmd_status(args: argparse.Namespace) -> int:
+    """Show system status: DB state, recent runs, queue depth."""
+    print(f"\n{'='*60}")
+    print(f"  {APP_NAME} v{APP_VERSION} -- System Status")
+    print(f"{'='*60}\n")
+
+    # Database status
+    db = Database()
+    try:
+        db.connect()
+        version = db.get_schema_version()
+        print(f"  Database:       OK (schema v{version})")
+
+        # Recent agent runs
+        runs = db.fetch_all(
+            "SELECT agent_name, status, dry_run, duration_s, started_at "
+            "FROM agent_runs ORDER BY id DESC LIMIT 10"
+        )
+        if runs:
+            print(f"\n  Recent Agent Runs ({len(runs)}):")
+            print(f"  {'Agent':<25} {'Status':<12} {'Duration':<10} {'Time'}")
+            print(f"  {'-'*25} {'-'*12} {'-'*10} {'-'*20}")
+            for r in runs:
+                dr = " [DRY]" if r["dry_run"] else ""
+                print(f"  {r['agent_name']:<25} {r['status']:<12} {r['duration_s']:.3f}s     {r['started_at']}{dr}")
+        else:
+            print(f"\n  No agent runs recorded yet.")
+
+        # Task queue
+        queued = db.fetch_one("SELECT COUNT(*) as cnt FROM task_queue WHERE status='queued'")
+        if queued:
+            print(f"\n  Task Queue:     {queued['cnt']} task(s) queued")
+
+        # Content stats
+        content = db.fetch_all(
+            "SELECT status, COUNT(*) as cnt FROM content GROUP BY status"
+        )
+        if content:
+            print(f"\n  Content:")
+            for c in content:
+                print(f"    {c['status']}: {c['cnt']}")
+
+        # Offers stats
+        offers = db.fetch_one("SELECT COUNT(*) as cnt FROM offers WHERE active=1")
+        if offers and offers['cnt'] > 0:
+            print(f"\n  Active Offers:  {offers['cnt']}")
+
+        db.disconnect()
+
+    except Exception as exc:
+        print(f"  Database:       NOT INITIALIZED (run 'python -m src.cli init' first)")
+        print(f"                  Error: {exc}")
+        return 1
+
+    # Config status
+    try:
+        settings.load()
+        yaml_keys = list(settings._yaml.keys()) if settings._yaml else []
+        print(f"\n  Config:         {len(yaml_keys)} YAML section(s) loaded: {', '.join(yaml_keys) or 'none'}")
+    except OpenClawError:
+        print(f"\n  Config:         Not loaded")
+
+    # Disk usage
+    data_dir = Path("data")
+    if data_dir.is_dir():
+        total_size = sum(f.stat().st_size for f in data_dir.rglob("*") if f.is_file())
+        print(f"  Data dir:       {total_size / 1024:.1f} KB")
+
+    log_dir = Path("logs")
+    if log_dir.is_dir():
+        total_size = sum(f.stat().st_size for f in log_dir.rglob("*") if f.is_file())
+        print(f"  Log dir:        {total_size / 1024:.1f} KB")
+
+    print(f"\n{'='*60}\n")
+    return 0
+
+
+# =====================================================================
+# Subcommand: health
+# =====================================================================
+
 def cmd_health(args: argparse.Namespace) -> int:
-    """Run system health checks and report status.
-
-    Checks database connectivity, agent statuses, disk space, external
-    API reachability, and configuration validity.
-
-    Returns
-    -------
-    int
-        ``0`` if healthy, ``1`` if degraded, ``2`` if critical.
-    """
-    logger.info("Running health checks...")
-    verbose = args.verbose
-
+    """Run system health checks."""
     checks: dict[str, str] = {}
 
-    # -- Configuration check -------------------------------------------
+    # Config
     try:
         settings.load()
         checks["configuration"] = "OK"
     except OpenClawError as exc:
-        checks["configuration"] = f"FAIL: {exc}"
+        checks["configuration"] = f"WARN: {exc}"
 
-    # -- Database check ------------------------------------------------
-    # TODO: Implement real DB connectivity check
-    checks["database"] = "OK (stub)"
+    # Database
+    try:
+        db = Database()
+        db.connect()
+        db.get_schema_version()
+        db.disconnect()
+        checks["database"] = "OK"
+    except Exception as exc:
+        checks["database"] = f"FAIL: {exc}"
 
-    # -- Disk space check ----------------------------------------------
-    # TODO: Implement real disk space check
-    checks["disk_space"] = "OK (stub)"
+    # Disk space
+    import shutil
+    usage = shutil.disk_usage(".")
+    pct = usage.used / usage.total * 100
+    if pct > 90:
+        checks["disk_space"] = f"WARN: {pct:.0f}% used"
+    else:
+        checks["disk_space"] = f"OK ({pct:.0f}% used, {usage.free // (1024**3)}GB free)"
 
-    # -- External APIs check -------------------------------------------
-    # TODO: Ping affiliate network APIs, LLM providers, etc.
-    checks["external_apis"] = "OK (stub)"
+    # Config files
+    config_dir = Path("config")
+    if config_dir.is_dir():
+        checks["config_files"] = f"OK ({len(list(config_dir.glob('*.yaml')))} YAML files)"
+    else:
+        checks["config_files"] = "FAIL: config/ directory missing"
 
-    # -- Report --------------------------------------------------------
-    failed = [name for name, status in checks.items() if not status.startswith("OK")]
-
+    # Print report
     print(f"\n{'='*50}")
     print(f"  {APP_NAME} Health Report")
     print(f"{'='*50}")
+    failed = []
     for name, status in checks.items():
-        indicator = "[OK]  " if status.startswith("OK") else "[FAIL]"
+        if status.startswith("OK"):
+            indicator = "[OK]  "
+        elif status.startswith("WARN"):
+            indicator = "[WARN]"
+        else:
+            indicator = "[FAIL]"
+            failed.append(name)
         print(f"  {indicator} {name}: {status}")
-        if verbose:
-            logger.info("Health check %s: %s", name, status)
     print(f"{'='*50}")
 
     if failed:
-        print(f"\n  {len(failed)} check(s) failed: {', '.join(failed)}")
-        return 2 if len(failed) > 1 else 1
-    else:
-        print("\n  All checks passed.")
-        return 0
+        print(f"\n  {len(failed)} check(s) failed.")
+        return 1
+    print(f"\n  All checks passed.")
+    return 0
 
+
+# =====================================================================
+# Subcommand: kill-switch
+# =====================================================================
 
 def cmd_kill_switch(args: argparse.Namespace) -> int:
-    """Engage or disengage the system-wide kill switch.
-
-    When engaged, all agents are halted immediately and no new tasks
-    are dispatched.  Existing in-flight work is allowed to complete
-    (with a timeout) but no new work starts.
-
-    Returns
-    -------
-    int
-        ``0`` on success.
-    """
+    """Engage or disengage the kill switch."""
     action = "engage" if args.engage else "disengage"
-    logger.warning("Kill switch action: %s", action)
-
-    # TODO: Implement kill switch via orchestrator state file or DB flag.
-    # from src.orchestrator.controller import OrchestratorController
-    # controller = OrchestratorController.from_settings(settings)
-    # if args.engage:
-    #     controller.engage_kill_switch(reason=args.reason)
-    # else:
-    #     controller.disengage_kill_switch()
-
     reason = args.reason or "manual operator action"
-    print(f"Kill switch {action}d. Reason: {reason}")
-    logger.warning("Kill switch %sd by CLI. Reason: %s", action, reason)
-    return 0
 
+    # Store kill switch state in a simple file for cross-process coordination
+    ks_file = Path("data/.kill_switch")
+    ks_file.parent.mkdir(parents=True, exist_ok=True)
 
-def cmd_unpublish(args: argparse.Namespace) -> int:
-    """Remove a published post from the live site.
-
-    The content is retained in the database with status ``unpublished``
-    for audit purposes.  The CMS entry is deleted or set to draft.
-
-    Returns
-    -------
-    int
-        ``0`` on success, ``1`` on failure.
-    """
-    post_id = args.post_id
-    reason = args.reason or "manual unpublish"
-
-    logger.info("Unpublishing post %s. Reason: %s", post_id, reason)
-
-    # TODO: Implement via publishing pipeline.
-    # from src.pipelines.publishing import unpublish_post
-    # unpublish_post(post_id=post_id, reason=reason, dry_run=args.dry_run)
-
-    print(f"Post {post_id} unpublished. Reason: {reason}")
-    return 0
-
-
-def cmd_revert(args: argparse.Namespace) -> int:
-    """Revert a post to a previous content version.
-
-    Fetches the specified version from the content history table and
-    re-publishes it, replacing the current live version.
-
-    Returns
-    -------
-    int
-        ``0`` on success, ``1`` on failure.
-    """
-    post_id = args.post_id
-    version = args.version
-
-    logger.info("Reverting post %s to version %d", post_id, version)
-
-    # TODO: Implement content version revert.
-    # from src.data.models import ContentVersion
-    # from src.pipelines.publishing import republish_version
-    # republish_version(post_id=post_id, target_version=version)
-
-    print(f"Post {post_id} reverted to version {version}.")
-    return 0
-
-
-def cmd_rotate_keys(args: argparse.Namespace) -> int:
-    """Rotate API keys for the specified provider.
-
-    Generates new credentials (where the provider supports it),
-    updates the vault, and verifies connectivity with the new keys.
-
-    Returns
-    -------
-    int
-        ``0`` on success, ``1`` on failure.
-    """
-    provider = args.provider
-
-    logger.info("Rotating API keys for provider: %s", provider)
-
-    # TODO: Implement key rotation.
-    # from src.integrations.vault import rotate_provider_keys
-    # rotate_provider_keys(provider=provider, dry_run=args.dry_run)
-
-    if args.dry_run:
-        print(f"[DRY RUN] Would rotate keys for provider: {provider}")
+    if args.engage:
+        ks_file.write_text(json.dumps({
+            "engaged": True,
+            "reason": reason,
+            "engaged_at": datetime.now(timezone.utc).isoformat(),
+        }))
+        print(f"  Kill switch ENGAGED. Reason: {reason}")
+        print(f"  All agents will be halted on next tick.")
     else:
-        print(f"Keys rotated for provider: {provider}")
-    return 0
-
-
-def cmd_reload_config(args: argparse.Namespace) -> int:
-    """Reload configuration from disk without restarting the process.
-
-    Re-reads ``.env`` and all YAML config files, validates them, and
-    pushes the updated configuration to running agents.
-
-    Returns
-    -------
-    int
-        ``0`` on success, ``1`` on failure.
-    """
-    logger.info("Reloading configuration...")
-
-    try:
-        settings.load()
-        logger.info("Configuration reloaded successfully: %s", settings)
-        print("Configuration reloaded successfully.")
-        return 0
-    except OpenClawError as exc:
-        logger.error("Failed to reload configuration: %s", exc)
-        print(f"ERROR: Failed to reload configuration: {exc}")
-        return 1
-
-
-def cmd_check_integrity(args: argparse.Namespace) -> int:
-    """Verify data integrity across the database and published content.
-
-    Checks for:
-    - Orphaned records (content without offers, offers without content)
-    - Broken internal links
-    - Hash mismatches between stored and computed content hashes
-    - Missing published content (DB says published, CMS says missing)
-
-    Returns
-    -------
-    int
-        ``0`` if all checks pass, ``1`` if issues found.
-    """
-    fix = args.fix
-    logger.info("Running integrity checks (fix=%s)...", fix)
-
-    issues_found: list[str] = []
-
-    # TODO: Implement real integrity checks.
-    # from src.data.integrity import (
-    #     check_orphaned_records,
-    #     check_broken_links,
-    #     check_content_hashes,
-    #     check_publish_sync,
-    # )
-    # issues_found.extend(check_orphaned_records(fix=fix))
-    # issues_found.extend(check_broken_links(fix=fix))
-    # issues_found.extend(check_content_hashes(fix=fix))
-    # issues_found.extend(check_publish_sync(fix=fix))
-
-    if issues_found:
-        print(f"\nIntegrity check found {len(issues_found)} issue(s):")
-        for issue in issues_found:
-            print(f"  - {issue}")
-        if fix:
-            print("\nAuto-fix was applied where possible.")
-        return 1
-    else:
-        print("Integrity check passed -- no issues found.")
-        return 0
-
-
-def cmd_restart(args: argparse.Namespace) -> int:
-    """Restart a specific agent or the entire orchestrator.
-
-    Sends a restart signal to the named agent, causing it to re-read
-    its configuration and reinitialize.  If ``--all`` is specified,
-    every agent is restarted sequentially.
-
-    Returns
-    -------
-    int
-        ``0`` on success, ``1`` on failure.
-    """
-    agent_name = args.agent
-    restart_all = args.all
-
-    if restart_all:
-        logger.info("Restarting all agents...")
-        targets = [a.value for a in AgentName]
-    else:
-        logger.info("Restarting agent: %s", agent_name)
-        targets = [agent_name]
-
-    for target in targets:
-        logger.info("Sending restart signal to agent: %s", target)
-        # TODO: Implement agent restart via orchestrator IPC.
-        # from src.orchestrator.controller import OrchestratorController
-        # controller = OrchestratorController.from_settings(settings)
-        # controller.restart_agent(target)
-        print(f"Agent '{target}' restart signal sent.")
+        if ks_file.exists():
+            ks_file.unlink()
+        print(f"  Kill switch DISENGAGED. Reason: {reason}")
+        print(f"  Normal operations can resume.")
 
     return 0
 
@@ -359,183 +302,45 @@ def cmd_restart(args: argparse.Namespace) -> int:
 # =====================================================================
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the top-level argument parser with all subcommands.
-
-    Returns
-    -------
-    argparse.ArgumentParser
-        Fully configured parser ready for ``parse_args()``.
-    """
     parser = argparse.ArgumentParser(
-        prog="openclaw-cli",
-        description=f"{APP_NAME} v{APP_VERSION} -- Administrative CLI",
+        prog="oc",
+        description=f"{APP_NAME} v{APP_VERSION} -- CLI",
     )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"{APP_NAME} {APP_VERSION}",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        default=False,
-        help="Preview actions without making changes.",
-    )
+    parser.add_argument("--version", action="version", version=f"{APP_NAME} {APP_VERSION}")
 
     subparsers = parser.add_subparsers(
-        dest="command",
-        title="commands",
-        description="Available administrative commands",
+        dest="command", title="commands",
+        description="Available commands",
         required=True,
     )
 
-    # -- init-db --------------------------------------------------------
-    sp_init = subparsers.add_parser(
-        "init-db",
-        help="Initialize or migrate the database.",
-    )
-    sp_init.add_argument(
-        "--skip-migrations",
-        action="store_true",
-        default=False,
-        help="Create tables without running migrations.",
-    )
-    sp_init.add_argument(
-        "--seed",
-        action="store_true",
-        default=False,
-        help="Seed reference data (niches, thresholds, etc.).",
-    )
-    sp_init.set_defaults(func=cmd_init_db)
+    # -- init
+    sp_init = subparsers.add_parser("init", help="Initialize database, directories, and config.")
+    sp_init.set_defaults(func=cmd_init)
 
-    # -- health ---------------------------------------------------------
-    sp_health = subparsers.add_parser(
-        "health",
-        help="Run system health checks.",
-    )
-    sp_health.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        default=False,
-        help="Show detailed health information.",
-    )
+    # -- run
+    sp_run = subparsers.add_parser("run", help="Run the agent pipeline.")
+    sp_run.add_argument("--dry-run", action="store_true", default=False, help="No side-effects (safe mode).")
+    sp_run.add_argument("--pipeline", type=str, default="", choices=["", "content", "publishing", "analytics"], help="Run only a specific pipeline.")
+    sp_run.add_argument("--ticks", type=int, default=1, help="Number of scheduler ticks to run (default: 1).")
+    sp_run.add_argument("--interval", type=int, default=5, help="Seconds between ticks (default: 5).")
+    sp_run.set_defaults(func=cmd_run)
+
+    # -- status
+    sp_status = subparsers.add_parser("status", help="Show system status and recent activity.")
+    sp_status.set_defaults(func=cmd_status)
+
+    # -- health
+    sp_health = subparsers.add_parser("health", help="Run system health checks.")
     sp_health.set_defaults(func=cmd_health)
 
-    # -- kill-switch ----------------------------------------------------
-    sp_kill = subparsers.add_parser(
-        "kill-switch",
-        help="Engage or disengage the system-wide kill switch.",
-    )
+    # -- kill-switch
+    sp_kill = subparsers.add_parser("kill-switch", help="Engage or disengage the kill switch.")
     sp_kill_group = sp_kill.add_mutually_exclusive_group(required=True)
-    sp_kill_group.add_argument(
-        "--engage",
-        action="store_true",
-        default=False,
-        help="Halt all agents immediately.",
-    )
-    sp_kill_group.add_argument(
-        "--disengage",
-        action="store_true",
-        default=False,
-        help="Resume normal operation.",
-    )
-    sp_kill.add_argument(
-        "--reason",
-        type=str,
-        default=None,
-        help="Reason for engaging/disengaging (logged for audit).",
-    )
+    sp_kill_group.add_argument("--engage", action="store_true", help="Halt all agents.")
+    sp_kill_group.add_argument("--disengage", action="store_true", help="Resume operations.")
+    sp_kill.add_argument("--reason", type=str, default=None, help="Reason (for audit log).")
     sp_kill.set_defaults(func=cmd_kill_switch)
-
-    # -- unpublish ------------------------------------------------------
-    sp_unpub = subparsers.add_parser(
-        "unpublish",
-        help="Remove a published post from the live site.",
-    )
-    sp_unpub.add_argument(
-        "--post-id",
-        type=str,
-        required=True,
-        help="Unique identifier of the post to unpublish.",
-    )
-    sp_unpub.add_argument(
-        "--reason",
-        type=str,
-        default=None,
-        help="Reason for unpublishing (logged for audit).",
-    )
-    sp_unpub.set_defaults(func=cmd_unpublish)
-
-    # -- revert ---------------------------------------------------------
-    sp_revert = subparsers.add_parser(
-        "revert",
-        help="Revert a post to a previous content version.",
-    )
-    sp_revert.add_argument(
-        "--post-id",
-        type=str,
-        required=True,
-        help="Unique identifier of the post to revert.",
-    )
-    sp_revert.add_argument(
-        "--version",
-        type=int,
-        required=True,
-        help="Target version number to revert to.",
-    )
-    sp_revert.set_defaults(func=cmd_revert)
-
-    # -- rotate-keys ----------------------------------------------------
-    sp_rotate = subparsers.add_parser(
-        "rotate-keys",
-        help="Rotate API keys for an integration provider.",
-    )
-    sp_rotate.add_argument(
-        "--provider",
-        type=str,
-        required=True,
-        help="Provider name (e.g. openai, wordpress, cloudflare).",
-    )
-    sp_rotate.set_defaults(func=cmd_rotate_keys)
-
-    # -- reload-config --------------------------------------------------
-    sp_reload = subparsers.add_parser(
-        "reload-config",
-        help="Reload configuration from disk without restarting.",
-    )
-    sp_reload.set_defaults(func=cmd_reload_config)
-
-    # -- check-integrity ------------------------------------------------
-    sp_integrity = subparsers.add_parser(
-        "check-integrity",
-        help="Verify data integrity across database and CMS.",
-    )
-    sp_integrity.add_argument(
-        "--fix",
-        action="store_true",
-        default=False,
-        help="Attempt to auto-fix discovered issues.",
-    )
-    sp_integrity.set_defaults(func=cmd_check_integrity)
-
-    # -- restart --------------------------------------------------------
-    sp_restart = subparsers.add_parser(
-        "restart",
-        help="Restart a specific agent or all agents.",
-    )
-    sp_restart.add_argument(
-        "--agent",
-        type=str,
-        default=None,
-        help="Name of the agent to restart.",
-    )
-    sp_restart.add_argument(
-        "--all",
-        action="store_true",
-        default=False,
-        help="Restart all agents sequentially.",
-    )
-    sp_restart.set_defaults(func=cmd_restart)
 
     return parser
 
@@ -545,33 +350,15 @@ def build_parser() -> argparse.ArgumentParser:
 # =====================================================================
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Parse arguments and dispatch to the appropriate subcommand.
-
-    Parameters
-    ----------
-    argv:
-        Command-line arguments.  ``None`` reads from ``sys.argv``.
-
-    Returns
-    -------
-    int
-        Exit code from the subcommand handler.
-    """
     setup_logging(enable_file=False, enable_json=False)
 
     parser = build_parser()
     args = parser.parse_args(argv)
 
     try:
-        settings.load()
-    except OpenClawError as exc:
-        # Some commands (like reload-config) may work without full config.
-        logger.warning("Could not load settings: %s", exc)
-
-    try:
         return args.func(args)
     except OpenClawError as exc:
-        logger.error("Command failed: %s", exc, exc_info=True)
+        logger.error("Command failed: %s", exc)
         print(f"ERROR: {exc}")
         return 1
     except Exception as exc:

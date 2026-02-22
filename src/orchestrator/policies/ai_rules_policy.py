@@ -28,13 +28,13 @@ from dataclasses import dataclass, field
 from enum import Enum, unique
 from typing import Any, Dict, List, Optional, Set
 
-from core.constants import (
+from src.core.constants import (
     DEFAULT_KEYWORD_DENSITY,
     DEFAULT_MIN_WORD_COUNT,
     DEFAULT_QUALITY_THRESHOLD,
 )
-from core.errors import ContentPolicyViolationError
-from core.logger import get_logger, log_event
+from src.core.errors import ContentPolicyViolationError
+from src.core.logger import get_logger, log_event
 
 
 # ---------------------------------------------------------------------------

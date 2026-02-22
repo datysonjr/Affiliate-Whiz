@@ -28,8 +28,8 @@ from datetime import datetime, timezone
 from enum import Enum, unique
 from typing import Dict, List, Optional
 
-from core.errors import InvalidStateTransitionError
-from core.logger import get_logger, log_event
+from src.core.errors import InvalidStateTransitionError
+from src.core.logger import get_logger, log_event
 
 # ---------------------------------------------------------------------------
 # State enumeration

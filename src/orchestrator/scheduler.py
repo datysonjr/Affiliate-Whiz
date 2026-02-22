@@ -29,11 +29,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-import yaml
+try:
+    import yaml  # type: ignore[import-untyped]
+except ImportError:
+    yaml = None  # type: ignore[assignment]
 
-from core.constants import CONFIG_DIR, DEFAULT_SCHEDULER_INTERVAL_SECONDS
-from core.errors import SchedulerError
-from core.logger import get_logger, log_event
+from src.core.constants import CONFIG_DIR, DEFAULT_SCHEDULER_INTERVAL_SECONDS
+from src.core.errors import SchedulerError
+from src.core.logger import get_logger, log_event
 
 
 # ---------------------------------------------------------------------------
@@ -203,6 +206,11 @@ class Scheduler:
             If the YAML file cannot be read or parsed.
         """
         path = config_path or os.path.join(self._config_dir, "schedules.yaml")
+
+        if yaml is None:
+            raise SchedulerError(
+                "PyYAML is required for schedule loading. Install with: pip install pyyaml"
+            )
 
         try:
             with open(path, "r", encoding="utf-8") as fh:

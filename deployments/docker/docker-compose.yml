@@ -1,48 +1,83 @@
 version: "3.8"
 
 services:
-  openclaw-controller:
+  # ── Local Dev: single-node mode ──────────────────────────────
+  # Run all agents on one machine.  Perfect for laptop testing.
+  #
+  #   docker compose up openclaw-dev
+  #
+  openclaw-dev:
     build:
       context: ../..
       dockerfile: deployments/docker/Dockerfile
-    container_name: openclaw-controller
+    container_name: openclaw-dev
+    env_file:
+      - ../../.env
+    environment:
+      - OPENCLAW_MODE=local_dev
+      - LOG_LEVEL=INFO
+    volumes:
+      - ../../data:/app/data
+      - ../../logs:/app/logs
+      - ../../config:/app/config:ro
+    command: ["--node-role", "core", "--dry-run", "--max-ticks", "3", "--heartbeat-interval", "5"]
+    healthcheck:
+      test: ["CMD", "python", "-m", "src.cli", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Cluster mode: core node ──────────────────────────────────
+  # Orchestrator + research + content agents.
+  #
+  #   docker compose up openclaw-core openclaw-pub
+  #
+  openclaw-core:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile
+    container_name: openclaw-core
     restart: unless-stopped
     env_file:
       - ../../.env
     environment:
-      - NODE_NAME=oc-core-01
-      - NODE_ROLE=controller
+      - OPENCLAW_NODE_NAME=oc-core-01
+      - OPENCLAW_NODE_ROLE=core
     volumes:
       - openclaw-data:/app/data
       - openclaw-logs:/app/logs
       - ../../config:/app/config:ro
     ports:
       - "8080:8080"  # Admin API
+    command: ["--node-role", "core", "--dry-run"]
     healthcheck:
-      test: ["CMD", "python", "src/cli.py", "health"]
+      test: ["CMD", "python", "-m", "src.cli", "health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  openclaw-publisher:
+  # ── Cluster mode: publisher node ─────────────────────────────
+  # Publishing + analytics + monitoring agents.
+  openclaw-pub:
     build:
       context: ../..
       dockerfile: deployments/docker/Dockerfile
-    container_name: openclaw-publisher
+    container_name: openclaw-pub
     restart: unless-stopped
     env_file:
       - ../../.env
     environment:
-      - NODE_NAME=oc-pub-01
-      - NODE_ROLE=publisher
+      - OPENCLAW_NODE_NAME=oc-pub-01
+      - OPENCLAW_NODE_ROLE=pub
     volumes:
       - openclaw-data:/app/data
       - openclaw-logs:/app/logs
       - ../../config:/app/config:ro
     depends_on:
-      - openclaw-controller
+      - openclaw-core
+    command: ["--node-role", "pub", "--dry-run", "--pipeline", "publishing"]
     healthcheck:
-      test: ["CMD", "python", "src/cli.py", "health"]
+      test: ["CMD", "python", "-m", "src.cli", "health"]
       interval: 30s
       timeout: 10s
       retries: 3

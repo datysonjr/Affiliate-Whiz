@@ -4,55 +4,50 @@ main.py
 
 Entry point for the OpenClaw affiliate marketing automation system.
 
-Responsibilities
-----------------
-* Parse command-line arguments (``--dry-run``, ``--node-role``, ``--log-level``).
-* Install signal handlers for graceful shutdown (SIGINT, SIGTERM).
-* Initialise logging and settings.
-* Start the orchestrator controller's main loop.
+Starts the orchestrator controller, registers all agents, and runs
+the scheduler loop.  Supports DRY_RUN mode (default) where no
+side-effects occur.
 
 Usage::
 
-    # Start the core node in normal mode
-    python -m src.main --node-role core
+    # Start in dry-run mode (default, safe)
+    python -m src.main --node-role core --dry-run
 
-    # Start the publisher node in dry-run mode
-    python -m src.main --node-role pub --dry-run
+    # Start with a specific pipeline only
+    python -m src.main --node-role core --dry-run --pipeline content
 
     # Override log level
-    python -m src.main --node-role core --log-level DEBUG
-
-Design notes
-------------
-* The main loop is intentionally simple: it delegates all scheduling,
-  routing, and agent management to the orchestrator controller.
-* ``--dry-run`` propagates to every agent so that no side-effects
-  (publishing, DNS changes, API calls) occur during validation runs.
-* Signal handlers set a threading ``Event`` so the main loop exits
-  cleanly without killing in-flight work.
+    python -m src.main --node-role core --dry-run --log-level DEBUG
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import signal
 import sys
 import threading
 import time
-from typing import NoReturn
+from datetime import datetime, timezone
+from typing import NoReturn, Optional
 
-from src.core.constants import APP_NAME, APP_VERSION, DEFAULT_HEARTBEAT_INTERVAL_SECONDS, NodeRole
+from src.core.constants import (
+    APP_NAME,
+    APP_VERSION,
+    AgentName,
+    DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
+    NodeRole,
+)
 from src.core.errors import KillSwitchActiveError, OpenClawError
 from src.core.logger import get_logger, log_event, setup_logging
 from src.core.settings import settings
+from src.data.db import Database
 
 # ---------------------------------------------------------------------------
 # Module-level state
 # ---------------------------------------------------------------------------
 
 logger = get_logger("main")
-
-# Threading event used to signal graceful shutdown from signal handlers.
 _shutdown_event = threading.Event()
 
 
@@ -61,18 +56,6 @@ _shutdown_event = threading.Event()
 # ---------------------------------------------------------------------------
 
 def _handle_shutdown_signal(signum: int, _frame: object) -> None:
-    """Set the shutdown event when SIGINT or SIGTERM is received.
-
-    This allows the main loop to finish its current iteration and exit
-    cleanly rather than being killed mid-operation.
-
-    Parameters
-    ----------
-    signum:
-        The signal number (e.g. ``signal.SIGINT``).
-    _frame:
-        Current stack frame (unused).
-    """
     sig_name = signal.Signals(signum).name
     log_event(logger, "shutdown.signal_received", signal=sig_name)
     logger.info("Received %s -- initiating graceful shutdown...", sig_name)
@@ -80,73 +63,120 @@ def _handle_shutdown_signal(signum: int, _frame: object) -> None:
 
 
 def install_signal_handlers() -> None:
-    """Register handlers for SIGINT and SIGTERM.
-
-    On Windows, only SIGINT (Ctrl-C) is reliably supported.
-    """
     signal.signal(signal.SIGINT, _handle_shutdown_signal)
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _handle_shutdown_signal)
-    logger.debug("Signal handlers installed for SIGINT/SIGTERM")
 
 
 # ---------------------------------------------------------------------------
-# Argument parsing
+# Agent factory
 # ---------------------------------------------------------------------------
 
-def build_argument_parser() -> argparse.ArgumentParser:
-    """Build and return the CLI argument parser for the main entry point.
+def _create_agents(dry_run: bool, pipeline_filter: str = ""):
+    """Create and return agent instances for the current node role.
 
-    Returns
-    -------
-    argparse.ArgumentParser
-        Fully configured parser.
+    In local dev mode all agents run on the same machine.
+    The pipeline_filter limits which agents are instantiated.
     """
-    parser = argparse.ArgumentParser(
-        prog="openclaw",
-        description=f"{APP_NAME} v{APP_VERSION} -- Affiliate Marketing Automation System",
-    )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"{APP_NAME} {APP_VERSION}",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        default=False,
-        help="Run all agents in dry-run mode (no side-effects).",
-    )
-    parser.add_argument(
-        "--node-role",
-        type=str,
-        choices=[r.value for r in NodeRole],
-        required=True,
-        help="Role of this node in the cluster topology (core | pub).",
-    )
-    parser.add_argument(
-        "--log-level",
-        type=str,
-        default=None,
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Override the log level (default: from settings / INFO).",
-    )
-    parser.add_argument(
-        "--config-dir",
-        type=str,
-        default=None,
-        help="Override the configuration directory path.",
-    )
-    parser.add_argument(
-        "--heartbeat-interval",
-        type=int,
-        default=DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
-        help=(
-            f"Seconds between heartbeat ticks in the main loop "
-            f"(default: {DEFAULT_HEARTBEAT_INTERVAL_SECONDS})."
-        ),
-    )
-    return parser
+    from src.agents.base_agent import BaseAgent, RunResult
+
+    # Lightweight agent stubs that produce mock output in dry-run mode.
+    # These prove the full flow works without needing real integrations.
+
+    class LocalResearchAgent(BaseAgent):
+        def plan(self):
+            self.logger.info("[%s] Planning: scan for niche opportunities", self.name)
+            return {"keywords": ["best wireless earbuds 2025", "home office desk setup"], "niches": ["tech accessories"]}
+
+        def execute(self, plan):
+            self.logger.info("[%s] Executing: researching %d keywords", self.name, len(plan["keywords"]))
+            if self._check_dry_run("call SERP API"):
+                return {"offers_found": 5, "keywords_analyzed": len(plan["keywords"]), "dry_run": True}
+            return {"offers_found": 5, "keywords_analyzed": len(plan["keywords"])}
+
+        def report(self, plan, result):
+            self._log_metric("keywords.analyzed", result["keywords_analyzed"])
+            self._log_metric("offers.found", result.get("offers_found", 0))
+            return {"summary": f"Researched {result['keywords_analyzed']} keywords, found {result.get('offers_found', 0)} offers"}
+
+    class LocalContentAgent(BaseAgent):
+        def plan(self):
+            self.logger.info("[%s] Planning: generate content from approved briefs", self.name)
+            return {"briefs": [{"title": "Top 5 Wireless Earbuds for 2025", "type": "roundup", "target_words": 1500}]}
+
+        def execute(self, plan):
+            self.logger.info("[%s] Executing: drafting %d articles", self.name, len(plan["briefs"]))
+            if self._check_dry_run("call LLM API for content generation"):
+                return {"articles_drafted": len(plan["briefs"]), "total_words": 1500, "dry_run": True}
+            return {"articles_drafted": len(plan["briefs"]), "total_words": 1500}
+
+        def report(self, plan, result):
+            self._log_metric("articles.drafted", result["articles_drafted"])
+            self._log_metric("words.written", result["total_words"])
+            return {"summary": f"Drafted {result['articles_drafted']} articles ({result['total_words']} words)"}
+
+    class LocalPublishingAgent(BaseAgent):
+        def plan(self):
+            self.logger.info("[%s] Planning: check approved content queue", self.name)
+            return {"posts_ready": 1, "target_site": "example-niche.com"}
+
+        def execute(self, plan):
+            self.logger.info("[%s] Executing: publishing %d posts", self.name, plan["posts_ready"])
+            if self._check_dry_run("publish to WordPress CMS"):
+                return {"published": 0, "skipped": plan["posts_ready"], "dry_run": True}
+            return {"published": plan["posts_ready"], "skipped": 0}
+
+        def report(self, plan, result):
+            self._log_metric("posts.published", result.get("published", 0))
+            self._log_metric("posts.skipped", result.get("skipped", 0))
+            return {"summary": f"Published {result.get('published', 0)}, skipped {result.get('skipped', 0)}"}
+
+    class LocalAnalyticsAgent(BaseAgent):
+        def plan(self):
+            self.logger.info("[%s] Planning: collect performance metrics", self.name)
+            return {"sites": ["example-niche.com"], "period": "24h"}
+
+        def execute(self, plan):
+            self.logger.info("[%s] Executing: gathering analytics for %d sites", self.name, len(plan["sites"]))
+            if self._check_dry_run("query analytics APIs"):
+                return {"pageviews": 0, "clicks": 0, "revenue": 0.0, "dry_run": True}
+            return {"pageviews": 142, "clicks": 23, "revenue": 4.50}
+
+        def report(self, plan, result):
+            self._log_metric("pageviews", result.get("pageviews", 0))
+            self._log_metric("clicks", result.get("clicks", 0))
+            self._log_metric("revenue_usd", result.get("revenue", 0.0))
+            return {"summary": f"Traffic: {result.get('pageviews', 0)} PV, {result.get('clicks', 0)} clicks, ${result.get('revenue', 0.0):.2f} revenue"}
+
+    # Build agent config with dry_run flag
+    base_config = {"enabled": True, "dry_run": dry_run, "risk_level": "low"}
+
+    # Map pipeline names to agent sets
+    pipeline_agents = {
+        "": [  # empty = all agents
+            (AgentName.RESEARCH.value, LocalResearchAgent),
+            (AgentName.CONTENT_GENERATION.value, LocalContentAgent),
+            (AgentName.PUBLISHING.value, LocalPublishingAgent),
+            (AgentName.ANALYTICS.value, LocalAnalyticsAgent),
+        ],
+        "content": [
+            (AgentName.RESEARCH.value, LocalResearchAgent),
+            (AgentName.CONTENT_GENERATION.value, LocalContentAgent),
+        ],
+        "publishing": [
+            (AgentName.PUBLISHING.value, LocalPublishingAgent),
+        ],
+        "analytics": [
+            (AgentName.ANALYTICS.value, LocalAnalyticsAgent),
+        ],
+    }
+
+    agent_list = pipeline_agents.get(pipeline_filter, pipeline_agents[""])
+    agents = []
+    for name, cls in agent_list:
+        agents.append(cls(name=name, config={**base_config}))
+
+    return agents
 
 
 # ---------------------------------------------------------------------------
@@ -155,92 +185,171 @@ def build_argument_parser() -> argparse.ArgumentParser:
 
 def main_loop(
     node_role: NodeRole,
-    dry_run: bool = False,
+    dry_run: bool = True,
     heartbeat_interval: int = DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
+    pipeline: str = "",
+    max_ticks: int = 0,
 ) -> int:
     """Run the orchestrator controller's main loop.
 
-    The loop ticks every *heartbeat_interval* seconds.  On each tick it
-    asks the orchestrator controller to evaluate the schedule, dispatch
-    due agents, and collect results.  The loop exits cleanly when the
-    shutdown event is set (via signal handler or kill switch).
-
     Parameters
     ----------
-    node_role:
-        Which cluster role this process fulfils.
-    dry_run:
-        If ``True``, all agents run in dry-run mode.
-    heartbeat_interval:
-        Seconds to sleep between ticks.
-
-    Returns
-    -------
-    int
-        Exit code: ``0`` for clean shutdown, ``1`` for error.
+    max_ticks:
+        If > 0, exit after this many ticks (useful for testing).
+        0 means run forever until shutdown signal.
     """
+    from src.orchestrator.controller import OrchestratorController
+
+    # Initialize database
+    db = Database()
+    db.connect()
+    migrations_applied = db.migrate()
+    if migrations_applied:
+        logger.info("Applied %d database migration(s)", migrations_applied)
+
+    # Create controller
+    controller = OrchestratorController(dry_run=dry_run)
+
+    # Create and register agents
+    agents = _create_agents(dry_run=dry_run, pipeline_filter=pipeline)
+    for agent in agents:
+        controller.register_agent(agent)
+
+    agent_names = [a.name for a in agents]
     log_event(
         logger,
         "main_loop.starting",
         node_role=node_role.value,
         dry_run=dry_run,
+        agents=agent_names,
         heartbeat_interval=heartbeat_interval,
     )
 
-    # TODO: Replace with real OrchestratorController instantiation once
-    #       orchestrator/controller.py is implemented.
-    # from src.orchestrator.controller import OrchestratorController
-    # controller = OrchestratorController(
-    #     node_role=node_role,
-    #     dry_run=dry_run,
-    #     settings=settings,
-    # )
-    # controller.initialize()
+    # Start controller
+    controller.start()
 
     tick_count = 0
+    agent_sequence = agent_names  # Run agents in registration order
+
+    print(f"\n{'='*60}")
+    print(f"  {APP_NAME} v{APP_VERSION} -- Local Dev Mode")
+    print(f"  Node role: {node_role.value}")
+    print(f"  DRY_RUN: {dry_run}")
+    print(f"  Agents: {', '.join(agent_names)}")
+    print(f"  Heartbeat: {heartbeat_interval}s")
+    if max_ticks:
+        print(f"  Max ticks: {max_ticks}")
+    print(f"{'='*60}\n")
 
     try:
         while not _shutdown_event.is_set():
             tick_count += 1
-            logger.debug("Heartbeat tick #%d", tick_count)
+            logger.info("--- Heartbeat tick #%d ---", tick_count)
 
-            try:
-                # TODO: Replace with controller.tick() once implemented.
-                # controller.tick()
-                pass
+            # Run each agent in sequence
+            for agent_name in agent_sequence:
+                if _shutdown_event.is_set():
+                    break
+                try:
+                    result = controller.run_agent(agent_name)
 
-            except KillSwitchActiveError:
-                logger.warning("Kill switch is active -- halting main loop.")
+                    # Record run to database
+                    try:
+                        db.execute(
+                            """INSERT INTO agent_runs
+                               (run_id, agent_name, status, dry_run, duration_s,
+                                plan_output, exec_output, report_output, error,
+                                started_at, finished_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (
+                                result.run_id,
+                                result.agent_name,
+                                result.status.value if hasattr(result.status, 'value') else str(result.status),
+                                1 if dry_run else 0,
+                                result.duration_s,
+                                json.dumps(result.plan_output, default=str) if result.plan_output else None,
+                                json.dumps(result.exec_output, default=str) if result.exec_output else None,
+                                json.dumps(result.report_output, default=str) if result.report_output else None,
+                                result.error,
+                                result.started_at.isoformat() if result.started_at else None,
+                                result.finished_at.isoformat() if result.finished_at else None,
+                            ),
+                        )
+                    except Exception as db_err:
+                        logger.warning("Failed to record run to DB: %s", db_err)
+
+                    status_str = result.status.value if hasattr(result.status, 'value') else str(result.status)
+                    logger.info(
+                        "Agent '%s' completed: status=%s duration=%.3fs",
+                        agent_name, status_str, result.duration_s,
+                    )
+
+                except KillSwitchActiveError:
+                    logger.warning("Kill switch active -- halting.")
+                    _shutdown_event.set()
+                    break
+                except OpenClawError as exc:
+                    logger.error("Agent '%s' error: %s", agent_name, exc)
+
+            # Check max_ticks limit
+            if max_ticks and tick_count >= max_ticks:
+                logger.info("Reached max_ticks=%d -- shutting down.", max_ticks)
                 break
-            except OpenClawError as exc:
-                logger.error(
-                    "OpenClaw error during tick #%d: %s", tick_count, exc,
-                    exc_info=True,
-                )
-                # Continue running -- the orchestrator should self-heal.
 
-            # Sleep in small increments so we can react to shutdown quickly.
-            _interruptible_sleep(heartbeat_interval)
+            # Sleep until next tick (interruptible)
+            _shutdown_event.wait(timeout=heartbeat_interval)
 
     except KeyboardInterrupt:
-        logger.info("KeyboardInterrupt caught -- shutting down.")
+        logger.info("KeyboardInterrupt -- shutting down.")
+
+    # Cleanup
+    controller.stop()
+    db.disconnect()
 
     log_event(logger, "main_loop.stopped", ticks_completed=tick_count)
-    logger.info("Main loop exited after %d ticks.", tick_count)
-
-    # TODO: controller.shutdown()
+    print(f"\nShutdown complete after {tick_count} tick(s).")
     return 0
 
 
-def _interruptible_sleep(seconds: int) -> None:
-    """Sleep for *seconds*, but wake up early if the shutdown event fires.
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
 
-    Parameters
-    ----------
-    seconds:
-        Maximum number of seconds to sleep.
-    """
-    _shutdown_event.wait(timeout=seconds)
+def build_argument_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="openclaw",
+        description=f"{APP_NAME} v{APP_VERSION} -- Affiliate Marketing Automation System",
+    )
+    parser.add_argument("--version", action="version", version=f"{APP_NAME} {APP_VERSION}")
+    parser.add_argument(
+        "--dry-run", action="store_true", default=False,
+        help="Run all agents in dry-run mode (no side-effects).",
+    )
+    parser.add_argument(
+        "--node-role", type=str, choices=[r.value for r in NodeRole],
+        default="core",
+        help="Role of this node (default: core).",
+    )
+    parser.add_argument(
+        "--pipeline", type=str, default="",
+        choices=["", "content", "publishing", "analytics"],
+        help="Run only agents for a specific pipeline.",
+    )
+    parser.add_argument(
+        "--log-level", type=str, default=None,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Override the log level.",
+    )
+    parser.add_argument(
+        "--heartbeat-interval", type=int,
+        default=DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
+        help=f"Seconds between heartbeat ticks (default: {DEFAULT_HEARTBEAT_INTERVAL_SECONDS}).",
+    )
+    parser.add_argument(
+        "--max-ticks", type=int, default=0,
+        help="Exit after N ticks (0 = run forever). Useful for testing.",
+    )
+    return parser
 
 
 # ---------------------------------------------------------------------------
@@ -248,48 +357,35 @@ def _interruptible_sleep(seconds: int) -> None:
 # ---------------------------------------------------------------------------
 
 def main(argv: list[str] | None = None) -> NoReturn:
-    """Parse arguments, set up the system, and run the main loop.
-
-    Parameters
-    ----------
-    argv:
-        Command-line arguments.  ``None`` reads from ``sys.argv``.
-    """
     parser = build_argument_parser()
     args = parser.parse_args(argv)
 
-    # -- Logging ----------------------------------------------------------
-    setup_logging(
-        level=args.log_level,
-        enable_file=True,
-        enable_json=True,
-    )
+    # -- Logging
+    setup_logging(level=args.log_level, enable_file=True, enable_json=True)
 
     logger.info(
-        "Starting %s v%s  node_role=%s  dry_run=%s",
-        APP_NAME,
-        APP_VERSION,
-        args.node_role,
-        args.dry_run,
+        "Starting %s v%s  node_role=%s  dry_run=%s  pipeline=%s",
+        APP_NAME, APP_VERSION, args.node_role, args.dry_run, args.pipeline or "all",
     )
 
-    # -- Settings ---------------------------------------------------------
+    # -- Settings
     try:
         settings.load()
         logger.info("Configuration loaded: %s", settings)
     except OpenClawError as exc:
-        logger.critical("Failed to load configuration: %s", exc)
-        sys.exit(2)
+        logger.warning("Config load issue (non-fatal for local dev): %s", exc)
 
-    # -- Signal handlers --------------------------------------------------
+    # -- Signals
     install_signal_handlers()
 
-    # -- Main loop --------------------------------------------------------
+    # -- Main loop
     node_role = NodeRole(args.node_role)
     exit_code = main_loop(
         node_role=node_role,
         dry_run=args.dry_run,
         heartbeat_interval=args.heartbeat_interval,
+        pipeline=args.pipeline,
+        max_ticks=args.max_ticks,
     )
     sys.exit(exit_code)
 

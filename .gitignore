@@ -37,7 +37,7 @@ ops/secrets/*.pem
 *.secret
 
 # Data
-data/
+/data/
 *.db
 *.sqlite
 *.sqlite3
@@ -45,6 +45,7 @@ data/
 # Logs
 logs/*.log
 logs/*.log.*.gz
+logs/*.json
 
 # Temp
 tmp/*

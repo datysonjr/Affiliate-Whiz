@@ -28,13 +28,13 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from core.constants import (
+from src.core.constants import (
     DEFAULT_COOLDOWN_MINUTES,
     DEFAULT_MAX_POSTS_PER_DAY,
     DEFAULT_POSTING_CADENCE_PER_DAY,
 )
-from core.errors import PostingPolicyViolationError
-from core.logger import get_logger, log_event
+from src.core.errors import PostingPolicyViolationError
+from src.core.logger import get_logger, log_event
 
 
 # ---------------------------------------------------------------------------

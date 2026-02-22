@@ -22,9 +22,9 @@ from dataclasses import dataclass, field
 from enum import Enum, unique
 from typing import Any, Dict, FrozenSet, List, Optional, Set
 
-from core.constants import RiskLevel
-from core.errors import RiskPolicyViolationError
-from core.logger import get_logger, log_event
+from src.core.constants import RiskLevel
+from src.core.errors import RiskPolicyViolationError
+from src.core.logger import get_logger, log_event
 
 
 # ---------------------------------------------------------------------------
