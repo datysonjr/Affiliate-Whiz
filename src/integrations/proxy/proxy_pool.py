@@ -2,51 +2,56 @@
 integrations.proxy.proxy_pool
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Managed pool of proxy connections for web scraping and research tasks.
+Rotating proxy pool for web scraping and research operations.
 
-Provides :class:`ProxyPool` which maintains a set of proxy servers,
-tracks their health, and distributes requests across healthy proxies
-with automatic rotation.  Failed proxies are temporarily quarantined
-and retested before being returned to the active pool.
+Provides the :class:`ProxyPool` class for managing a pool of HTTP/SOCKS
+proxies with health tracking, automatic rotation, failure detection, and
+load balancing.  Used by the research agent to make web requests through
+diverse IP addresses, avoiding rate limits and blocks.
 
 Design references:
-    - config/providers.yaml  ``proxies`` section
     - ARCHITECTURE.md  Section 4 (Integration Layer)
-
-Usage::
-
-    from src.integrations.proxy.proxy_pool import ProxyPool
-
-    pool = ProxyPool(proxies=[
-        "http://user:pass@proxy1.example.com:8080",
-        "http://user:pass@proxy2.example.com:8080",
-    ])
-    proxy = pool.get_proxy()
-    # ... use proxy for HTTP request ...
-    pool.release_proxy(proxy)
+    - config/providers.yaml  ``proxy`` section
 """
 
 from __future__ import annotations
 
+import logging
 import random
-import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from enum import Enum, unique
+from typing import Any, Dict, List, Optional
 
 from src.core.errors import IntegrationError
 from src.core.logger import get_logger, log_event
 
 logger = get_logger("integrations.proxy.proxy_pool")
 
+
 # ---------------------------------------------------------------------------
-# Constants
+# Enumerations
 # ---------------------------------------------------------------------------
 
-_DEFAULT_MAX_FAILURES = 3
-_DEFAULT_COOLDOWN_SECONDS = 300  # 5 minutes
-_DEFAULT_HEALTH_CHECK_TIMEOUT = 10  # seconds
+@unique
+class ProxyProtocol(str, Enum):
+    """Supported proxy protocols."""
+
+    HTTP = "http"
+    HTTPS = "https"
+    SOCKS4 = "socks4"
+    SOCKS5 = "socks5"
+
+
+@unique
+class ProxyStatus(str, Enum):
+    """Health status of a proxy."""
+
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    FAILED = "failed"
+    BANNED = "banned"
 
 
 # ---------------------------------------------------------------------------
@@ -54,49 +59,76 @@ _DEFAULT_HEALTH_CHECK_TIMEOUT = 10  # seconds
 # ---------------------------------------------------------------------------
 
 @dataclass
-class ProxyInfo:
-    """Metadata and health tracking for a single proxy server.
+class ProxyEntry:
+    """A single proxy in the pool.
 
     Attributes
     ----------
-    url:
-        Proxy URL including scheme, auth, host, and port
-        (e.g. ``"http://user:pass@host:port"``).
-    is_healthy:
-        Whether the proxy is currently considered healthy.
-    in_use:
-        Whether the proxy is currently checked out for a request.
-    total_requests:
-        Lifetime request count through this proxy.
-    total_failures:
-        Lifetime failure count for this proxy.
+    proxy_id:
+        Unique identifier for this proxy entry.
+    host:
+        Proxy server hostname or IP.
+    port:
+        Proxy server port.
+    protocol:
+        Proxy protocol.
+    username:
+        Authentication username (empty for unauthenticated proxies).
+    password:
+        Authentication password.
+    country:
+        ISO 3166-1 alpha-2 country code of the proxy's IP.
+    status:
+        Current health status.
+    success_count:
+        Number of successful requests through this proxy.
+    failure_count:
+        Number of failed requests through this proxy.
     consecutive_failures:
-        Number of consecutive failures (reset on success).
+        Number of consecutive failures (resets on success).
+    avg_response_time:
+        Average response time in seconds.
     last_used_at:
-        UTC timestamp of the most recent checkout.
-    last_failure_at:
-        UTC timestamp of the most recent failure.
-    cooldown_until:
-        UTC timestamp when the proxy becomes eligible again after
-        being quarantined (``None`` if not quarantined).
-    response_time_ms:
-        Most recent response time in milliseconds (0 if untested).
-    tags:
-        Arbitrary labels for filtering (e.g. ``"residential"``,
-        ``"datacenter"``, ``"us"``).
+        UTC timestamp of the last request through this proxy.
+    last_checked_at:
+        UTC timestamp of the last health check.
+    in_use:
+        Whether the proxy is currently assigned to an active request.
+    metadata:
+        Additional proxy-level data.
     """
 
-    url: str
-    is_healthy: bool = True
-    in_use: bool = False
-    total_requests: int = 0
-    total_failures: int = 0
+    proxy_id: str
+    host: str = ""
+    port: int = 8080
+    protocol: ProxyProtocol = ProxyProtocol.HTTP
+    username: str = ""
+    password: str = ""
+    country: str = ""
+    status: ProxyStatus = ProxyStatus.HEALTHY
+    success_count: int = 0
+    failure_count: int = 0
     consecutive_failures: int = 0
+    avg_response_time: float = 0.0
     last_used_at: Optional[datetime] = None
-    last_failure_at: Optional[datetime] = None
-    cooldown_until: Optional[datetime] = None
-    response_time_ms: float = 0.0
-    tags: List[str] = field(default_factory=list)
+    last_checked_at: Optional[datetime] = None
+    in_use: bool = False
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def url(self) -> str:
+        """Return the proxy URL in ``protocol://host:port`` format."""
+        if self.username and self.password:
+            return f"{self.protocol.value}://{self.username}:{self.password}@{self.host}:{self.port}"
+        return f"{self.protocol.value}://{self.host}:{self.port}"
+
+    @property
+    def reliability(self) -> float:
+        """Compute a reliability score (0.0--1.0) based on success rate."""
+        total = self.success_count + self.failure_count
+        if total == 0:
+            return 1.0
+        return self.success_count / total
 
 
 # ---------------------------------------------------------------------------
@@ -104,434 +136,350 @@ class ProxyInfo:
 # ---------------------------------------------------------------------------
 
 class ProxyPool:
-    """Managed pool of proxy connections with health tracking and rotation.
+    """Manages a pool of rotating HTTP/SOCKS proxies.
 
-    Thread-safe: all mutable state is guarded by an internal lock so the
-    pool can be shared across multiple threads or async tasks.
+    Provides proxy acquisition, release, failure tracking, and automatic
+    rotation.  Proxies with high failure rates are temporarily removed
+    from the available pool.
 
     Parameters
     ----------
     proxies:
-        List of proxy URLs to populate the pool.
-    max_failures:
-        Number of consecutive failures before a proxy is quarantined.
-    cooldown_seconds:
-        How long (in seconds) a quarantined proxy must wait before
-        being retested.
+        Initial list of proxy entries to populate the pool.
+    max_consecutive_failures:
+        Number of consecutive failures before a proxy is marked as failed.
     rotation_strategy:
-        How to select the next proxy.  One of ``"round_robin"``,
-        ``"random"``, ``"least_used"``.
+        Strategy for selecting the next proxy: ``"round_robin"``,
+        ``"random"``, or ``"least_used"``.
+
+    Usage::
+
+        pool = ProxyPool(proxies=[
+            ProxyEntry(proxy_id="p1", host="1.2.3.4", port=8080),
+            ProxyEntry(proxy_id="p2", host="5.6.7.8", port=8080),
+        ])
+        proxy = pool.get_proxy()
+        try:
+            # Use proxy for HTTP request
+            ...
+        finally:
+            pool.release_proxy(proxy.proxy_id, success=True)
     """
 
     def __init__(
         self,
-        proxies: Optional[List[str]] = None,
-        max_failures: int = _DEFAULT_MAX_FAILURES,
-        cooldown_seconds: int = _DEFAULT_COOLDOWN_SECONDS,
-        rotation_strategy: str = "round_robin",
+        proxies: Optional[List[ProxyEntry]] = None,
+        max_consecutive_failures: int = 5,
+        rotation_strategy: str = "least_used",
     ) -> None:
-        self._lock = threading.Lock()
-        self._max_failures = max_failures
-        self._cooldown_seconds = cooldown_seconds
+        self._proxies: Dict[str, ProxyEntry] = {}
+        self._max_consecutive_failures = max_consecutive_failures
         self._rotation_strategy = rotation_strategy
-        self._round_robin_index: int = 0
+        self._rotation_index: int = 0
+        self._total_requests: int = 0
 
-        # Build the internal proxy registry
-        self._proxies: Dict[str, ProxyInfo] = {}
-        for proxy_url in (proxies or []):
-            normalised = proxy_url.strip()
-            if normalised and normalised not in self._proxies:
-                self._proxies[normalised] = ProxyInfo(url=normalised)
+        if proxies:
+            for proxy in proxies:
+                self._proxies[proxy.proxy_id] = proxy
 
         log_event(
-            logger,
-            "proxy_pool.init",
+            logger, "proxy_pool.init",
             pool_size=len(self._proxies),
             strategy=rotation_strategy,
-            max_failures=max_failures,
-            cooldown_s=cooldown_seconds,
         )
 
     # ------------------------------------------------------------------
-    # Internal helpers
+    # Proxy acquisition
     # ------------------------------------------------------------------
 
-    def _get_available_proxies(self) -> List[ProxyInfo]:
-        """Return proxies that are healthy, not in use, and not quarantined.
+    def get_proxy(
+        self,
+        *,
+        country: str = "",
+        protocol: Optional[ProxyProtocol] = None,
+    ) -> ProxyEntry:
+        """Acquire a proxy from the pool.
 
-        Must be called with ``self._lock`` held.
-
-        Returns
-        -------
-        list[ProxyInfo]
-            Available proxy entries.
-        """
-        now = datetime.now(timezone.utc)
-        available: List[ProxyInfo] = []
-
-        for proxy in self._proxies.values():
-            # Check if cooldown has expired
-            if proxy.cooldown_until and now >= proxy.cooldown_until:
-                proxy.is_healthy = True
-                proxy.cooldown_until = None
-                proxy.consecutive_failures = 0
-                logger.debug(
-                    "Proxy %s cooldown expired, returning to pool",
-                    self._mask_url(proxy.url),
-                )
-
-            if proxy.is_healthy and not proxy.in_use:
-                available.append(proxy)
-
-        return available
-
-    def _select_proxy(self, available: List[ProxyInfo]) -> ProxyInfo:
-        """Select a proxy from the available pool using the configured strategy.
-
-        Must be called with ``self._lock`` held.
+        Selects a healthy, available proxy based on the configured
+        rotation strategy and marks it as in-use.
 
         Parameters
         ----------
-        available:
-            List of available proxy entries.
+        country:
+            Optional country filter (ISO 3166-1 alpha-2 code).
+        protocol:
+            Optional protocol filter.
 
         Returns
         -------
-        ProxyInfo
+        ProxyEntry
+            The selected proxy.
+
+        Raises
+        ------
+        IntegrationError
+            If no healthy proxies are available.
+        """
+        candidates = [
+            p for p in self._proxies.values()
+            if p.status in (ProxyStatus.HEALTHY, ProxyStatus.DEGRADED)
+            and not p.in_use
+        ]
+
+        if country:
+            candidates = [p for p in candidates if p.country == country]
+        if protocol:
+            candidates = [p for p in candidates if p.protocol == protocol]
+
+        if not candidates:
+            raise IntegrationError(
+                "No healthy proxies available in the pool",
+                details={
+                    "pool_size": len(self._proxies),
+                    "healthy_count": self.get_healthy_count(),
+                    "country_filter": country,
+                    "protocol_filter": protocol.value if protocol else "",
+                },
+            )
+
+        proxy = self._select_proxy(candidates)
+        proxy.in_use = True
+        proxy.last_used_at = datetime.now(timezone.utc)
+        self._total_requests += 1
+
+        logger.debug(
+            "Acquired proxy %s (%s:%d, reliability=%.2f)",
+            proxy.proxy_id, proxy.host, proxy.port, proxy.reliability,
+        )
+        return proxy
+
+    def _select_proxy(self, candidates: List[ProxyEntry]) -> ProxyEntry:
+        """Select a proxy from the candidate list based on rotation strategy.
+
+        Parameters
+        ----------
+        candidates:
+            Available healthy proxies.
+
+        Returns
+        -------
+        ProxyEntry
             The selected proxy.
         """
         if self._rotation_strategy == "random":
-            return random.choice(available)
+            return random.choice(candidates)
 
-        if self._rotation_strategy == "least_used":
-            return min(available, key=lambda p: p.total_requests)
+        if self._rotation_strategy == "round_robin":
+            self._rotation_index = self._rotation_index % len(candidates)
+            proxy = candidates[self._rotation_index]
+            self._rotation_index += 1
+            return proxy
 
-        # Default: round_robin
-        idx = self._round_robin_index % len(available)
-        self._round_robin_index = (self._round_robin_index + 1) % len(available)
-        return available[idx]
-
-    @staticmethod
-    def _mask_url(url: str) -> str:
-        """Mask credentials in a proxy URL for safe logging.
-
-        Parameters
-        ----------
-        url:
-            Proxy URL that may contain ``user:pass@``.
-
-        Returns
-        -------
-        str
-            URL with password masked.
-        """
-        if "@" in url:
-            scheme_and_auth, host_part = url.rsplit("@", 1)
-            if ":" in scheme_and_auth:
-                # Find the last colon that separates user from password
-                parts = scheme_and_auth.split("://", 1)
-                if len(parts) == 2:
-                    scheme = parts[0]
-                    user_pass = parts[1]
-                    if ":" in user_pass:
-                        user = user_pass.split(":", 1)[0]
-                        return f"{scheme}://{user}:***@{host_part}"
-            return f"***@{host_part}"
-        return url
-
-    # ------------------------------------------------------------------
-    # Public API methods
-    # ------------------------------------------------------------------
-
-    def get_proxy(self, *, tag: str = "") -> str:
-        """Check out a healthy proxy from the pool.
-
-        The proxy is marked as ``in_use`` until :meth:`release_proxy`
-        is called.
-
-        Parameters
-        ----------
-        tag:
-            Optional tag filter.  If provided, only proxies with a
-            matching tag are considered.
-
-        Returns
-        -------
-        str
-            Proxy URL string.
-
-        Raises
-        ------
-        IntegrationError
-            If no healthy proxies are available.
-        """
-        with self._lock:
-            available = self._get_available_proxies()
-
-            if tag:
-                available = [p for p in available if tag in p.tags]
-
-            if not available:
-                healthy_count = sum(
-                    1 for p in self._proxies.values() if p.is_healthy
-                )
-                in_use_count = sum(
-                    1 for p in self._proxies.values() if p.in_use
-                )
-                raise IntegrationError(
-                    "No healthy proxies available in pool",
-                    details={
-                        "pool_size": len(self._proxies),
-                        "healthy": healthy_count,
-                        "in_use": in_use_count,
-                        "tag_filter": tag,
-                    },
-                )
-
-            proxy = self._select_proxy(available)
-            proxy.in_use = True
-            proxy.total_requests += 1
-            proxy.last_used_at = datetime.now(timezone.utc)
-
-        log_event(
-            logger,
-            "proxy_pool.checkout",
-            proxy=self._mask_url(proxy.url),
-            total_requests=proxy.total_requests,
+        # Default: least_used (select proxy with fewest total requests)
+        return min(
+            candidates,
+            key=lambda p: p.success_count + p.failure_count,
         )
 
-        return proxy.url
+    # ------------------------------------------------------------------
+    # Proxy release and failure tracking
+    # ------------------------------------------------------------------
 
-    def release_proxy(self, proxy_url: str) -> None:
-        """Return a proxy to the pool after use.
+    def release_proxy(
+        self,
+        proxy_id: str,
+        *,
+        success: bool = True,
+        response_time: float = 0.0,
+    ) -> None:
+        """Release a proxy back to the pool after use.
 
-        Resets the ``in_use`` flag so the proxy becomes available for
-        other requests.  If the proxy was used successfully, its
-        consecutive failure counter is reset.
+        Updates the proxy's statistics and marks it as available.
 
         Parameters
         ----------
-        proxy_url:
-            The proxy URL to release (must match what :meth:`get_proxy` returned).
+        proxy_id:
+            Identifier of the proxy to release.
+        success:
+            Whether the request through this proxy succeeded.
+        response_time:
+            Request response time in seconds.
         """
-        with self._lock:
-            proxy = self._proxies.get(proxy_url)
-            if proxy is None:
-                logger.warning(
-                    "Attempted to release unknown proxy: %s",
-                    self._mask_url(proxy_url),
-                )
-                return
+        proxy = self._proxies.get(proxy_id)
+        if proxy is None:
+            logger.warning("Attempted to release unknown proxy: %s", proxy_id)
+            return
 
-            proxy.in_use = False
-            # A successful release implies the request worked
+        proxy.in_use = False
+
+        if success:
+            proxy.success_count += 1
             proxy.consecutive_failures = 0
+            if proxy.status == ProxyStatus.DEGRADED:
+                proxy.status = ProxyStatus.HEALTHY
+            # Update rolling average response time
+            total = proxy.success_count + proxy.failure_count
+            proxy.avg_response_time = (
+                (proxy.avg_response_time * (total - 1) + response_time) / total
+            ) if total > 0 else response_time
+        else:
+            proxy.failure_count += 1
+            proxy.consecutive_failures += 1
+            if proxy.consecutive_failures >= self._max_consecutive_failures:
+                proxy.status = ProxyStatus.FAILED
+                logger.warning(
+                    "Proxy %s marked as FAILED after %d consecutive failures",
+                    proxy_id, proxy.consecutive_failures,
+                )
 
-        log_event(
-            logger,
-            "proxy_pool.release",
-            proxy=self._mask_url(proxy_url),
+        logger.debug(
+            "Released proxy %s (success=%s, reliability=%.2f, status=%s)",
+            proxy_id, success, proxy.reliability, proxy.status.value,
         )
 
-    def mark_failed(self, proxy_url: str) -> None:
-        """Mark a proxy as having failed a request.
-
-        Increments the failure counter.  If consecutive failures exceed
-        ``max_failures``, the proxy is quarantined for ``cooldown_seconds``.
+    def mark_failed(
+        self,
+        proxy_id: str,
+        *,
+        reason: str = "",
+    ) -> None:
+        """Explicitly mark a proxy as failed.
 
         Parameters
         ----------
-        proxy_url:
-            The proxy URL that failed.
+        proxy_id:
+            Identifier of the proxy to mark as failed.
+        reason:
+            Human-readable reason for the failure.
         """
-        with self._lock:
-            proxy = self._proxies.get(proxy_url)
-            if proxy is None:
-                logger.warning(
-                    "Attempted to mark unknown proxy as failed: %s",
-                    self._mask_url(proxy_url),
-                )
-                return
+        proxy = self._proxies.get(proxy_id)
+        if proxy is None:
+            logger.warning("Attempted to mark unknown proxy as failed: %s", proxy_id)
+            return
 
-            proxy.in_use = False
-            proxy.total_failures += 1
-            proxy.consecutive_failures += 1
-            proxy.last_failure_at = datetime.now(timezone.utc)
+        proxy.status = ProxyStatus.FAILED
+        proxy.in_use = False
 
-            if proxy.consecutive_failures >= self._max_failures:
-                proxy.is_healthy = False
-                proxy.cooldown_until = datetime.fromtimestamp(
-                    time.time() + self._cooldown_seconds, tz=timezone.utc
-                )
-                log_event(
-                    logger,
-                    "proxy_pool.quarantined",
-                    proxy=self._mask_url(proxy_url),
-                    consecutive_failures=proxy.consecutive_failures,
-                    cooldown_until=proxy.cooldown_until.isoformat(),
-                )
-            else:
-                log_event(
-                    logger,
-                    "proxy_pool.failure_recorded",
-                    proxy=self._mask_url(proxy_url),
-                    consecutive_failures=proxy.consecutive_failures,
-                    max_failures=self._max_failures,
-                )
+        log_event(
+            logger, "proxy_pool.mark_failed",
+            proxy_id=proxy_id, reason=reason,
+        )
 
-    def rotate(self) -> str:
-        """Get a fresh proxy, releasing the current one if applicable.
+    # ------------------------------------------------------------------
+    # Rotation and management
+    # ------------------------------------------------------------------
 
-        Convenience method for single-proxy workflows where you just
-        want the "next" proxy without tracking checkout/release manually.
+    def rotate(self) -> int:
+        """Reset failed proxies to healthy status for retry.
 
-        Returns
-        -------
-        str
-            A new proxy URL from the pool.
-
-        Raises
-        ------
-        IntegrationError
-            If no healthy proxies are available.
-        """
-        with self._lock:
-            # Release any proxies that are checked out
-            for proxy in self._proxies.values():
-                if proxy.in_use:
-                    proxy.in_use = False
-
-        # Get a fresh proxy
-        return self.get_proxy()
-
-    def get_healthy_count(self) -> int:
-        """Return the number of currently healthy proxies.
-
-        A proxy is considered healthy if it has not exceeded the failure
-        threshold and is not in its cooldown period.
+        Proxies that were marked as failed are given another chance.
+        Their consecutive failure counters are reset to allow them
+        back into the available pool.
 
         Returns
         -------
         int
-            Count of healthy proxies (regardless of in-use status).
+            Number of proxies that were rotated back to healthy status.
         """
-        with self._lock:
-            now = datetime.now(timezone.utc)
-            count = 0
-            for proxy in self._proxies.values():
-                # Check if cooldown has expired
-                if proxy.cooldown_until and now >= proxy.cooldown_until:
-                    proxy.is_healthy = True
-                    proxy.cooldown_until = None
-                    proxy.consecutive_failures = 0
-                if proxy.is_healthy:
-                    count += 1
-            return count
+        rotated = 0
+        for proxy in self._proxies.values():
+            if proxy.status == ProxyStatus.FAILED:
+                proxy.status = ProxyStatus.DEGRADED
+                proxy.consecutive_failures = 0
+                proxy.in_use = False
+                rotated += 1
 
-    # ------------------------------------------------------------------
-    # Pool management
-    # ------------------------------------------------------------------
+        if rotated:
+            log_event(
+                logger, "proxy_pool.rotate",
+                rotated=rotated, pool_size=len(self._proxies),
+            )
 
-    def add_proxy(self, proxy_url: str, tags: Optional[List[str]] = None) -> None:
+        return rotated
+
+    def add_proxy(self, proxy: ProxyEntry) -> None:
         """Add a new proxy to the pool.
 
         Parameters
         ----------
-        proxy_url:
-            Proxy URL to add.
-        tags:
-            Optional labels for the proxy.
+        proxy:
+            Proxy entry to add.
         """
-        normalised = proxy_url.strip()
-        if not normalised:
-            return
+        self._proxies[proxy.proxy_id] = proxy
+        logger.debug("Added proxy %s to pool (%s:%d)", proxy.proxy_id, proxy.host, proxy.port)
 
-        with self._lock:
-            if normalised not in self._proxies:
-                self._proxies[normalised] = ProxyInfo(
-                    url=normalised,
-                    tags=tags or [],
-                )
-                log_event(
-                    logger,
-                    "proxy_pool.added",
-                    proxy=self._mask_url(normalised),
-                    pool_size=len(self._proxies),
-                )
-
-    def remove_proxy(self, proxy_url: str) -> bool:
-        """Remove a proxy from the pool entirely.
+    def remove_proxy(self, proxy_id: str) -> bool:
+        """Remove a proxy from the pool.
 
         Parameters
         ----------
-        proxy_url:
-            Proxy URL to remove.
+        proxy_id:
+            Identifier of the proxy to remove.
 
         Returns
         -------
         bool
             ``True`` if the proxy was found and removed.
         """
-        with self._lock:
-            if proxy_url in self._proxies:
-                del self._proxies[proxy_url]
-                log_event(
-                    logger,
-                    "proxy_pool.removed",
-                    proxy=self._mask_url(proxy_url),
-                    pool_size=len(self._proxies),
-                )
-                return True
-            return False
+        if proxy_id in self._proxies:
+            del self._proxies[proxy_id]
+            logger.debug("Removed proxy %s from pool", proxy_id)
+            return True
+        return False
+
+    # ------------------------------------------------------------------
+    # Pool status
+    # ------------------------------------------------------------------
+
+    def get_healthy_count(self) -> int:
+        """Return the number of healthy (available) proxies.
+
+        Returns
+        -------
+        int
+            Count of proxies with ``HEALTHY`` or ``DEGRADED`` status
+            that are not currently in use.
+        """
+        return sum(
+            1 for p in self._proxies.values()
+            if p.status in (ProxyStatus.HEALTHY, ProxyStatus.DEGRADED)
+            and not p.in_use
+        )
+
+    @property
+    def total_size(self) -> int:
+        """Return the total number of proxies in the pool."""
+        return len(self._proxies)
+
+    @property
+    def total_requests(self) -> int:
+        """Return the total number of proxy acquisitions."""
+        return self._total_requests
 
     def get_stats(self) -> Dict[str, Any]:
-        """Return a summary of pool health and usage statistics.
+        """Return pool statistics.
 
         Returns
         -------
         dict[str, Any]
-            Pool statistics including total, healthy, in-use, and
-            quarantined proxy counts plus aggregate request/failure totals.
+            Pool statistics including counts by status.
         """
-        with self._lock:
-            total = len(self._proxies)
-            healthy = sum(1 for p in self._proxies.values() if p.is_healthy)
-            in_use = sum(1 for p in self._proxies.values() if p.in_use)
-            quarantined = sum(
-                1 for p in self._proxies.values()
-                if not p.is_healthy and p.cooldown_until
-            )
-            total_requests = sum(p.total_requests for p in self._proxies.values())
-            total_failures = sum(p.total_failures for p in self._proxies.values())
+        status_counts: Dict[str, int] = {}
+        for proxy in self._proxies.values():
+            key = proxy.status.value
+            status_counts[key] = status_counts.get(key, 0) + 1
 
         return {
-            "total_proxies": total,
-            "healthy": healthy,
-            "in_use": in_use,
-            "quarantined": quarantined,
-            "total_requests": total_requests,
-            "total_failures": total_failures,
-            "failure_rate": (
-                round(total_failures / total_requests, 4)
-                if total_requests > 0
-                else 0.0
-            ),
+            "total_proxies": self.total_size,
+            "healthy_available": self.get_healthy_count(),
+            "total_requests": self._total_requests,
+            "status_breakdown": status_counts,
+            "rotation_strategy": self._rotation_strategy,
         }
 
-    # ------------------------------------------------------------------
-    # Introspection
-    # ------------------------------------------------------------------
-
-    @property
-    def pool_size(self) -> int:
-        """Return the total number of proxies in the pool."""
-        return len(self._proxies)
-
     def __repr__(self) -> str:
-        stats = self.get_stats()
         return (
-            f"ProxyPool(total={stats['total_proxies']}, "
-            f"healthy={stats['healthy']}, "
-            f"in_use={stats['in_use']}, "
+            f"ProxyPool(total={self.total_size}, "
+            f"healthy={self.get_healthy_count()}, "
             f"strategy={self._rotation_strategy!r})"
         )
