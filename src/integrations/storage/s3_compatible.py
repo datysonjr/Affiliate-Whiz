@@ -2,32 +2,21 @@
 integrations.storage.s3_compatible
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-S3-compatible object storage client for backups, media, and static assets.
+S3-compatible object storage integration for the OpenClaw system.
 
-Provides :class:`S3Storage` which wraps the S3 API (via ``boto3``) to
-upload, download, list, and delete objects in any S3-compatible storage
-service (AWS S3, Cloudflare R2, MinIO, Backblaze B2, etc.).
+Provides the :class:`S3Storage` class for uploading, downloading, listing,
+and deleting objects in S3-compatible storage services (AWS S3, MinIO,
+Backblaze B2, Cloudflare R2, DigitalOcean Spaces, etc.).
 
 Design references:
-    - config/providers.yaml  ``storage.s3`` section
     - ARCHITECTURE.md  Section 4 (Integration Layer)
-
-Usage::
-
-    from src.integrations.storage.s3_compatible import S3Storage
-
-    storage = S3Storage(
-        bucket="openclaw-backups",
-        access_key="AKIA...",
-        secret_key="wJal...",
-        endpoint_url="https://xxx.r2.cloudflarestorage.com",
-    )
-    await storage.upload("backups/db-2024-01-15.sqlite", local_path="/tmp/dump.sqlite")
+    - config/providers.yaml  ``storage`` section
 """
 
 from __future__ import annotations
 
 import hashlib
+import logging
 import mimetypes
 import os
 from dataclasses import dataclass, field
@@ -35,31 +24,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from src.core.constants import DEFAULT_REQUEST_TIMEOUT
 from src.core.errors import IntegrationError, APIAuthenticationError
 from src.core.logger import get_logger, log_event
-
-logger = get_logger("integrations.storage.s3_compatible")
 
 # ---------------------------------------------------------------------------
 # Optional dependency: boto3
 # ---------------------------------------------------------------------------
 try:
     import boto3  # type: ignore[import-untyped]
-    from botocore.exceptions import (  # type: ignore[import-untyped]
-        BotoCoreError,
-        ClientError,
-        NoCredentialsError,
-    )
-    _HAS_BOTO3 = True
-except ImportError:
-    _HAS_BOTO3 = False
+    from botocore.config import Config as BotoConfig  # type: ignore[import-untyped]
+    from botocore.exceptions import ClientError  # type: ignore[import-untyped]
+except ImportError:  # pragma: no cover
+    boto3 = None  # type: ignore[assignment]
+    BotoConfig = None  # type: ignore[assignment]
+    ClientError = Exception  # type: ignore[assignment,misc]
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-_DEFAULT_REGION = "auto"
-_DEFAULT_SIGNED_URL_EXPIRY = 3600  # 1 hour
+logger = get_logger("integrations.storage.s3_compatible")
 
 
 # ---------------------------------------------------------------------------
@@ -68,61 +49,39 @@ _DEFAULT_SIGNED_URL_EXPIRY = 3600  # 1 hour
 
 @dataclass
 class S3Object:
-    """Metadata for a single object in S3 storage.
+    """Metadata for a single object in S3-compatible storage.
 
     Attributes
     ----------
     key:
-        Object key (path within the bucket).
+        Object key (path) within the bucket.
+    bucket:
+        Bucket name.
     size_bytes:
         Object size in bytes.
     last_modified:
         UTC timestamp of the last modification.
     etag:
-        Entity tag (MD5 hash of the object content for standard uploads).
+        Entity tag (usually an MD5 hash of the object content).
     content_type:
         MIME type of the object.
     storage_class:
-        Storage class (``"STANDARD"``, ``"INTELLIGENT_TIERING"``, etc.).
+        Storage class (e.g. ``"STANDARD"``, ``"GLACIER"``).
+    url:
+        Public URL if the object is publicly accessible.
     metadata:
         User-defined metadata key-value pairs.
     """
 
     key: str
+    bucket: str = ""
     size_bytes: int = 0
     last_modified: Optional[datetime] = None
     etag: str = ""
     content_type: str = ""
     storage_class: str = "STANDARD"
-    metadata: Dict[str, str] = field(default_factory=dict)
-
-
-@dataclass
-class UploadResult:
-    """Result of an object upload operation.
-
-    Attributes
-    ----------
-    key:
-        Object key in the bucket.
-    bucket:
-        Target bucket name.
-    size_bytes:
-        Number of bytes uploaded.
-    etag:
-        ETag returned by S3.
-    version_id:
-        Version ID (if bucket versioning is enabled).
-    url:
-        Public URL of the uploaded object (if publicly accessible).
-    """
-
-    key: str
-    bucket: str = ""
-    size_bytes: int = 0
-    etag: str = ""
-    version_id: str = ""
     url: str = ""
+    metadata: Dict[str, str] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -130,518 +89,338 @@ class UploadResult:
 # ---------------------------------------------------------------------------
 
 class S3Storage:
-    """S3-compatible object storage client.
+    """Client for S3-compatible object storage.
 
-    Wraps ``boto3`` to provide a simplified interface for common object
-    storage operations.  Supports any S3-compatible endpoint via the
+    Wraps ``boto3`` to provide a simplified interface for common storage
+    operations.  Supports any S3-compatible endpoint by configuring the
     ``endpoint_url`` parameter.
 
     Parameters
     ----------
     bucket:
-        Default bucket name for all operations.
+        Default bucket name.
     access_key:
-        S3 access key ID.
+        AWS / S3-compatible access key ID.
     secret_key:
-        S3 secret access key.
+        AWS / S3-compatible secret access key.
     endpoint_url:
-        Custom S3-compatible endpoint URL.  Required for non-AWS
-        services (Cloudflare R2, MinIO, Backblaze B2, etc.).
+        Custom S3-compatible endpoint URL (e.g. ``"https://s3.us-west-002.backblazeb2.com"``).
         Leave empty for AWS S3.
     region:
-        AWS region or ``"auto"`` for S3-compatible services.
-    signed_url_expiry:
-        Default expiry time in seconds for pre-signed URLs.
+        AWS region (e.g. ``"us-east-1"``).
+    public_base_url:
+        Base URL for constructing public object URLs (e.g. a CDN URL).
+    timeout:
+        HTTP request timeout in seconds.
+
+    Raises
+    ------
+    IntegrationError
+        If ``boto3`` is not installed.
+    APIAuthenticationError
+        If credentials are missing.
     """
 
     def __init__(
         self,
         bucket: str,
-        access_key: str,
-        secret_key: str,
+        access_key: str = "",
+        secret_key: str = "",
         endpoint_url: str = "",
-        region: str = _DEFAULT_REGION,
-        signed_url_expiry: int = _DEFAULT_SIGNED_URL_EXPIRY,
+        region: str = "us-east-1",
+        public_base_url: str = "",
+        timeout: int = DEFAULT_REQUEST_TIMEOUT,
     ) -> None:
-        if not bucket:
-            raise IntegrationError("S3 bucket name is required")
-        if not access_key or not secret_key:
-            raise APIAuthenticationError(
-                "S3 storage requires both access_key and secret_key",
+        if boto3 is None:
+            raise IntegrationError(
+                "The 'boto3' package is required for S3Storage. "
+                "Install it with: pip install boto3"
             )
+        if not bucket:
+            raise IntegrationError("bucket is required for S3Storage")
 
         self._bucket = bucket
-        self._access_key = access_key
-        self._secret_key = secret_key
         self._endpoint_url = endpoint_url
         self._region = region
-        self._signed_url_expiry = signed_url_expiry
-        self._client: Any = None
-        self._operation_count: int = 0
+        self._public_base_url = public_base_url.rstrip("/") if public_base_url else ""
+        self._request_count: int = 0
+        self.logger: logging.Logger = get_logger("integrations.storage.s3_compatible")
 
-        # Initialize boto3 client if available
-        if _HAS_BOTO3:
-            client_kwargs: Dict[str, Any] = {
-                "service_name": "s3",
-                "aws_access_key_id": access_key,
-                "aws_secret_access_key": secret_key,
-                "region_name": region,
-            }
-            if endpoint_url:
-                client_kwargs["endpoint_url"] = endpoint_url
+        # Build boto3 client
+        client_kwargs: Dict[str, Any] = {
+            "service_name": "s3",
+            "region_name": region,
+        }
+        if access_key and secret_key:
+            client_kwargs["aws_access_key_id"] = access_key
+            client_kwargs["aws_secret_access_key"] = secret_key
+        if endpoint_url:
+            client_kwargs["endpoint_url"] = endpoint_url
 
-            try:
-                self._client = boto3.client(**client_kwargs)
-            except (BotoCoreError, Exception) as exc:
-                raise IntegrationError(
-                    "Failed to initialize S3 client",
-                    details={"endpoint": endpoint_url, "region": region},
-                    cause=exc,
-                ) from exc
-        else:
-            logger.warning(
-                "boto3 is not installed; S3 operations will not be available. "
-                "Install with: pip install boto3"
-            )
+        boto_config = BotoConfig(
+            connect_timeout=timeout,
+            read_timeout=timeout,
+            retries={"max_attempts": 3, "mode": "standard"},
+        ) if BotoConfig else None
+        if boto_config:
+            client_kwargs["config"] = boto_config
+
+        self._client = boto3.client(**client_kwargs)
 
         log_event(
-            logger,
-            "s3.init",
-            bucket=bucket,
-            endpoint=endpoint_url or "aws-default",
-            region=region,
-            has_boto3=_HAS_BOTO3,
+            logger, "s3.init",
+            bucket=bucket, region=region,
+            has_endpoint=bool(endpoint_url),
         )
 
     # ------------------------------------------------------------------
-    # Internal helpers
+    # Operations
     # ------------------------------------------------------------------
 
-    def _ensure_client(self) -> None:
-        """Raise if the boto3 client is not available.
-
-        Raises
-        ------
-        IntegrationError
-            If boto3 is not installed.
-        """
-        if self._client is None:
-            raise IntegrationError(
-                "S3 client is not available. Ensure boto3 is installed: pip install boto3"
-            )
-
-    def _track_operation(self) -> None:
-        """Record that an S3 operation was performed."""
-        self._operation_count += 1
-
-    @staticmethod
-    def _detect_content_type(path: str) -> str:
-        """Detect MIME type from a file path.
+    def upload(
+        self,
+        local_path: str,
+        key: str,
+        *,
+        content_type: str = "",
+        metadata: Optional[Dict[str, str]] = None,
+        public: bool = False,
+    ) -> S3Object:
+        """Upload a local file to S3.
 
         Parameters
         ----------
-        path:
-            File path or object key.
+        local_path:
+            Path to the local file.
+        key:
+            Destination object key in the bucket.
+        content_type:
+            MIME type override.  If empty, it is guessed from the filename.
+        metadata:
+            User-defined metadata to attach to the object.
+        public:
+            If ``True``, set the ACL to ``public-read``.
+
+        Returns
+        -------
+        S3Object
+            Metadata of the uploaded object.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the local file does not exist.
+        IntegrationError
+            If the upload fails.
+        """
+        path = Path(local_path)
+        if not path.is_file():
+            raise FileNotFoundError(f"File not found: {local_path}")
+
+        if not content_type:
+            content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+
+        extra_args: Dict[str, Any] = {"ContentType": content_type}
+        if metadata:
+            extra_args["Metadata"] = metadata
+        if public:
+            extra_args["ACL"] = "public-read"
+
+        try:
+            self._client.upload_file(
+                str(path), self._bucket, key, ExtraArgs=extra_args
+            )
+            self._request_count += 1
+        except ClientError as exc:
+            raise IntegrationError(
+                f"S3 upload failed: {key}",
+                details={"bucket": self._bucket, "key": key, "error": str(exc)},
+                cause=exc,
+            ) from exc
+
+        size = path.stat().st_size
+        url = self._build_url(key) if public else ""
+
+        self.logger.info(
+            "Uploaded %s to s3://%s/%s (%d bytes, %s)",
+            path.name, self._bucket, key, size, content_type,
+        )
+
+        return S3Object(
+            key=key,
+            bucket=self._bucket,
+            size_bytes=size,
+            last_modified=datetime.now(timezone.utc),
+            content_type=content_type,
+            url=url,
+            metadata=metadata or {},
+        )
+
+    def download(
+        self,
+        key: str,
+        local_path: str,
+    ) -> str:
+        """Download an object from S3 to a local file.
+
+        Parameters
+        ----------
+        key:
+            Object key in the bucket.
+        local_path:
+            Destination path on the local filesystem.
 
         Returns
         -------
         str
-            Detected MIME type, or ``"application/octet-stream"`` as fallback.
-        """
-        content_type, _ = mimetypes.guess_type(path)
-        return content_type or "application/octet-stream"
-
-    # ------------------------------------------------------------------
-    # Public API methods
-    # ------------------------------------------------------------------
-
-    async def upload(
-        self,
-        key: str,
-        *,
-        local_path: Optional[str] = None,
-        data: Optional[bytes] = None,
-        content_type: str = "",
-        metadata: Optional[Dict[str, str]] = None,
-        bucket: str = "",
-    ) -> UploadResult:
-        """Upload a file or bytes to S3.
-
-        Either *local_path* or *data* must be provided.  If both are
-        given, *data* takes precedence.
-
-        Parameters
-        ----------
-        key:
-            Object key (destination path in the bucket).
-        local_path:
-            Path to a local file to upload.
-        data:
-            Raw bytes to upload directly.
-        content_type:
-            MIME type.  Auto-detected from key if not specified.
-        metadata:
-            User-defined metadata to attach to the object.
-        bucket:
-            Override the default bucket.
-
-        Returns
-        -------
-        UploadResult
-            Upload outcome with ETag and version info.
+            The local file path where the object was saved.
 
         Raises
         ------
         IntegrationError
-            If the upload fails or neither local_path nor data is provided.
+            If the download fails.
         """
-        self._ensure_client()
-        target_bucket = bucket or self._bucket
-
-        if data is None and local_path is None:
-            raise IntegrationError(
-                "Either local_path or data must be provided for upload"
-            )
-
-        resolved_content_type = content_type or self._detect_content_type(key)
-        extra_args: Dict[str, Any] = {"ContentType": resolved_content_type}
-        if metadata:
-            extra_args["Metadata"] = metadata
-
-        log_event(
-            logger,
-            "s3.upload",
-            bucket=target_bucket,
-            key=key,
-            content_type=resolved_content_type,
-            source="data" if data is not None else "file",
-        )
-        self._track_operation()
-
         try:
-            if data is not None:
-                size_bytes = len(data)
-                response = self._client.put_object(
-                    Bucket=target_bucket,
-                    Key=key,
-                    Body=data,
-                    **extra_args,
-                )
-            else:
-                size_bytes = os.path.getsize(local_path)  # type: ignore[arg-type]
-                self._client.upload_file(
-                    Filename=local_path,
-                    Bucket=target_bucket,
-                    Key=key,
-                    ExtraArgs=extra_args,
-                )
-                response = {}
-
-            etag = response.get("ETag", "").strip('"')
-            version_id = response.get("VersionId", "")
-
-            return UploadResult(
-                key=key,
-                bucket=target_bucket,
-                size_bytes=size_bytes,
-                etag=etag,
-                version_id=version_id,
-            )
-
-        except (ClientError, BotoCoreError, OSError) as exc:
-            raise IntegrationError(
-                f"S3 upload failed for key={key!r}",
-                details={"bucket": target_bucket, "key": key},
-                cause=exc,
-            ) from exc
-
-    async def download(
-        self,
-        key: str,
-        *,
-        local_path: Optional[str] = None,
-        bucket: str = "",
-    ) -> bytes:
-        """Download an object from S3.
-
-        If *local_path* is provided, the file is saved to disk and the
-        content is also returned as bytes.
-
-        Parameters
-        ----------
-        key:
-            Object key to download.
-        local_path:
-            Optional local filesystem path to save the downloaded file.
-        bucket:
-            Override the default bucket.
-
-        Returns
-        -------
-        bytes
-            Object content as bytes.
-
-        Raises
-        ------
-        IntegrationError
-            If the download fails or the object does not exist.
-        """
-        self._ensure_client()
-        target_bucket = bucket or self._bucket
-
-        log_event(
-            logger,
-            "s3.download",
-            bucket=target_bucket,
-            key=key,
-            save_to_disk=bool(local_path),
-        )
-        self._track_operation()
-
-        try:
-            response = self._client.get_object(Bucket=target_bucket, Key=key)
-            content = response["Body"].read()
-
-            if local_path:
-                Path(local_path).parent.mkdir(parents=True, exist_ok=True)
-                with open(local_path, "wb") as fh:
-                    fh.write(content)
-                logger.debug("Downloaded %s to %s (%d bytes)", key, local_path, len(content))
-
-            return content
-
+            # Ensure parent directory exists
+            Path(local_path).parent.mkdir(parents=True, exist_ok=True)
+            self._client.download_file(self._bucket, key, local_path)
+            self._request_count += 1
         except ClientError as exc:
-            error_code = exc.response.get("Error", {}).get("Code", "Unknown")
-            if error_code == "NoSuchKey":
-                raise IntegrationError(
-                    f"S3 object not found: {key!r}",
-                    details={"bucket": target_bucket, "key": key},
-                    cause=exc,
-                ) from exc
             raise IntegrationError(
-                f"S3 download failed for key={key!r}",
-                details={"bucket": target_bucket, "key": key, "error_code": error_code},
-                cause=exc,
-            ) from exc
-        except (BotoCoreError, OSError) as exc:
-            raise IntegrationError(
-                f"S3 download failed for key={key!r}",
-                details={"bucket": target_bucket, "key": key},
+                f"S3 download failed: {key}",
+                details={"bucket": self._bucket, "key": key, "error": str(exc)},
                 cause=exc,
             ) from exc
 
-    async def list_objects(
+        self.logger.info(
+            "Downloaded s3://%s/%s to %s", self._bucket, key, local_path,
+        )
+        return local_path
+
+    def list_objects(
         self,
         prefix: str = "",
         *,
-        delimiter: str = "",
         max_keys: int = 1000,
-        bucket: str = "",
+        delimiter: str = "",
     ) -> List[S3Object]:
         """List objects in the bucket with an optional prefix filter.
 
         Parameters
         ----------
         prefix:
-            Key prefix to filter results (e.g. ``"backups/"``).
-        delimiter:
-            Delimiter for grouping (e.g. ``"/"`` for directory-like listing).
+            Key prefix to filter by (e.g. ``"images/"``).
         max_keys:
             Maximum number of objects to return.
-        bucket:
-            Override the default bucket.
+        delimiter:
+            Delimiter for grouping keys (e.g. ``"/"`` for directory-like listing).
 
         Returns
         -------
         list[S3Object]
             Object metadata for matching keys.
-
-        Raises
-        ------
-        IntegrationError
-            If the listing fails.
         """
-        self._ensure_client()
-        target_bucket = bucket or self._bucket
-
-        log_event(
-            logger,
-            "s3.list_objects",
-            bucket=target_bucket,
-            prefix=prefix,
-            max_keys=max_keys,
-        )
-        self._track_operation()
+        params: Dict[str, Any] = {
+            "Bucket": self._bucket,
+            "MaxKeys": min(max_keys, 1000),
+        }
+        if prefix:
+            params["Prefix"] = prefix
+        if delimiter:
+            params["Delimiter"] = delimiter
 
         try:
-            params: Dict[str, Any] = {
-                "Bucket": target_bucket,
-                "MaxKeys": max_keys,
-            }
-            if prefix:
-                params["Prefix"] = prefix
-            if delimiter:
-                params["Delimiter"] = delimiter
-
             response = self._client.list_objects_v2(**params)
-            contents = response.get("Contents", [])
-
-            objects: List[S3Object] = []
-            for item in contents:
-                last_modified = item.get("LastModified")
-                if last_modified and not last_modified.tzinfo:
-                    last_modified = last_modified.replace(tzinfo=timezone.utc)
-
-                objects.append(S3Object(
-                    key=item.get("Key", ""),
-                    size_bytes=item.get("Size", 0),
-                    last_modified=last_modified,
-                    etag=item.get("ETag", "").strip('"'),
-                    storage_class=item.get("StorageClass", "STANDARD"),
-                ))
-
-            return objects
-
-        except (ClientError, BotoCoreError) as exc:
+            self._request_count += 1
+        except ClientError as exc:
             raise IntegrationError(
-                f"S3 list failed for prefix={prefix!r}",
-                details={"bucket": target_bucket, "prefix": prefix},
+                f"S3 list_objects failed for prefix '{prefix}'",
+                details={"bucket": self._bucket, "prefix": prefix, "error": str(exc)},
                 cause=exc,
             ) from exc
 
-    async def delete(
-        self,
-        key: str,
-        *,
-        bucket: str = "",
-    ) -> bool:
+        objects: List[S3Object] = []
+        for item in response.get("Contents", []):
+            objects.append(S3Object(
+                key=item.get("Key", ""),
+                bucket=self._bucket,
+                size_bytes=item.get("Size", 0),
+                last_modified=item.get("LastModified"),
+                etag=item.get("ETag", "").strip('"'),
+                storage_class=item.get("StorageClass", "STANDARD"),
+            ))
+
+        self.logger.debug(
+            "Listed %d objects in s3://%s/%s", len(objects), self._bucket, prefix,
+        )
+        return objects
+
+    def delete(self, key: str) -> bool:
         """Delete an object from S3.
 
         Parameters
         ----------
         key:
             Object key to delete.
-        bucket:
-            Override the default bucket.
 
         Returns
         -------
         bool
-            ``True`` if the deletion was successful.
+            ``True`` if the deletion succeeded.
 
         Raises
         ------
         IntegrationError
             If the deletion fails.
         """
-        self._ensure_client()
-        target_bucket = bucket or self._bucket
-
-        log_event(
-            logger,
-            "s3.delete",
-            bucket=target_bucket,
-            key=key,
-        )
-        self._track_operation()
-
         try:
-            self._client.delete_object(Bucket=target_bucket, Key=key)
-            return True
-
-        except (ClientError, BotoCoreError) as exc:
+            self._client.delete_object(Bucket=self._bucket, Key=key)
+            self._request_count += 1
+        except ClientError as exc:
             raise IntegrationError(
-                f"S3 delete failed for key={key!r}",
-                details={"bucket": target_bucket, "key": key},
+                f"S3 delete failed: {key}",
+                details={"bucket": self._bucket, "key": key, "error": str(exc)},
                 cause=exc,
             ) from exc
 
-    async def get_signed_url(
-        self,
-        key: str,
-        *,
-        expires_in: Optional[int] = None,
-        bucket: str = "",
-        http_method: str = "GET",
-    ) -> str:
-        """Generate a pre-signed URL for temporary access to an object.
+        self.logger.info("Deleted s3://%s/%s", self._bucket, key)
+        return True
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _build_url(self, key: str) -> str:
+        """Build a public URL for an S3 object.
 
         Parameters
         ----------
         key:
-            Object key to generate the URL for.
-        expires_in:
-            URL expiry time in seconds.  Defaults to the instance's
-            ``signed_url_expiry`` setting.
-        bucket:
-            Override the default bucket.
-        http_method:
-            HTTP method the URL will be valid for (``"GET"`` or ``"PUT"``).
+            Object key.
 
         Returns
         -------
         str
-            Pre-signed URL.
-
-        Raises
-        ------
-        IntegrationError
-            If URL generation fails.
+            Public URL, or empty string if no base URL is configured.
         """
-        self._ensure_client()
-        target_bucket = bucket or self._bucket
-        expiry = expires_in or self._signed_url_expiry
-
-        log_event(
-            logger,
-            "s3.get_signed_url",
-            bucket=target_bucket,
-            key=key,
-            expires_in=expiry,
-            method=http_method,
-        )
-        self._track_operation()
-
-        try:
-            client_method = (
-                "get_object" if http_method.upper() == "GET" else "put_object"
-            )
-            url = self._client.generate_presigned_url(
-                ClientMethod=client_method,
-                Params={"Bucket": target_bucket, "Key": key},
-                ExpiresIn=expiry,
-            )
-            return url
-
-        except (ClientError, BotoCoreError) as exc:
-            raise IntegrationError(
-                f"Failed to generate signed URL for key={key!r}",
-                details={"bucket": target_bucket, "key": key},
-                cause=exc,
-            ) from exc
-
-    # ------------------------------------------------------------------
-    # Introspection
-    # ------------------------------------------------------------------
+        if self._public_base_url:
+            return f"{self._public_base_url}/{key}"
+        if self._endpoint_url:
+            return f"{self._endpoint_url}/{self._bucket}/{key}"
+        return f"https://{self._bucket}.s3.{self._region}.amazonaws.com/{key}"
 
     @property
     def bucket(self) -> str:
-        """Return the default bucket name."""
+        """Return the configured bucket name."""
         return self._bucket
 
     @property
-    def operation_count(self) -> int:
-        """Return the total number of S3 operations performed."""
-        return self._operation_count
-
-    @property
-    def has_client(self) -> bool:
-        """Return whether the boto3 client is available."""
-        return self._client is not None
+    def request_count(self) -> int:
+        """Return the total number of S3 API requests made."""
+        return self._request_count
 
     def __repr__(self) -> str:
         return (
             f"S3Storage(bucket={self._bucket!r}, "
-            f"endpoint={self._endpoint_url or 'aws-default'!r}, "
-            f"operations={self._operation_count})"
+            f"region={self._region!r}, requests={self._request_count})"
         )
