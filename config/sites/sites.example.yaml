@@ -1,0 +1,31 @@
+# config/sites/sites.example.yaml
+version: 1
+
+sites:
+  - site_id: "site_001"
+    name: "Example Niche Site (Staging)"
+    niche: "example niche"
+    status: "staging"          # staging | production | paused
+    primary_domain: "example.com"
+    wp_profile: "wp_staging_01"
+    seo_profile: "seo_default"
+    affiliate_profile: "aff_default"
+    cadence:
+      max_posts_per_day: 2
+      publish_days: ["MON","WED","FRI"]
+    content_strategy:
+      hub_pages:
+        - "best-of"
+        - "buying-guides"
+      cluster_topics:
+        - "topic-a"
+        - "topic-b"
+
+  - site_id: "site_002"
+    name: "Future Production Site Placeholder"
+    niche: "TBD"
+    status: "paused"
+    primary_domain: "tbd.com"
+    wp_profile: "wp_prod_01"
+    seo_profile: "seo_default"
+    affiliate_profile: "aff_default"

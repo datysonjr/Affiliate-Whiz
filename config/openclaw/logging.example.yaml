@@ -1,0 +1,28 @@
+# config/openclaw/logging.example.yaml
+version: 1
+
+logging:
+  level: "INFO"          # DEBUG | INFO | WARNING | ERROR
+  format: "json"         # json recommended for analysis
+  redact_keys:
+    - "API_KEY"
+    - "TOKEN"
+    - "PASSWORD"
+    - "SECRET"
+  files:
+    app_log: "/data/logs/openclaw.log"
+    audit_log: "/data/logs/audit.log"
+  rotation:
+    enabled: true
+    max_mb: 50
+    keep_files: 10
+
+audit:
+  enabled: true
+  record_fields:
+    - "timestamp"
+    - "actor"            # e.g. DA/Don Anthony or system
+    - "action"
+    - "site_id"
+    - "post_id"
+    - "result"

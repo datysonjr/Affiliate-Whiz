@@ -1,31 +1,33 @@
 # config/cluster/roles.example.yaml
-# Role definitions for cluster nodes
-# Copy to roles.yaml and customize
+version: 1
 
-roles:
-  primary:
-    description: "Scheduler + Orchestrator + Publishing"
-    services:
-      - orchestrator
-      - scheduler
-      - publishing_worker
-    max_concurrent_agents: 3
+role_definitions:
+  orchestrator:
+    description: "Routes jobs, enforces policies, maintains system state"
+  scheduler:
+    description: "Creates run plans and enqueues jobs"
+  db_primary:
+    description: "Primary DB host (sqlite volume v1, postgres later)"
+  worker_light:
+    description: "Low/medium CPU tasks: research, scoring, reporting"
+  worker_heavy:
+    description: "Heavier tasks: content generation batches, processing"
+  publishing:
+    description: "WordPress publishing + sitemap updates (gated)"
+  analytics:
+    description: "Ingests performance signals and updates ROI models"
 
-  worker:
-    description: "Research + Content + Analytics"
-    services:
-      - research_worker
-      - content_worker
-      - analytics_worker
-    max_concurrent_agents: 4
+role_assignment:
+  node_a:
+    - orchestrator
+    - scheduler
+    - db_primary
+    - worker_light
+  node_b:
+    - worker_heavy
+    - publishing
+    - analytics
 
-  full:
-    description: "All services on single node (local dev)"
-    services:
-      - orchestrator
-      - scheduler
-      - research_worker
-      - content_worker
-      - publishing_worker
-      - analytics_worker
-    max_concurrent_agents: 2
+notes:
+  - "Roles are configurable; in outages, node_b can run worker_light if needed."
+  - "Publishing should remain gated (DRY_RUN default, SAFE_STAGING optional)."

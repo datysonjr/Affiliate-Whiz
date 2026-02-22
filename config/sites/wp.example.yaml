@@ -1,0 +1,32 @@
+# config/sites/wp.example.yaml
+version: 1
+
+wordpress_profiles:
+  wp_staging_01:
+    environment: "staging"
+    base_url: "https://staging-example.com"
+    # placeholder
+    api_type: "wp_rest"
+    auth_method: "application_password"         # recommended for WP REST
+    username_env: "WP_STAGING_USER"
+    app_password_env: "WP_STAGING_APP_PASSWORD"
+    default_category: "Guides"
+    default_status: "draft"                     # staging posts default to draft
+    media_uploads_enabled: true
+
+  wp_prod_01:
+    environment: "production"
+    base_url: "https://example.com"             # placeholder
+    api_type: "wp_rest"
+    auth_method: "application_password"
+    username_env: "WP_PROD_USER"
+    app_password_env: "WP_PROD_APP_PASSWORD"
+    default_category: "Guides"
+    default_status: "draft"                     # keep draft by default; promote via explicit step
+    media_uploads_enabled: true
+
+publishing_defaults:
+  include_affiliate_disclosure_block: true
+  include_author_box: true
+  include_last_updated: true
+  enable_table_of_contents: true

@@ -1,0 +1,33 @@
+# config/openclaw/schedules.example.yaml
+version: 1
+
+schedules:
+  daily_research:
+    cron: "0 7 * * *"      # 7:00 AM local
+    enabled: true
+
+  daily_content_batch:
+    cron: "0 9 * * *"      # 9:00 AM
+    enabled: true
+
+  daily_internal_linking:
+    cron: "0 12 * * *"     # noon
+    enabled: true
+
+  daily_analytics_snapshot:
+    cron: "0 18 * * *"     # 6:00 PM
+    enabled: true
+
+  nightly_backup:
+    cron: "0 2 * * *"      # 2:00 AM
+    enabled: true
+
+  weekly_review_report:
+    cron: "0 10 * * MON"   # Mondays 10:00 AM
+    enabled: true
+
+rate_limits:
+  # global caps across all schedules
+  max_total_posts_per_day: 10
+  max_total_sites_per_day: 4
+  max_total_new_sites_per_week: 2

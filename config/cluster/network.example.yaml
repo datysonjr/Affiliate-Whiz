@@ -1,27 +1,43 @@
 # config/cluster/network.example.yaml
-# Network configuration for the OpenClaw cluster
-# Copy to network.yaml and fill in actual values
+version: 1
 
-network:
-  lan:
-    subnet: "192.168.1.0/24"      # Replace with actual subnet
-    gateway: "192.168.1.1"        # Replace with router IP
-    dns_primary: "8.8.8.8"
-    dns_secondary: "8.8.4.4"
-    
-  reserved_ips:
-    router: "192.168.1.1"
-    switch: "192.168.1.2"         # If managed switch has IP
-    node_a: "192.168.1.100"
-    node_b: "192.168.1.101"
-    # Reserve range 192.168.1.100-110 for cluster nodes
+isp: "Spectrum"
+dedicated_line_mbps: 1000
 
-  hardware:
-    router: "Spectrum router (dedicated 1Gbps)"
-    switch: "Netgear 16-port PoE gigabit"
-    ups: "CyberPower CP1500AVRLCD3"
+router:
+  model: "Spectrum Router (placeholder)"
+  lan_gateway_ip: "192.168.1.1"
+  lan_subnet_cidr: "192.168.1.0/24"
+  dns_servers:
+    - "1.1.1.1"
+    - "8.8.8.8"
+  dhcp:
+    enabled: true
+    range_start: "192.168.1.100"
+    range_end: "192.168.1.199"
+  reservations:
+    # Reserve these in router UI so they never change
+    - hostname: "oc-core-01"
+      mac_address: "AA:BB:CC:DD:EE:01"  # placeholder
+      ip: "192.168.1.10"
+    - hostname: "oc-work-01"
+      mac_address: "AA:BB:CC:DD:EE:02"  # placeholder
+      ip: "192.168.1.11"
 
-  internet:
-    provider: "Spectrum"
-    speed: "1Gbps dedicated"
-    purpose: "OpenClaw cluster only"
+switch:
+  model: "Netgear 16-port PoE Gigabit"
+  uplink_port: 1
+  port_map:
+    "1": "Router uplink"
+    "2": "oc-core-01 (node_a)"
+    "3": "oc-work-01 (node_b)"
+    # leave remaining ports open for expansion
+
+ups:
+  model: "CyberPower CP1500AVRLCD3"
+  protected_devices:
+    - "router"
+    - "switch"
+    - "node_a"
+    - "node_b"
+  usb_shutdown_host: "oc-core-01" # recommended: connect UPS USB to node_a

@@ -1,0 +1,40 @@
+# config/sites/affiliate.example.yaml
+version: 1
+
+affiliate_profiles:
+  aff_default:
+    disclosure_required: true
+    disclosure_block:
+      heading: "Affiliate Disclosure"
+      text: "This site may earn a commission from qualifying purchases made through links on this page. This does not affect our recommendations or the price you pay."
+    link_rules:
+      use_nofollow: true
+      use_sponsored: true
+      open_in_new_tab: true
+    tracking:
+      utm_enabled: true
+      utm_defaults:
+        source: "openclaw"
+        medium: "affiliate"
+        campaign: "auto"
+    networks:
+      # Add only what you actually use; keep tokens in env vars
+      - name: "amazon_associates"
+        enabled: false
+        tag_env: "AMAZON_ASSOC_TAG"
+      - name: "impact"
+        enabled: false
+        api_key_env: "IMPACT_API_KEY"
+      - name: "cj"
+        enabled: false
+        api_key_env: "CJ_API_KEY"
+
+offer_scoring:
+  # Simple starting heuristics (tune later)
+  min_commission_rate: 0.03
+  prefer_reputable_merchants: true
+  avoid_policy_sensitive_categories:
+    - "medical_claims"
+    - "financial_advice"
+    - "adult"
+    - "weapons"

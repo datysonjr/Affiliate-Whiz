@@ -1,0 +1,42 @@
+# config/sites/seo.example.yaml
+version: 1
+
+seo_profiles:
+  seo_default:
+    permalink_style: "/%postname%/"
+    title_rules:
+      max_chars: 60
+      include_year_when_relevant: true
+    meta_description_rules:
+      max_chars: 155
+    heading_rules:
+      require_h1: true
+      require_h2_sections: true
+      max_h2: 10
+    schema:
+      enabled: true
+      types_enabled:
+        - "Article"
+        - "FAQPage"          # only when FAQs exist
+    internal_linking:
+      min_internal_links: 3
+      max_internal_links: 8
+      anchor_policy: "natural"  # avoid over-optimized anchors
+    image_policy:
+      require_featured_image: true
+      alt_text_required: true
+    sitemap:
+      enabled: true
+      ping_after_publish: true
+
+ai_citation_policy:
+  # Helps content be credible & durable (no made-up facts)
+  require_sources_for:
+    - "statistics"
+    - "medical claims"
+    - "legal claims"
+    - "pricing claims"
+  allowed_source_types:
+    - "manufacturer_docs"
+    - "official_orgs"
+    - "reputable_reviews"

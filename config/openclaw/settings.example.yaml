@@ -1,0 +1,36 @@
+# config/openclaw/settings.example.yaml
+version: 1
+
+project:
+  name: "openclaw-affiliate-bot"
+  mode: "DRY_RUN"  # DRY_RUN | SAFE_STAGING | PRODUCTION
+  timezone: "America/New_York"
+
+paths:
+  data_root: "/data"                 # inside container
+  exports_dir: "/data/exports"
+  logs_dir: "/data/logs"
+  sqlite_path: "/data/db/openclaw.sqlite"
+
+runtime:
+  max_concurrency: 2                 # start small
+  max_jobs_per_hour: 30              # safety cap
+  job_retry_limit: 2
+  retry_backoff_seconds: [10, 60]    # exponential-ish
+
+quality_gates:
+  require_affiliate_disclosure: true
+  require_unique_content_check: true
+  require_internal_links: true
+  require_sources_for_claims: true
+  # avoid unverifiable claims
+
+publishing_gates:
+  allow_publishing: false            # must be true for SAFE_STAGING/PRODUCTION
+  staging_only: true                 # SAFE_STAGING requirement
+  max_posts_per_site_per_day: 3
+  max_sites_touched_per_day: 2
+
+security:
+  redact_secrets_in_logs: true
+  audit_log_enabled: true

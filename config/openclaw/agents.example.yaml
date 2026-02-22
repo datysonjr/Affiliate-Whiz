@@ -1,0 +1,66 @@
+# config/openclaw/agents.example.yaml
+version: 1
+
+agents:
+  master_scheduler:
+    enabled: true
+    priority: 1
+
+  research:
+    enabled: true
+    priority: 2
+    settings:
+      max_niches_to_evaluate_per_day: 5
+      serp_sample_size: 10
+      min_keywords_per_niche: 20
+
+  content_generation:
+    enabled: true
+    priority: 3
+    settings:
+      max_articles_per_day: 10
+      templates:
+        - "product_review"
+        - "comparison"
+        - "roundup"
+        - "how_to"
+      min_word_count: 900
+      max_word_count: 1800
+
+  publishing:
+    enabled: true
+    priority: 4
+    settings:
+      require_mode: "SAFE_STAGING"   # publishing only when mode matches and allow_publishing=true
+      max_posts_per_hour: 2
+
+  analytics:
+    enabled: true
+    priority: 5
+    settings:
+      snapshot_sources:
+        - "search_console"   # optional later
+        - "ga4"              # optional later
+        - "affiliate_dashboard_manual_import" # v1 fallback
+      roi_window_days: 30
+
+  health_monitor:
+    enabled: true
+    priority: 0
+    settings:
+      interval_seconds: 60
+      disk_free_min_gb: 20
+      queue_depth_max: 500
+
+  error_recovery:
+    enabled: true
+    priority: 0
+    settings:
+      quarantine_on_repeat_failures: true
+      quarantine_threshold: 5
+
+  traffic_routing:
+    enabled: false
+    priority: 9
+    settings:
+      notes: "Reserved for future experiments (CDN, routing, etc.)"
