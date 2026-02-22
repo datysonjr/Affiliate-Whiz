@@ -1,0 +1,40 @@
+# LLM and Service Provider Configuration
+llm:
+  primary:
+    provider: "anthropic"
+    model: "claude-sonnet-4-20250514"
+    max_tokens: 4096
+    temperature: 0.7
+    daily_budget_usd: 30.00
+    requests_per_minute: 20
+
+  fallback:
+    provider: "openai"
+    model: "gpt-4o"
+    max_tokens: 4096
+    temperature: 0.7
+    daily_budget_usd: 20.00
+    requests_per_minute: 20
+
+  # For high-volume, lower-quality tasks (keyword expansion, etc.)
+  fast:
+    provider: "anthropic"
+    model: "claude-haiku-4-20250514"
+    max_tokens: 2048
+    temperature: 0.5
+    daily_budget_usd: 10.00
+    requests_per_minute: 50
+
+seo_tools:
+  # Configure your SEO data provider
+  provider: ""  # e.g., "semrush", "ahrefs", "serpapi"
+  api_key_vault_ref: "seo_api_key"
+
+image_generation:
+  provider: ""  # e.g., "dall-e", "midjourney", "stock"
+  api_key_vault_ref: "image_api_key"
+
+search:
+  provider: "serpapi"  # or "google_custom_search"
+  api_key_vault_ref: "search_api_key"
+  max_daily_searches: 500

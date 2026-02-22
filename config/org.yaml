@@ -1,0 +1,22 @@
+# Organization Configuration
+org:
+  name: "OpenClaw"
+  team:
+    - name: "Corey"
+      role: "Lead / Strategy"
+    - name: "DA / Don Anthony"
+      role: "Operations"
+    - name: "Fern"
+      role: "Content"
+    - name: "David"
+      role: "Technical"
+    - name: "Jamie"
+      role: "Analytics"
+
+  contact:
+    email: ""  # fill in
+    slack_channel: ""  # fill in
+
+  compliance:
+    ftc_disclosure: true
+    affiliate_disclosure_url: ""  # fill in per site

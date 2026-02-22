@@ -1,0 +1,62 @@
+# Environment
+.env
+*.env
+!ops/env/example.env
+!ops/env/prod.env.template
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets (never commit)
+ops/secrets/vault.enc
+ops/secrets/*.key
+ops/secrets/*.pem
+*.secret
+
+# Data
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/*.log
+logs/*.log.*.gz
+
+# Temp
+tmp/*
+!tmp/.gitkeep
+
+# Backups
+backups/
+
+# Node modules (if any JS tooling)
+node_modules/
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/

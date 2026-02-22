@@ -1,0 +1,33 @@
+# Schedule Configuration
+# Uses cron syntax: minute hour day_of_month month day_of_week
+
+schedules:
+  # Core operations
+  orchestrator:
+    controller_heartbeat: "*/1 * * * *"  # every minute
+    scheduler_run: "*/30 * * * *"  # every 30 minutes
+
+  # Agent schedules (can override agents.yaml)
+  agents:
+    research: "0 6,10,14,18 * * *"  # 4x daily
+    content_generation: "0 7,11,15,19 * * *"  # 4x daily
+    publishing: "0 8,12,16,20 * * *"  # 4x daily
+    analytics: "0 0,6,12,18 * * *"  # 4x daily
+    health_monitor: "*/5 * * * *"  # every 5 minutes
+    error_recovery: "*/10 * * * *"  # every 10 minutes
+    traffic_routing: "0 3,15 * * *"  # 2x daily
+
+  # Maintenance
+  maintenance:
+    log_rotation: "0 2 * * *"  # daily at 2 AM
+    backup: "0 1 * * *"  # daily at 1 AM
+    key_rotation: "0 0 1 * *"  # monthly, 1st day
+    offer_rescore: "0 4 * * 0"  # weekly, Sunday 4 AM
+    content_prune: "0 5 * * 1"  # weekly, Monday 5 AM
+    sitemap_refresh: "0 */6 * * *"  # every 6 hours
+
+  # Reporting
+  reporting:
+    daily_summary: "0 22 * * *"  # daily at 10 PM
+    weekly_report: "0 9 * * 1"  # Monday 9 AM
+    monthly_report: "0 9 1 * *"  # 1st of month 9 AM

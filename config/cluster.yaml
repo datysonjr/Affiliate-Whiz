@@ -1,0 +1,42 @@
+# Cluster Configuration
+cluster:
+  id: "openclaw-prod"
+
+  nodes:
+    - name: "oc-core-01"
+      ip: "192.168.1.10"
+      role: "controller"
+      responsibilities:
+        - orchestrator
+        - research_agent
+        - content_generation_agent
+        - database
+        - queue
+      hardware:
+        type: "Mac Mini"
+        ram: ""  # fill in (e.g., "16GB")
+        storage: ""  # fill in (e.g., "512GB SSD")
+      ssd_dock_path: "/Volumes/OpenClawDock"
+      ssh_port: 22
+
+    - name: "oc-pub-01"
+      ip: "192.168.1.11"
+      role: "publisher"
+      responsibilities:
+        - publishing_agent
+        - analytics_agent
+        - health_monitor_agent
+        - backup_runner
+      hardware:
+        type: "Mac Mini"
+        ram: ""  # fill in
+        storage: ""  # fill in
+      ssd_dock_path: "/Volumes/OpenClawDock"
+      ssh_port: 22
+
+  network:
+    gateway: "192.168.1.1"
+    subnet: "255.255.255.0"
+    dns:
+      - "1.1.1.1"
+      - "1.0.0.1"

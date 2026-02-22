@@ -1,0 +1,71 @@
+# Agent Configuration
+agents:
+  master_scheduler:
+    enabled: true
+    frequency: "*/30 * * * *"  # every 30 minutes
+    max_concurrent_tasks: 5
+    risk_level: "low"
+
+  research:
+    enabled: true
+    frequency: "0 */4 * * *"  # every 4 hours
+    max_concurrent_tasks: 3
+    max_daily_searches: 500
+    risk_level: "low"
+    tools:
+      - browser
+      - scraper
+      - seo
+
+  content_generation:
+    enabled: true
+    frequency: "0 */2 * * *"  # every 2 hours
+    max_concurrent_tasks: 2
+    max_daily_articles: 20
+    risk_level: "medium"
+    tools:
+      - llm
+      - seo
+      - link
+    quality_threshold: 0.7  # minimum quality score to publish
+
+  publishing:
+    enabled: true
+    frequency: "0 * * * *"  # every hour
+    max_concurrent_tasks: 2
+    max_daily_posts: 15
+    risk_level: "medium"
+    tools:
+      - cms
+      - seo
+      - analytics
+    cooldown_minutes: 30  # minimum time between posts per site
+
+  analytics:
+    enabled: true
+    frequency: "0 */6 * * *"  # every 6 hours
+    max_concurrent_tasks: 1
+    risk_level: "low"
+    tools:
+      - analytics
+      - browser
+
+  health_monitor:
+    enabled: true
+    frequency: "*/5 * * * *"  # every 5 minutes
+    risk_level: "low"
+
+  error_recovery:
+    enabled: true
+    frequency: "*/10 * * * *"  # every 10 minutes
+    max_retries: 3
+    risk_level: "medium"
+
+  traffic_routing:
+    enabled: true
+    frequency: "0 */12 * * *"  # every 12 hours
+    risk_level: "low"
+    tools:
+      - link
+      - seo
+      - analytics

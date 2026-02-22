@@ -1,0 +1,35 @@
+# Sites Configuration
+sites:
+  # Example site - replace with your actual sites
+  - id: "example-site-1"
+    domain: "example.com"
+    niche_id: "example-niche-1"
+    enabled: false
+    cms:
+      type: "wordpress"
+      credentials_key: "wp_example_site_1"  # vault reference
+    hosting:
+      provider: "cloudflare"
+      project_id: ""
+    posting:
+      cadence_per_day: 2
+      max_per_day: 5
+      preferred_hours:
+        - 9
+        - 14
+        - 19
+      timezone: "America/New_York"
+    seo:
+      target_word_count: 2000
+      disclosure_text: "This post contains affiliate links. We may earn a commission at no extra cost to you."
+    analytics:
+      google_analytics_id: ""
+      search_console_verified: false
+
+defaults:
+  posting:
+    cadence_per_day: 1
+    max_per_day: 3
+  seo:
+    target_word_count: 1500
+    min_word_count: 1000

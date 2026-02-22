@@ -1,0 +1,27 @@
+{
+  "id": "test-article-001",
+  "title": "Best Test Widgets for 2025: Complete Buyer's Guide",
+  "slug": "best-test-widgets-2025",
+  "site_id": "example-site-1",
+  "niche_id": "example-niche-1",
+  "keywords": {
+    "primary": "best test widgets",
+    "secondary": ["test widget review", "top test widgets", "test widget comparison"]
+  },
+  "content_type": "roundup",
+  "status": "draft",
+  "word_count": 2500,
+  "quality_score": 0.85,
+  "sections": [
+    {"heading": "Introduction", "word_count": 200},
+    {"heading": "How We Tested", "word_count": 300},
+    {"heading": "Top Picks", "word_count": 1500},
+    {"heading": "Buying Guide", "word_count": 300},
+    {"heading": "FAQ", "word_count": 200}
+  ],
+  "affiliate_links": 5,
+  "internal_links": 3,
+  "has_disclosure": true,
+  "has_schema": true,
+  "created_at": "2025-01-15T10:00:00Z"
+}

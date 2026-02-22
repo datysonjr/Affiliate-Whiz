@@ -1,0 +1,238 @@
+# ===========================================================================
+# OpenClaw Alert Rules
+# ===========================================================================
+#
+# Alert definitions for monitoring the OpenClaw affiliate marketing system.
+# These rules are evaluated by the health-monitor agent and can also be
+# imported into Grafana or Alertmanager for external notification.
+#
+# Severity levels:
+#   - critical:  Immediate action required, system may be down.
+#   - warning:   Degraded performance, investigate soon.
+#   - info:      Notable event, no action required.
+#
+# Each rule defines:
+#   - name:        Unique identifier for the alert.
+#   - description: Human-readable explanation of what the alert detects.
+#   - metric:      The metric or condition being monitored.
+#   - condition:   Trigger threshold / expression.
+#   - for:         Duration the condition must hold before firing.
+#   - severity:    Alert severity level.
+#   - channels:    Notification channels (log, email, slack, webhook).
+#   - runbook:     Link or instructions for remediation.
+# ===========================================================================
+
+groups:
+  # -----------------------------------------------------------------------
+  # Publishing Pipeline Alerts
+  # -----------------------------------------------------------------------
+  - name: publishing
+    interval: 60s
+    rules:
+      - name: publishing_failures
+        description: >
+          Publishing pipeline has failed more than 3 times in the last hour.
+          This indicates CMS connectivity issues, content validation failures,
+          or WordPress API problems.
+        metric: openclaw_pipeline_errors_total{pipeline="publishing"}
+        condition: increase > 3 over 1h
+        for: 5m
+        severity: critical
+        channels:
+          - log
+          - email
+        runbook: |
+          1. Check CMS connectivity: curl -s https://<site>/wp-json/wp/v2/posts
+          2. Review publishing agent logs: grep "publishing" logs/openclaw.log
+          3. Verify WordPress credentials are not expired
+          4. Check if kill switch was engaged automatically
+          5. Restart publishing pipeline if CMS is reachable
+
+      - name: publishing_stall
+        description: >
+          No posts have been published in the last 6 hours during an active
+          campaign.  May indicate a stuck pipeline or empty content queue.
+        metric: openclaw_posts_published_total
+        condition: increase == 0 over 6h
+        for: 10m
+        severity: warning
+        channels:
+          - log
+        runbook: |
+          1. Check content queue depth: /api/metrics -> queue.content_depth
+          2. Verify content pipeline is running: /api/agents
+          3. Check for upstream failures in offer discovery
+          4. Manually trigger pipeline if queue has items
+
+  # -----------------------------------------------------------------------
+  # Traffic & Analytics Alerts
+  # -----------------------------------------------------------------------
+  - name: traffic
+    interval: 300s
+    rules:
+      - name: traffic_drop
+        description: >
+          Organic traffic has dropped by more than 30% compared to the
+          same period last week.  May indicate a Google algorithm penalty,
+          deindexing, or site downtime.
+        metric: openclaw_site_traffic_sessions
+        condition: decrease > 30% compared_to 7d_ago
+        for: 1h
+        severity: critical
+        channels:
+          - log
+          - email
+        runbook: |
+          1. Check Google Search Console for manual actions
+          2. Verify site is accessible and not returning errors
+          3. Run indexing check: /api/health/detailed
+          4. Check for recent content changes that may have triggered a penalty
+          5. Review robots.txt and sitemap for issues
+
+      - name: affiliate_link_failures
+        description: >
+          More than 10% of affiliate link clicks are resulting in errors
+          (broken links, expired offers, or merchant site issues).
+        metric: openclaw_affiliate_link_errors_total
+        condition: rate > 0.10 of openclaw_affiliate_link_clicks_total over 1h
+        for: 15m
+        severity: warning
+        channels:
+          - log
+        runbook: |
+          1. Run affiliate link health check across all sites
+          2. Identify broken merchant URLs in the offers table
+          3. Deactivate offers with dead links
+          4. Replace broken links in published posts
+          5. Check affiliate network status pages
+
+  # -----------------------------------------------------------------------
+  # Indexing & SEO Alerts
+  # -----------------------------------------------------------------------
+  - name: indexing
+    interval: 600s
+    rules:
+      - name: indexing_stall
+        description: >
+          New pages are not being indexed by search engines within the
+          expected timeframe (48 hours).  May indicate crawl budget issues,
+          robots.txt blocks, or sitemap problems.
+        metric: openclaw_pages_indexed_total
+        condition: increase == 0 over 48h
+        for: 1h
+        severity: warning
+        channels:
+          - log
+        runbook: |
+          1. Submit sitemap to Google Search Console
+          2. Verify robots.txt allows crawling of content pages
+          3. Check for noindex meta tags on published pages
+          4. Use Google URL Inspection tool on recent posts
+          5. Verify internal linking structure
+
+  # -----------------------------------------------------------------------
+  # Infrastructure Alerts
+  # -----------------------------------------------------------------------
+  - name: infrastructure
+    interval: 60s
+    rules:
+      - name: proxy_bans
+        description: >
+          High rate of proxy IP bans detected during web scraping operations.
+          More than 5 bans in 30 minutes indicates aggressive anti-bot
+          detection by target sites.
+        metric: openclaw_proxy_bans_total
+        condition: increase > 5 over 30m
+        for: 5m
+        severity: warning
+        channels:
+          - log
+        runbook: |
+          1. Rotate proxy pool: trigger key_rotation for proxy credentials
+          2. Increase request delays in scraping configuration
+          3. Review User-Agent rotation settings
+          4. Check if target sites have updated their anti-bot measures
+          5. Consider switching to residential proxy pool
+
+      - name: high_error_rate
+        description: >
+          System-wide error rate exceeds 10 errors per minute sustained
+          over 5 minutes.  Indicates a systemic issue affecting multiple
+          components.
+        metric: openclaw_errors_total
+        condition: rate > 10 per minute over 5m
+        for: 5m
+        severity: critical
+        channels:
+          - log
+          - email
+        runbook: |
+          1. Check /api/health/detailed for component-level status
+          2. Review recent error logs: tail -100 logs/openclaw.log | grep ERROR
+          3. Check database connectivity and disk space
+          4. Verify external API credentials have not expired
+          5. Consider engaging kill switch if errors are cascading
+          6. Check for recent configuration changes
+
+      - name: disk_space_low
+        description: >
+          Available disk space on the node is below 10%.  The database,
+          logs, and content cache will fail if disk fills up.
+        metric: openclaw_disk_free_pct
+        condition: value < 10
+        for: 5m
+        severity: critical
+        channels:
+          - log
+          - email
+        runbook: |
+          1. Check disk usage: df -h
+          2. Clean old log files: find logs/ -mtime +30 -delete
+          3. Purge old metrics data: truncate data/metrics.jsonl
+          4. Archive or delete old trace files
+          5. Vacuum the SQLite database: sqlite3 data/openclaw.db "VACUUM"
+          6. Remove unused content cache entries
+
+      - name: disk_space_warning
+        description: >
+          Available disk space is below 25%.  Plan cleanup to prevent
+          the critical threshold from being reached.
+        metric: openclaw_disk_free_pct
+        condition: value < 25
+        for: 30m
+        severity: warning
+        channels:
+          - log
+        runbook: |
+          1. Review disk usage breakdown by directory
+          2. Schedule log rotation and cleanup
+          3. Consider archiving old database records
+
+# ===========================================================================
+# Notification channel configuration
+# ===========================================================================
+notification_channels:
+  log:
+    type: log
+    description: Write alerts to the openclaw log file
+    enabled: true
+
+  email:
+    type: email
+    description: Send alert emails to the operations team
+    enabled: false
+    config:
+      smtp_host: ""
+      smtp_port: 587
+      from_address: "alerts@openclaw.local"
+      to_addresses: []
+      use_tls: true
+
+  slack:
+    type: webhook
+    description: Post alerts to a Slack channel
+    enabled: false
+    config:
+      webhook_url: ""
+      channel: "#openclaw-alerts"
+      username: "OpenClaw Alert"

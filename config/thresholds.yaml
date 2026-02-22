@@ -1,0 +1,50 @@
+# Thresholds Configuration
+# These control kill switches, alerts, and automated actions
+
+kill_switch:
+  # Auto-enable kill switch if any of these are true
+  error_rate_percent: 25  # >25% of operations failing
+  publishing_failures_consecutive: 5  # 5 failures in a row
+  revenue_drop_percent: 50  # >50% revenue drop day-over-day
+  api_cost_daily_usd: 100  # daily API spend exceeds $100
+
+alerts:
+  # Send alert when threshold is crossed
+  error_rate_percent: 10
+  publishing_failures_consecutive: 3
+  revenue_drop_percent: 20
+  api_cost_daily_usd: 50
+  disk_usage_percent: 80
+  queue_depth: 100  # items waiting in queue
+  indexing_stall_hours: 48  # no new pages indexed in 48h
+  affiliate_link_failures: 5  # broken affiliate links detected
+  uptime_check_failures: 3  # consecutive health check failures
+
+performance:
+  # Content quality
+  min_content_quality_score: 0.7  # 0-1 scale
+  min_word_count: 1000
+  max_keyword_density: 0.03  # 3%
+
+  # SEO
+  min_page_speed_score: 80  # out of 100
+  max_time_to_index_hours: 72
+
+  # Revenue
+  min_epc: 0.10  # minimum earnings per click to keep content
+  min_ctr: 0.01  # minimum click-through rate (1%)
+
+scaling:
+  # Auto-scale rules
+  scale_up:
+    min_roi: 2.0  # 2x return on content investment
+    min_traffic_growth_percent: 10  # 10% month-over-month
+  scale_down:
+    max_days_no_clicks: 60  # no clicks in 60 days → prune candidate
+    max_days_no_revenue: 90  # no revenue in 90 days → prune
+
+spam_risk:
+  max_posts_per_site_per_day: 5
+  min_time_between_posts_minutes: 30
+  max_similar_titles_percent: 20  # no more than 20% of titles too similar
+  max_affiliate_link_density: 0.05  # max 5% of words are affiliate links

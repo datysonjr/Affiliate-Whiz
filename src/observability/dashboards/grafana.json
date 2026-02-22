@@ -1,0 +1,234 @@
+{
+  "__meta": {
+    "description": "OpenClaw affiliate marketing automation - operational dashboard",
+    "version": "1.0.0",
+    "generated_by": "openclaw"
+  },
+  "dashboard": {
+    "id": null,
+    "uid": "openclaw-main",
+    "title": "OpenClaw Operations",
+    "tags": ["openclaw", "affiliate", "automation"],
+    "timezone": "utc",
+    "refresh": "30s",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Publishing Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "description": "Posts published per hour across all sites",
+        "targets": [
+          {
+            "expr": "rate(openclaw_posts_published_total[1h])",
+            "legendFormat": "Posts / hour"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 0.5},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Error Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "description": "Pipeline and agent errors per minute",
+        "targets": [
+          {
+            "expr": "rate(openclaw_errors_total[5m])",
+            "legendFormat": "{{error_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "errors/min",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 20}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Revenue (24h)",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 8},
+        "description": "Total affiliate revenue in the last 24 hours",
+        "targets": [
+          {
+            "expr": "sum(increase(openclaw_revenue_usd_total[24h]))",
+            "legendFormat": "Revenue"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 10},
+                {"color": "green", "value": 50}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Content Queue Depth",
+        "type": "gauge",
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 8},
+        "description": "Number of articles pending in the content pipeline queue",
+        "targets": [
+          {
+            "expr": "openclaw_queue_content_depth",
+            "legendFormat": "Queue Depth"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 30},
+                {"color": "orange", "value": 60},
+                {"color": "red", "value": 80}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "System Health",
+        "type": "table",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 8},
+        "description": "Per-component health status overview",
+        "targets": [
+          {
+            "expr": "openclaw_component_health",
+            "legendFormat": "{{component}}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}}},
+              {"type": "value", "options": {"1": {"text": "UP", "color": "green"}}}
+            ]
+          }
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "renameByName": {
+                "component": "Component",
+                "Value": "Status"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Pipeline Duration (p95)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+        "description": "95th percentile pipeline execution time in seconds",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(openclaw_pipeline_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{pipeline}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Active Agents",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+        "description": "Number of agents currently running tasks",
+        "targets": [
+          {
+            "expr": "openclaw_agents_active",
+            "legendFormat": "{{agent}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "site",
+          "type": "query",
+          "query": "label_values(openclaw_posts_published_total, site)",
+          "current": {"text": "All", "value": "$__all"},
+          "includeAll": true
+        },
+        {
+          "name": "niche",
+          "type": "query",
+          "query": "label_values(openclaw_posts_published_total, niche)",
+          "current": {"text": "All", "value": "$__all"},
+          "includeAll": true
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "iconColor": "blue",
+          "tags": ["deployment"]
+        },
+        {
+          "name": "Kill Switch Events",
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "iconColor": "red",
+          "tags": ["kill-switch"]
+        }
+      ]
+    }
+  }
+}

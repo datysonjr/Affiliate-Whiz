@@ -1,0 +1,69 @@
+# Pipeline Configuration
+pipelines:
+  offer_discovery:
+    enabled: true
+    steps:
+      - name: ingest
+        sources:
+          - amazon_associates
+          - impact
+          - cj
+          - shareasale
+        batch_size: 100
+      - name: normalize
+        deduplicate: true
+      - name: score
+        min_score: 40  # minimum score to keep (out of 100)
+        tier_thresholds:
+          A: 80
+          B: 60
+          C: 40
+
+  content:
+    enabled: true
+    steps:
+      - name: outline
+        max_sections: 10
+      - name: draft
+        llm_provider: "primary"
+        max_tokens: 4096
+      - name: optimize_seo
+        target_keyword_density: 0.015  # 1.5%
+      - name: fact_check
+        enabled: true
+        block_on_failure: true
+      - name: internal_links
+        min_links: 3
+        max_links: 8
+
+  publishing:
+    enabled: true
+    steps:
+      - name: build_site
+        skip_if_exists: true
+      - name: publish_post
+        add_disclosure: true
+        add_schema: true
+      - name: update_sitemap
+        auto: true
+      - name: ping_indexing
+        providers:
+          - google
+          - bing
+
+  optimization:
+    enabled: true
+    steps:
+      - name: measure
+        metrics:
+          - clicks
+          - ctr
+          - epc
+          - revenue
+        lookback_days: 30
+      - name: prune
+        min_age_days: 60
+        min_clicks: 5
+        action: "draft"  # move to draft status, not delete
+      - name: scale
+        top_performers_multiply: 2  # create 2x more content in winning niches

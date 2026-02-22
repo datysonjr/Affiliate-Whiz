@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  openclaw-controller:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile
+    container_name: openclaw-controller
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      - NODE_NAME=oc-core-01
+      - NODE_ROLE=controller
+    volumes:
+      - openclaw-data:/app/data
+      - openclaw-logs:/app/logs
+      - ../../config:/app/config:ro
+    ports:
+      - "8080:8080"  # Admin API
+    healthcheck:
+      test: ["CMD", "python", "src/cli.py", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  openclaw-publisher:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile
+    container_name: openclaw-publisher
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      - NODE_NAME=oc-pub-01
+      - NODE_ROLE=publisher
+    volumes:
+      - openclaw-data:/app/data
+      - openclaw-logs:/app/logs
+      - ../../config:/app/config:ro
+    depends_on:
+      - openclaw-controller
+    healthcheck:
+      test: ["CMD", "python", "src/cli.py", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  openclaw-data:
+    driver: local
+  openclaw-logs:
+    driver: local

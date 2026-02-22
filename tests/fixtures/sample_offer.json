@@ -1,0 +1,14 @@
+{
+  "id": "test-offer-001",
+  "name": "Test Product Widget Pro",
+  "merchant": "Test Merchant Inc",
+  "network": "amazon_associates",
+  "commission_rate": 0.08,
+  "cookie_duration_days": 30,
+  "avg_order_value": 79.99,
+  "category": "electronics",
+  "url": "https://example.com/product/test-widget-pro",
+  "description": "A sample test product for unit testing offer pipelines.",
+  "active": true,
+  "created_at": "2025-01-01T00:00:00Z"
+}
