@@ -27,6 +27,7 @@ from src.core.errors import (
     PublishingError,
 )
 from src.core.logger import get_logger, log_event
+from src.domains.seo.validator import enforce_seo
 from src.pipelines.content.draft import ArticleDraft
 
 logger = get_logger("pipelines.publishing.publish_post")
@@ -453,6 +454,16 @@ def publish_to_cms(
 
     # Validate before publishing
     _validate_draft(draft)
+
+    # Enforce OpenClaw SEO structural requirements
+    # Assembles full article text and checks for: TLDR block, comparison
+    # table, FAQ section, minimum internal links, verdict statements.
+    # Raises ContentValidationError if any required block is missing.
+    full_text = draft.introduction + "\n"
+    for section in draft.sections:
+        full_text += f"## {section.heading}\n{section.body}\n"
+    full_text += draft.conclusion
+    enforce_seo(full_text)
 
     # Format for CMS
     payload = format_for_cms(
