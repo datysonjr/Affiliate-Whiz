@@ -264,7 +264,9 @@ class CMSTool:
         result = self._request("POST", "/posts", json_data=data)
         if isinstance(result, dict):
             return self._normalize_wp_post(result)
-        return result
+        raise RuntimeError(
+            "Unexpected WP response shape: expected dict for create_post"
+        )
 
     def update_post(self, post_id: int, data: dict[str, Any]) -> dict[str, Any]:
         """Update an existing post in the CMS.
@@ -283,7 +285,9 @@ class CMSTool:
         result = self._request("PATCH", f"/posts/{post_id}", json_data=data)
         if isinstance(result, dict):
             return self._normalize_wp_post(result)
-        return result
+        raise RuntimeError(
+            "Unexpected WP response shape: expected dict for update_post"
+        )
 
     def delete_post(self, post_id: int, force: bool = False) -> bool:
         """Delete (or trash) a post from the CMS.
@@ -360,7 +364,7 @@ class CMSTool:
         result = self._request("POST", "/media", data=file_data, headers=headers)
 
         if isinstance(result, dict):
-            url = result.get("source_url", result.get("url", ""))
+            url = result.get("source_url") or result.get("url") or ""
             # Set alt text if provided
             if alt_text and result.get("id"):
                 try:
@@ -371,7 +375,7 @@ class CMSTool:
                     )
                 except Exception as exc:
                     logger.warning("Failed to set alt text: %s", exc)
-            return url
+            return str(url)
         return ""
 
     # ------------------------------------------------------------------

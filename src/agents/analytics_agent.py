@@ -205,13 +205,13 @@ class AnalyticsAgent(BaseAgent):
         if plan.collect_traffic:
             for site in plan.sites:
                 try:
-                    snapshot = self._collect_traffic(site, plan.lookback_hours)
-                    result.traffic[site] = snapshot
+                    traffic_snap = self._collect_traffic(site, plan.lookback_hours)
+                    result.traffic[site] = traffic_snap
                     self.logger.info(
                         "Traffic collected for site '%s': %d page views, %d visitors.",
                         site,
-                        snapshot.page_views,
-                        snapshot.unique_visitors,
+                        traffic_snap.page_views,
+                        traffic_snap.unique_visitors,
                     )
                 except Exception as exc:
                     result.errors.append(f"Traffic collection for site '{site}': {exc}")
@@ -224,13 +224,13 @@ class AnalyticsAgent(BaseAgent):
         if plan.collect_revenue:
             for network in plan.networks:
                 try:
-                    snapshot = self._collect_revenue(network, plan.lookback_hours)
-                    result.revenue[network] = snapshot
+                    revenue_snap = self._collect_revenue(network, plan.lookback_hours)
+                    result.revenue[network] = revenue_snap
                     self.logger.info(
                         "Revenue collected for network '%s': $%.2f (%d conversions).",
                         network,
-                        snapshot.revenue,
-                        snapshot.conversions,
+                        revenue_snap.revenue,
+                        revenue_snap.conversions,
                     )
                 except Exception as exc:
                     result.errors.append(

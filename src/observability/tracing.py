@@ -308,6 +308,7 @@ class Tracer:
             return
 
         try:
+            assert self._storage_path is not None
             path = Path(self._storage_path)
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("a", encoding="utf-8") as fh:
