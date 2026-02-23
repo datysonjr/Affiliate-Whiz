@@ -15,17 +15,15 @@ Design references:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import mimetypes
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from src.core.constants import DEFAULT_REQUEST_TIMEOUT
-from src.core.errors import IntegrationError, APIAuthenticationError
+from src.core.errors import IntegrationError
 from src.core.logger import get_logger, log_event
 
 # ---------------------------------------------------------------------------
@@ -46,6 +44,7 @@ logger = get_logger("integrations.storage.s3_compatible")
 # ---------------------------------------------------------------------------
 # Data containers
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class S3Object:
@@ -87,6 +86,7 @@ class S3Object:
 # ---------------------------------------------------------------------------
 # S3Storage client
 # ---------------------------------------------------------------------------
+
 
 class S3Storage:
     """Client for S3-compatible object storage.
@@ -157,19 +157,25 @@ class S3Storage:
         if endpoint_url:
             client_kwargs["endpoint_url"] = endpoint_url
 
-        boto_config = BotoConfig(
-            connect_timeout=timeout,
-            read_timeout=timeout,
-            retries={"max_attempts": 3, "mode": "standard"},
-        ) if BotoConfig else None
+        boto_config = (
+            BotoConfig(
+                connect_timeout=timeout,
+                read_timeout=timeout,
+                retries={"max_attempts": 3, "mode": "standard"},
+            )
+            if BotoConfig
+            else None
+        )
         if boto_config:
             client_kwargs["config"] = boto_config
 
         self._client = boto3.client(**client_kwargs)
 
         log_event(
-            logger, "s3.init",
-            bucket=bucket, region=region,
+            logger,
+            "s3.init",
+            bucket=bucket,
+            region=region,
             has_endpoint=bool(endpoint_url),
         )
 
@@ -218,7 +224,9 @@ class S3Storage:
             raise FileNotFoundError(f"File not found: {local_path}")
 
         if not content_type:
-            content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+            content_type = (
+                mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+            )
 
         extra_args: Dict[str, Any] = {"ContentType": content_type}
         if metadata:
@@ -227,9 +235,7 @@ class S3Storage:
             extra_args["ACL"] = "public-read"
 
         try:
-            self._client.upload_file(
-                str(path), self._bucket, key, ExtraArgs=extra_args
-            )
+            self._client.upload_file(str(path), self._bucket, key, ExtraArgs=extra_args)
             self._request_count += 1
         except ClientError as exc:
             raise IntegrationError(
@@ -243,7 +249,11 @@ class S3Storage:
 
         self.logger.info(
             "Uploaded %s to s3://%s/%s (%d bytes, %s)",
-            path.name, self._bucket, key, size, content_type,
+            path.name,
+            self._bucket,
+            key,
+            size,
+            content_type,
         )
 
         return S3Object(
@@ -293,7 +303,10 @@ class S3Storage:
             ) from exc
 
         self.logger.info(
-            "Downloaded s3://%s/%s to %s", self._bucket, key, local_path,
+            "Downloaded s3://%s/%s to %s",
+            self._bucket,
+            key,
+            local_path,
         )
         return local_path
 
@@ -341,17 +354,22 @@ class S3Storage:
 
         objects: List[S3Object] = []
         for item in response.get("Contents", []):
-            objects.append(S3Object(
-                key=item.get("Key", ""),
-                bucket=self._bucket,
-                size_bytes=item.get("Size", 0),
-                last_modified=item.get("LastModified"),
-                etag=item.get("ETag", "").strip('"'),
-                storage_class=item.get("StorageClass", "STANDARD"),
-            ))
+            objects.append(
+                S3Object(
+                    key=item.get("Key", ""),
+                    bucket=self._bucket,
+                    size_bytes=item.get("Size", 0),
+                    last_modified=item.get("LastModified"),
+                    etag=item.get("ETag", "").strip('"'),
+                    storage_class=item.get("StorageClass", "STANDARD"),
+                )
+            )
 
         self.logger.debug(
-            "Listed %d objects in s3://%s/%s", len(objects), self._bucket, prefix,
+            "Listed %d objects in s3://%s/%s",
+            len(objects),
+            self._bucket,
+            prefix,
         )
         return objects
 

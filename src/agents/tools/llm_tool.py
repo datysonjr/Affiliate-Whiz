@@ -44,7 +44,9 @@ class LLMTool:
 
         # Primary provider settings
         self.primary_provider: str = config.get("primary_provider", "anthropic")
-        self.primary_model: str = config.get("primary_model", "claude-sonnet-4-20250514")
+        self.primary_model: str = config.get(
+            "primary_model", "claude-sonnet-4-20250514"
+        )
         self.primary_api_key: str = config.get("primary_api_key", "")
         self.primary_base_url: Optional[str] = config.get("primary_base_url")
 
@@ -128,6 +130,7 @@ class LLMTool:
 
         if provider == "anthropic":
             import anthropic
+
             kwargs: dict[str, Any] = {"api_key": api_key}
             if base_url:
                 kwargs["base_url"] = base_url
@@ -135,6 +138,7 @@ class LLMTool:
 
         if provider == "openai":
             import openai
+
             kwargs = {"api_key": api_key}
             if base_url:
                 kwargs["base_url"] = base_url
@@ -236,7 +240,9 @@ class LLMTool:
     ) -> dict[str, Any]:
         """Dispatch an API call to the correct provider handler."""
         if provider == "anthropic":
-            return self._call_anthropic(client, model, messages, max_tokens, temperature)
+            return self._call_anthropic(
+                client, model, messages, max_tokens, temperature
+            )
         if provider == "openai":
             return self._call_openai(client, model, messages, max_tokens, temperature)
         raise ValueError(f"Cannot dispatch to unknown provider: {provider}")
@@ -312,9 +318,7 @@ class LLMTool:
                 logger.error("Fallback provider also failed: %s", exc)
 
         self._failed_requests += 1
-        raise RuntimeError(
-            f"All LLM providers failed. Last error: {last_error}"
-        )
+        raise RuntimeError(f"All LLM providers failed. Last error: {last_error}")
 
     def _track_usage(self, prompt_tokens: int, completion_tokens: int) -> None:
         self._total_prompt_tokens += prompt_tokens

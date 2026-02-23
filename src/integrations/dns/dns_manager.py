@@ -34,6 +34,7 @@ logger = get_logger("integrations.dns.dns_manager")
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class RecordType(str, Enum):
     """Supported DNS record types."""
@@ -61,6 +62,7 @@ class PropagationStatus(str, Enum):
 # ---------------------------------------------------------------------------
 # Data containers
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class DNSRecord:
@@ -136,14 +138,13 @@ class PropagationResult:
     status: PropagationStatus = PropagationStatus.PENDING
     nameservers_checked: List[str] = field(default_factory=list)
     check_duration_seconds: float = 0.0
-    checked_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    checked_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ---------------------------------------------------------------------------
 # DNSManager
 # ---------------------------------------------------------------------------
+
 
 class DNSManager:
     """Manages DNS records for affiliate sites.
@@ -194,8 +195,10 @@ class DNSManager:
         self.logger: logging.Logger = get_logger("integrations.dns.dns_manager")
 
         log_event(
-            logger, "dns_manager.init",
-            provider=provider, has_zone_id=bool(zone_id),
+            logger,
+            "dns_manager.init",
+            provider=provider,
+            has_zone_id=bool(zone_id),
         )
 
     # ------------------------------------------------------------------
@@ -247,8 +250,11 @@ class DNSManager:
             raise IntegrationError("zone_id is required for DNS operations")
 
         log_event(
-            logger, "dns_manager.add_record",
-            name=name, record_type=record_type, content=content,
+            logger,
+            "dns_manager.add_record",
+            name=name,
+            record_type=record_type,
+            content=content,
         )
         self._request_count += 1
 
@@ -268,7 +274,10 @@ class DNSManager:
 
         self.logger.info(
             "Created DNS %s record: %s -> %s (ttl=%d)",
-            record_type, name, content, ttl,
+            record_type,
+            name,
+            content,
+            ttl,
         )
         return record
 
@@ -318,8 +327,10 @@ class DNSManager:
             raise IntegrationError("record_id is required to update a DNS record")
 
         log_event(
-            logger, "dns_manager.update_record",
-            record_id=record_id, has_name=name is not None,
+            logger,
+            "dns_manager.update_record",
+            record_id=record_id,
+            has_name=name is not None,
             has_content=content is not None,
         )
         self._request_count += 1
@@ -370,13 +381,17 @@ class DNSManager:
             raise IntegrationError("record_id is required to delete a DNS record")
 
         log_event(
-            logger, "dns_manager.delete_record",
-            record_id=record_id, zone_id=effective_zone,
+            logger,
+            "dns_manager.delete_record",
+            record_id=record_id,
+            zone_id=effective_zone,
         )
         self._request_count += 1
 
         # Production: DELETE /zones/{zone_id}/dns_records/{record_id}
-        self.logger.info("Deleted DNS record %s from zone %s", record_id, effective_zone)
+        self.logger.info(
+            "Deleted DNS record %s from zone %s", record_id, effective_zone
+        )
         return True
 
     def get_records(
@@ -407,8 +422,10 @@ class DNSManager:
             raise IntegrationError("zone_id is required for DNS operations")
 
         log_event(
-            logger, "dns_manager.get_records",
-            zone_id=effective_zone, record_type=record_type or "all",
+            logger,
+            "dns_manager.get_records",
+            zone_id=effective_zone,
+            record_type=record_type or "all",
             name=name or "all",
         )
         self._request_count += 1
@@ -416,7 +433,9 @@ class DNSManager:
         # Production: GET /zones/{zone_id}/dns_records?type=...&name=...
         self.logger.debug(
             "Listed DNS records for zone %s (type=%s, name=%s)",
-            effective_zone, record_type or "*", name or "*",
+            effective_zone,
+            record_type or "*",
+            name or "*",
         )
         return []
 
@@ -461,16 +480,19 @@ class DNSManager:
             Verification result including observed values and status.
         """
         resolvers = nameservers or [
-            "8.8.8.8",        # Google
-            "1.1.1.1",        # Cloudflare
-            "9.9.9.9",        # Quad9
-            "208.67.222.222", # OpenDNS
+            "8.8.8.8",  # Google
+            "1.1.1.1",  # Cloudflare
+            "9.9.9.9",  # Quad9
+            "208.67.222.222",  # OpenDNS
         ]
 
         log_event(
-            logger, "dns_manager.verify_propagation",
-            domain=domain, record_type=record_type,
-            expected=expected_value, timeout=timeout_seconds,
+            logger,
+            "dns_manager.verify_propagation",
+            domain=domain,
+            record_type=record_type,
+            expected=expected_value,
+            timeout=timeout_seconds,
         )
 
         start_time = time.monotonic()
@@ -492,7 +514,8 @@ class DNSManager:
 
             self.logger.debug(
                 "Propagation check for %s (elapsed=%.1fs): waiting for transport",
-                domain, elapsed,
+                domain,
+                elapsed,
             )
 
             # Since we cannot actually resolve DNS without dnspython, return
@@ -517,7 +540,9 @@ class DNSManager:
 
         self.logger.info(
             "DNS propagation check for %s: status=%s (%.1fs)",
-            domain, status.value, elapsed,
+            domain,
+            status.value,
+            elapsed,
         )
         return result
 

@@ -23,7 +23,7 @@ Design references:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum, unique
 from typing import Dict, List, Optional
@@ -34,6 +34,7 @@ from src.core.logger import get_logger, log_event
 # ---------------------------------------------------------------------------
 # State enumeration
 # ---------------------------------------------------------------------------
+
 
 @unique
 class SystemState(str, Enum):
@@ -55,21 +56,27 @@ class SystemState(str, Enum):
 
 _ALLOWED_TRANSITIONS: Dict[SystemState, frozenset[SystemState]] = {
     SystemState.IDLE: frozenset({SystemState.RUNNING, SystemState.SHUTDOWN}),
-    SystemState.RUNNING: frozenset({
-        SystemState.PAUSED,
-        SystemState.ERROR,
-        SystemState.SHUTDOWN,
-        SystemState.IDLE,
-    }),
-    SystemState.PAUSED: frozenset({
-        SystemState.RUNNING,
-        SystemState.ERROR,
-        SystemState.SHUTDOWN,
-    }),
-    SystemState.ERROR: frozenset({
-        SystemState.IDLE,
-        SystemState.SHUTDOWN,
-    }),
+    SystemState.RUNNING: frozenset(
+        {
+            SystemState.PAUSED,
+            SystemState.ERROR,
+            SystemState.SHUTDOWN,
+            SystemState.IDLE,
+        }
+    ),
+    SystemState.PAUSED: frozenset(
+        {
+            SystemState.RUNNING,
+            SystemState.ERROR,
+            SystemState.SHUTDOWN,
+        }
+    ),
+    SystemState.ERROR: frozenset(
+        {
+            SystemState.IDLE,
+            SystemState.SHUTDOWN,
+        }
+    ),
     SystemState.SHUTDOWN: frozenset(),  # terminal -- no exits
 }
 
@@ -77,6 +84,7 @@ _ALLOWED_TRANSITIONS: Dict[SystemState, frozenset[SystemState]] = {
 # ---------------------------------------------------------------------------
 # Transition record
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class TransitionRecord:
@@ -107,6 +115,7 @@ class TransitionRecord:
 # ---------------------------------------------------------------------------
 # StateMachine
 # ---------------------------------------------------------------------------
+
 
 class StateMachine:
     """Finite state machine that tracks the orchestrator's lifecycle.
@@ -213,7 +222,10 @@ class StateMachine:
                     "entity": self._entity,
                     "from_state": str(self._state),
                     "to_state": str(target),
-                    "allowed": [str(s) for s in _ALLOWED_TRANSITIONS.get(self._state, frozenset())],
+                    "allowed": [
+                        str(s)
+                        for s in _ALLOWED_TRANSITIONS.get(self._state, frozenset())
+                    ],
                 },
             )
 

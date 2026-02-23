@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from src.core.errors import IntegrationError
 from src.core.logger import get_logger
 from src.domains.offers.models import Offer
 
@@ -26,6 +25,7 @@ from src.domains.offers.models import Offer
 # ---------------------------------------------------------------------------
 # Commission rate detail
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class CommissionRate:
@@ -55,6 +55,7 @@ class CommissionRate:
 # ---------------------------------------------------------------------------
 # Offer detail (extended metadata from a network)
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class OfferDetail:
@@ -99,6 +100,7 @@ class OfferDetail:
 # ---------------------------------------------------------------------------
 # Abstract base class
 # ---------------------------------------------------------------------------
+
 
 class AffiliateNetworkSource(ABC):
     """Abstract interface for fetching offer data from an affiliate network.

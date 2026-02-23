@@ -19,10 +19,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from src.core.constants import DEFAULT_KEYWORD_DENSITY
-from src.core.errors import PipelineStepError
 from src.core.logger import get_logger, log_event
 from src.pipelines.content.draft import ArticleDraft
 
@@ -43,6 +42,7 @@ HEADING_MAX_LENGTH = 80
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class SEOReport:
@@ -84,6 +84,7 @@ class SEOReport:
 # ---------------------------------------------------------------------------
 # Title optimization
 # ---------------------------------------------------------------------------
+
 
 def optimize_title(
     title: str,
@@ -134,6 +135,7 @@ def optimize_title(
 # Meta description optimization
 # ---------------------------------------------------------------------------
 
+
 def optimize_meta_description(
     article_intro: str,
     primary_keyword: str,
@@ -163,7 +165,7 @@ def optimize_meta_description(
         The optimized meta description.
     """
     # Split into sentences and pick the best one
-    sentences = re.split(r'(?<=[.!?])\s+', article_intro.strip())
+    sentences = re.split(r"(?<=[.!?])\s+", article_intro.strip())
     best_sentence = ""
 
     # Prefer a sentence that contains the keyword
@@ -199,6 +201,7 @@ def optimize_meta_description(
 # ---------------------------------------------------------------------------
 # Keyword density analysis
 # ---------------------------------------------------------------------------
+
 
 def check_keyword_density(
     text: str,
@@ -322,6 +325,7 @@ def _estimate_insertions_needed(
 # Heading optimization
 # ---------------------------------------------------------------------------
 
+
 def optimize_headings(
     draft: ArticleDraft,
     primary_keyword: str,
@@ -388,7 +392,9 @@ def optimize_headings(
         seen_headings[normalized] = seen_headings.get(normalized, 0) + 1
     for heading_text, count in seen_headings.items():
         if count > 1:
-            issues.append(f"Duplicate heading found: '{heading_text}' appears {count} times.")
+            issues.append(
+                f"Duplicate heading found: '{heading_text}' appears {count} times."
+            )
 
     log_event(
         logger,
@@ -402,6 +408,7 @@ def optimize_headings(
 # ---------------------------------------------------------------------------
 # Schema markup
 # ---------------------------------------------------------------------------
+
 
 def add_schema_markup(
     draft: ArticleDraft,
@@ -494,14 +501,15 @@ def _slugify(text: str) -> str:
     str
         Lowercase, hyphen-separated slug.
     """
-    slug = re.sub(r'[^\w\s-]', '', text.lower())
-    slug = re.sub(r'[\s_]+', '-', slug)
-    return slug.strip('-')
+    slug = re.sub(r"[^\w\s-]", "", text.lower())
+    slug = re.sub(r"[\s_]+", "-", slug)
+    return slug.strip("-")
 
 
 # ---------------------------------------------------------------------------
 # Main optimization pipeline
 # ---------------------------------------------------------------------------
+
 
 def optimize_seo(
     draft: ArticleDraft,
@@ -575,9 +583,13 @@ def optimize_seo(
         suggestions.append(density_result["recommendation"])
     suggestions.extend(heading_issues)
     if len(title_tag) < TITLE_MIN_LENGTH:
-        suggestions.append(f"Title tag is short ({len(title_tag)} chars). Aim for {TITLE_MIN_LENGTH}-{TITLE_MAX_LENGTH}.")
+        suggestions.append(
+            f"Title tag is short ({len(title_tag)} chars). Aim for {TITLE_MIN_LENGTH}-{TITLE_MAX_LENGTH}."
+        )
     if len(meta_description) < META_DESCRIPTION_MIN_LENGTH:
-        suggestions.append(f"Meta description is short ({len(meta_description)} chars). Aim for {META_DESCRIPTION_MIN_LENGTH}-{META_DESCRIPTION_MAX_LENGTH}.")
+        suggestions.append(
+            f"Meta description is short ({len(meta_description)} chars). Aim for {META_DESCRIPTION_MIN_LENGTH}-{META_DESCRIPTION_MAX_LENGTH}."
+        )
 
     # Calculate SEO score
     score = _calculate_seo_score(
@@ -655,7 +667,11 @@ def _calculate_seo_score(
     # Meta description scoring (0-20)
     if meta_description:
         score += 10
-        if META_DESCRIPTION_MIN_LENGTH <= len(meta_description) <= META_DESCRIPTION_MAX_LENGTH:
+        if (
+            META_DESCRIPTION_MIN_LENGTH
+            <= len(meta_description)
+            <= META_DESCRIPTION_MAX_LENGTH
+        ):
             score += 5
         if primary_keyword.lower() in meta_description.lower():
             score += 5

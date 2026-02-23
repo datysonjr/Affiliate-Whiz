@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import queue
 import threading
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -30,6 +29,7 @@ from typing import Any, Dict, List, Optional
 # ---------------------------------------------------------------------------
 # Task descriptor
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class QueuedTask:
@@ -64,6 +64,7 @@ class QueuedTask:
 # Abstract queue interface (swap to Redis/Celery by implementing this)
 # ---------------------------------------------------------------------------
 
+
 class BaseTaskQueue(ABC):
     """Abstract interface for task queues.
 
@@ -94,6 +95,7 @@ class BaseTaskQueue(ABC):
 # ---------------------------------------------------------------------------
 # In-process priority queue implementation
 # ---------------------------------------------------------------------------
+
 
 class InProcessQueue(BaseTaskQueue):
     """Thread-safe in-process priority queue.

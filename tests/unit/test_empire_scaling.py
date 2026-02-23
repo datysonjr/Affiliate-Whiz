@@ -3,18 +3,10 @@
 import unittest
 
 from src.domains.ops.empire_scaling import (
-    AUTOMATION_THRESHOLD_SITES,
     CAPACITY_EXPANSION_PCT,
     CAPACITY_EXPERIMENTAL_PCT,
     CAPACITY_REFRESH_PCT,
     EXPANSION_TRIGGER_COUNT,
-    KILL_NO_IMPRESSIONS_DAYS,
-    KILL_NO_INDEX_DAYS,
-    MAX_INFRA_COST_RATIO,
-    MIN_WEEKS_BETWEEN_LAUNCHES,
-    CapacityAllocation,
-    DomainHealthScore,
-    ExpansionTriggerCheck,
     ScalingStage,
     SiteMaturity,
     SiteMetrics,
@@ -36,6 +28,7 @@ from src.domains.ops.empire_scaling import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _healthy_site(**kwargs) -> SiteMetrics:
     """A profitable, healthy site."""
@@ -161,8 +154,8 @@ def _validated_site(**kwargs) -> SiteMetrics:
 # Tests — SiteMetrics properties
 # ---------------------------------------------------------------------------
 
-class TestSiteMetrics(unittest.TestCase):
 
+class TestSiteMetrics(unittest.TestCase):
     def test_index_coverage(self):
         site = _healthy_site(total_pages=100, indexed_pages=80)
         self.assertEqual(site.index_coverage, 80.0)
@@ -192,8 +185,8 @@ class TestSiteMetrics(unittest.TestCase):
 # Tests — scaling stage determination
 # ---------------------------------------------------------------------------
 
-class TestScalingStage(unittest.TestCase):
 
+class TestScalingStage(unittest.TestCase):
     def test_no_sites_is_validation(self):
         self.assertEqual(determine_scaling_stage([]), ScalingStage.VALIDATION)
 
@@ -228,10 +221,12 @@ class TestScalingStage(unittest.TestCase):
 # Tests — site maturity
 # ---------------------------------------------------------------------------
 
-class TestSiteMaturity(unittest.TestCase):
 
+class TestSiteMaturity(unittest.TestCase):
     def test_new_site(self):
-        self.assertEqual(classify_site_maturity(_new_site(age_days=15)), SiteMaturity.NEW)
+        self.assertEqual(
+            classify_site_maturity(_new_site(age_days=15)), SiteMaturity.NEW
+        )
 
     def test_growing_site(self):
         site = _healthy_site(age_days=90, total_pages=30)
@@ -261,8 +256,8 @@ class TestSiteMaturity(unittest.TestCase):
 # Tests — domain health
 # ---------------------------------------------------------------------------
 
-class TestDomainHealth(unittest.TestCase):
 
+class TestDomainHealth(unittest.TestCase):
     def test_healthy_site_perfect_score(self):
         health = compute_domain_health(_healthy_site())
         self.assertEqual(health.score, 100.0)
@@ -276,7 +271,9 @@ class TestDomainHealth(unittest.TestCase):
     def test_partial_health(self):
         site = _healthy_site(impressions_trend=-0.1, refresh_backlog=3)
         health = compute_domain_health(site)
-        self.assertEqual(health.score, 50.0)  # index + error ok, impressions + refresh fail
+        self.assertEqual(
+            health.score, 50.0
+        )  # index + error ok, impressions + refresh fail
         self.assertFalse(health.is_healthy)
 
     def test_high_error_rate_fails(self):
@@ -289,8 +286,8 @@ class TestDomainHealth(unittest.TestCase):
 # Tests — niche saturation
 # ---------------------------------------------------------------------------
 
-class TestNicheSaturation(unittest.TestCase):
 
+class TestNicheSaturation(unittest.TestCase):
     def test_saturated_site_detected(self):
         self.assertTrue(detect_niche_saturation(_saturated_site()))
 
@@ -299,7 +296,9 @@ class TestNicheSaturation(unittest.TestCase):
 
     def test_needs_two_signals(self):
         # Only slow ranking, but impressions and CTR fine
-        site = _healthy_site(avg_days_to_rank=100, impressions_trend=0.1, ctr_trend=0.05)
+        site = _healthy_site(
+            avg_days_to_rank=100, impressions_trend=0.1, ctr_trend=0.05
+        )
         self.assertFalse(detect_niche_saturation(site))
 
 
@@ -307,8 +306,8 @@ class TestNicheSaturation(unittest.TestCase):
 # Tests — kill-fast policy
 # ---------------------------------------------------------------------------
 
-class TestKillPolicy(unittest.TestCase):
 
+class TestKillPolicy(unittest.TestCase):
     def test_zero_indexing_triggers_kill(self):
         site = _new_site(age_days=50, indexed_pages=0)
         self.assertTrue(check_kill_policy(site))
@@ -329,8 +328,8 @@ class TestKillPolicy(unittest.TestCase):
 # Tests — per-site scaling decisions
 # ---------------------------------------------------------------------------
 
-class TestSiteDecision(unittest.TestCase):
 
+class TestSiteDecision(unittest.TestCase):
     def test_healthy_site_expands(self):
         decision = decide_site_scaling(_healthy_site())
         self.assertEqual(decision.verdict, SiteVerdict.EXPAND)
@@ -365,8 +364,8 @@ class TestSiteDecision(unittest.TestCase):
 # Tests — expansion triggers
 # ---------------------------------------------------------------------------
 
-class TestExpansionTriggers(unittest.TestCase):
 
+class TestExpansionTriggers(unittest.TestCase):
     def test_healthy_portfolio_can_expand(self):
         sites = [_healthy_site(site_id=f"s{i}") for i in range(5)]
         check = check_expansion_triggers(sites)
@@ -397,8 +396,8 @@ class TestExpansionTriggers(unittest.TestCase):
 # Tests — capacity allocation
 # ---------------------------------------------------------------------------
 
-class TestCapacityAllocation(unittest.TestCase):
 
+class TestCapacityAllocation(unittest.TestCase):
     def test_default_allocation(self):
         cap = compute_capacity_allocation()
         self.assertEqual(cap.refresh_capacity, 60.0)
@@ -412,7 +411,9 @@ class TestCapacityAllocation(unittest.TestCase):
         self.assertEqual(cap.experimental_capacity, 20.0)
 
     def test_percentages_sum_to_100(self):
-        total = CAPACITY_REFRESH_PCT + CAPACITY_EXPANSION_PCT + CAPACITY_EXPERIMENTAL_PCT
+        total = (
+            CAPACITY_REFRESH_PCT + CAPACITY_EXPANSION_PCT + CAPACITY_EXPERIMENTAL_PCT
+        )
         self.assertEqual(total, 100)
 
 
@@ -420,8 +421,8 @@ class TestCapacityAllocation(unittest.TestCase):
 # Tests — validation stage check
 # ---------------------------------------------------------------------------
 
-class TestValidationCheck(unittest.TestCase):
 
+class TestValidationCheck(unittest.TestCase):
     def test_validated_site_passes(self):
         self.assertTrue(check_validation_stage([_validated_site()]))
 
@@ -441,8 +442,8 @@ class TestValidationCheck(unittest.TestCase):
 # Tests — full scaling plan
 # ---------------------------------------------------------------------------
 
-class TestBuildScalingPlan(unittest.TestCase):
 
+class TestBuildScalingPlan(unittest.TestCase):
     def test_single_healthy_site(self):
         plan = build_scaling_plan([_validated_site()])
         self.assertEqual(plan.stage, ScalingStage.REPLICATION)

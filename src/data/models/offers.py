@@ -21,7 +21,7 @@ Design references:
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -182,8 +182,11 @@ class OfferRepository:
         offer.created_at = now
         offer.updated_at = now
         log_event(
-            logger, "offer.created",
-            id=offer.id, name=offer.name, merchant=offer.merchant,
+            logger,
+            "offer.created",
+            id=offer.id,
+            name=offer.name,
+            merchant=offer.merchant,
         )
         return offer
 
@@ -218,9 +221,7 @@ class OfferRepository:
         OfferRecord or None
             The offer if found, otherwise ``None``.
         """
-        row = self._db.fetch_one(
-            "SELECT * FROM offers WHERE id = ?", (offer_id,)
-        )
+        row = self._db.fetch_one("SELECT * FROM offers WHERE id = ?", (offer_id,))
         if row is None:
             return None
         return self._row_to_offer(row)
@@ -446,9 +447,7 @@ class OfferRepository:
         bool
             ``True`` if a row was deleted, ``False`` if no such offer.
         """
-        cursor = self._db.execute(
-            "DELETE FROM offers WHERE id = ?", (offer_id,)
-        )
+        cursor = self._db.execute("DELETE FROM offers WHERE id = ?", (offer_id,))
         deleted = cursor.rowcount > 0
         if deleted:
             log_event(logger, "offer.deleted", id=offer_id)

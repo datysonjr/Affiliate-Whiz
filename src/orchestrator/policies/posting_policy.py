@@ -22,8 +22,6 @@ Design references:
 from __future__ import annotations
 
 import logging
-import time
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -31,9 +29,7 @@ from typing import Any, Dict, List, Optional
 from src.core.constants import (
     DEFAULT_COOLDOWN_MINUTES,
     DEFAULT_MAX_POSTS_PER_DAY,
-    DEFAULT_POSTING_CADENCE_PER_DAY,
 )
-from src.core.errors import PostingPolicyViolationError
 from src.core.logger import get_logger, log_event
 
 
@@ -50,6 +46,7 @@ _DEFAULT_NEW_DOMAIN_MAX_POSTS_PER_DAY: int = 1
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PostingRecord:
@@ -100,6 +97,7 @@ class PostingVerdict:
 # PostingPolicy
 # ---------------------------------------------------------------------------
 
+
 class PostingPolicy:
     """Enforces posting frequency, anti-spam, and domain reputation rules.
 
@@ -132,7 +130,9 @@ class PostingPolicy:
             cfg.get("new_domain_age_days", _DEFAULT_NEW_DOMAIN_AGE_DAYS)
         )
         self._new_domain_max_posts: int = int(
-            cfg.get("new_domain_max_posts_per_day", _DEFAULT_NEW_DOMAIN_MAX_POSTS_PER_DAY)
+            cfg.get(
+                "new_domain_max_posts_per_day", _DEFAULT_NEW_DOMAIN_MAX_POSTS_PER_DAY
+            )
         )
 
         # In-memory posting history keyed by site_id.
@@ -149,7 +149,9 @@ class PostingPolicy:
     # History management
     # ------------------------------------------------------------------
 
-    def record_post(self, site_id: str, *, posted_at: Optional[datetime] = None) -> None:
+    def record_post(
+        self, site_id: str, *, posted_at: Optional[datetime] = None
+    ) -> None:
         """Record that a post was published to *site_id*.
 
         Parameters
@@ -160,9 +162,7 @@ class PostingPolicy:
             UTC timestamp.  Defaults to now.
         """
         posted_at = posted_at or datetime.now(timezone.utc)
-        record = self._history.setdefault(
-            site_id, PostingRecord(site_id=site_id)
-        )
+        record = self._history.setdefault(site_id, PostingRecord(site_id=site_id))
         record.post_timestamps.append(posted_at)
 
     def set_domain_age(self, site_id: str, age_days: int) -> None:
@@ -175,9 +175,7 @@ class PostingPolicy:
         age_days:
             Number of days the domain has been active.
         """
-        record = self._history.setdefault(
-            site_id, PostingRecord(site_id=site_id)
-        )
+        record = self._history.setdefault(site_id, PostingRecord(site_id=site_id))
         record.domain_age_days = age_days
 
     # ------------------------------------------------------------------
@@ -349,7 +347,9 @@ class PostingPolicy:
         # Title similarity
         if title and recent_titles:
             similar_count = self._count_similar_titles(title, recent_titles)
-            similarity_pct = similar_count / len(recent_titles) if recent_titles else 0.0
+            similarity_pct = (
+                similar_count / len(recent_titles) if recent_titles else 0.0
+            )
             details["similar_titles_pct"] = round(similarity_pct, 3)
             if similarity_pct > self._max_similar_titles_pct:
                 violations.append(

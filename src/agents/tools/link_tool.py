@@ -284,9 +284,7 @@ class LinkTool:
                 if len(candidate) < min_keyword_length:
                     continue
 
-                pattern = re.compile(
-                    r"\b" + re.escape(candidate.lower()) + r"\b"
-                )
+                pattern = re.compile(r"\b" + re.escape(candidate.lower()) + r"\b")
                 for match in pattern.finditer(content_lower):
                     if matches_for_post >= max_links_per_post:
                         break
@@ -409,7 +407,5 @@ class LinkTool:
             results.append(result)
 
         broken_count = sum(1 for r in results if r["is_broken"])
-        logger.info(
-            "Link check complete: %d/%d broken", broken_count, len(results)
-        )
+        logger.info("Link check complete: %d/%d broken", broken_count, len(results))
         return results

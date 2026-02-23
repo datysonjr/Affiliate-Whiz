@@ -41,7 +41,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from src.core.errors import SecurityError, CredentialExpiredError
 from src.core.logger import get_logger, log_event
 
 logger = get_logger("security.key_rotation")
@@ -73,8 +72,12 @@ class KeySchedule:
     """
 
     __slots__ = (
-        "key_name", "expires_at", "last_rotated",
-        "rotation_interval_days", "auto_rotate", "provider",
+        "key_name",
+        "expires_at",
+        "last_rotated",
+        "rotation_interval_days",
+        "auto_rotate",
+        "provider",
     )
 
     def __init__(
@@ -232,8 +235,10 @@ class KeyRotation:
             self._save()
 
         log_event(
-            logger, "key_rotation.scheduled",
-            key=key_name, expires_at=expires_at,
+            logger,
+            "key_rotation.scheduled",
+            key=key_name,
+            expires_at=expires_at,
             interval_days=rotation_interval_days,
         )
         return schedule
@@ -291,7 +296,9 @@ class KeyRotation:
             )
             return schedules
 
-    def get_expiring_soon(self, days: int = DEFAULT_WARNING_DAYS) -> List[Dict[str, Any]]:
+    def get_expiring_soon(
+        self, days: int = DEFAULT_WARNING_DAYS
+    ) -> List[Dict[str, Any]]:
         """Return keys that will expire within the given number of days.
 
         Parameters
@@ -379,14 +386,13 @@ class KeyRotation:
                     except Exception as exc:
                         logger.error(
                             "Rotation callback failed for %s: %s",
-                            key_name, exc,
+                            key_name,
+                            exc,
                         )
                         return False
 
             if new_value is None:
-                logger.warning(
-                    "No new value provided for key rotation: %s", key_name
-                )
+                logger.warning("No new value provided for key rotation: %s", key_name)
                 return False
 
             # Store the new value
@@ -416,7 +422,8 @@ class KeyRotation:
             self._save()
 
         log_event(
-            logger, "key_rotation.rotated",
+            logger,
+            "key_rotation.rotated",
             key=key_name,
             next_expiry=schedule.expires_at,
         )
@@ -455,14 +462,17 @@ class KeyRotation:
                     else:
                         logger.info(
                             "Key %s expires in %.1f days (auto_rotate disabled)",
-                            key_name, schedule.days_until_expiry,
+                            key_name,
+                            schedule.days_until_expiry,
                         )
                     warnings.append(key_name)
 
         if rotated:
             log_event(
-                logger, "key_rotation.batch_complete",
-                rotated=rotated, warnings=warnings,
+                logger,
+                "key_rotation.batch_complete",
+                rotated=rotated,
+                warnings=warnings,
             )
 
         return rotated
@@ -475,8 +485,7 @@ class KeyRotation:
         """Persist rotation schedules to disk."""
         data = {
             "schedules": {
-                name: schedule.to_dict()
-                for name, schedule in self._schedules.items()
+                name: schedule.to_dict() for name, schedule in self._schedules.items()
             },
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -490,7 +499,8 @@ class KeyRotation:
         except OSError as exc:
             logger.warning(
                 "Failed to save rotation schedules to %s: %s",
-                self._storage_path, exc,
+                self._storage_path,
+                exc,
             )
 
     def _load(self) -> None:
@@ -505,7 +515,8 @@ class KeyRotation:
         except (OSError, json.JSONDecodeError) as exc:
             logger.warning(
                 "Failed to load rotation schedules from %s: %s",
-                self._storage_path, exc,
+                self._storage_path,
+                exc,
             )
             return
 
@@ -519,7 +530,4 @@ class KeyRotation:
 
     def __repr__(self) -> str:
         expired = sum(1 for s in self._schedules.values() if s.is_expired)
-        return (
-            f"KeyRotation(keys={len(self._schedules)}, "
-            f"expired={expired})"
-        )
+        return f"KeyRotation(keys={len(self._schedules)}, expired={expired})"

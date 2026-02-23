@@ -26,13 +26,14 @@ from __future__ import annotations
 import asyncio
 import re
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 
 # =====================================================================
 # UTC helpers
 # =====================================================================
+
 
 def now_utc() -> datetime:
     """Return the current time as a timezone-aware UTC datetime.
@@ -77,11 +78,11 @@ def utc_from_timestamp(ts: float) -> datetime:
 
 _CRON_FIELD_COUNT = 5
 _CRON_FIELD_RANGES = [
-    (0, 59),   # minute
-    (0, 23),   # hour
-    (1, 31),   # day of month
-    (1, 12),   # month
-    (0, 6),    # day of week (0 = Monday in our convention)
+    (0, 59),  # minute
+    (0, 23),  # hour
+    (1, 31),  # day of month
+    (1, 12),  # month
+    (0, 6),  # day of week (0 = Monday in our convention)
 ]
 
 
@@ -143,9 +144,7 @@ def _parse_cron_field(field: str, min_val: int, max_val: int) -> set[int]:
     except ValueError:
         raise ValueError(f"Cannot parse cron field: {field!r}") from None
     if not (min_val <= val <= max_val):
-        raise ValueError(
-            f"Cron field value {val} out of range [{min_val}, {max_val}]"
-        )
+        raise ValueError(f"Cron field value {val} out of range [{min_val}, {max_val}]")
     return {val}
 
 
@@ -246,6 +245,7 @@ def is_due(
 # Duration formatting
 # =====================================================================
 
+
 def format_duration(seconds: float) -> str:
     """Format a duration in seconds as a human-readable string.
 
@@ -295,6 +295,7 @@ def format_duration(seconds: float) -> str:
 # =====================================================================
 # Sleep utilities
 # =====================================================================
+
 
 def sleep_until(target: datetime) -> float:
     """Sleep until the specified UTC datetime, then return.

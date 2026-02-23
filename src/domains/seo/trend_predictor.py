@@ -41,6 +41,7 @@ logger = get_logger("domains.seo.trend_predictor")
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class SignalLevel(IntEnum):
     """The 5-level trend signal pyramid.
@@ -48,11 +49,11 @@ class SignalLevel(IntEnum):
     Lower level = earlier signal = higher strategic value.
     """
 
-    SUPPLY = 1          # Manufacturer / distributor activity
-    INDUSTRY = 2        # VC funding, startup launches, patents
-    CREATOR = 3         # YouTube / TikTok / influencer coverage
-    CONSUMER = 4        # Reddit / forums / discussion spikes
-    SEARCH_VOLUME = 5   # Keyword tools, Google Trends (too late)
+    SUPPLY = 1  # Manufacturer / distributor activity
+    INDUSTRY = 2  # VC funding, startup launches, patents
+    CREATOR = 3  # YouTube / TikTok / influencer coverage
+    CONSUMER = 4  # Reddit / forums / discussion spikes
+    SEARCH_VOLUME = 5  # Keyword tools, Google Trends (too late)
 
 
 @unique
@@ -138,6 +139,7 @@ def get_signal_level(source: SignalSource) -> SignalLevel:
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class TrendSignal:
@@ -287,6 +289,7 @@ def generate_explosion_playbook(niche: str) -> List[str]:
 # Multi-signal confirmation
 # ---------------------------------------------------------------------------
 
+
 def check_multi_signal_confirmation(
     signals: Sequence[TrendSignal],
 ) -> tuple[bool, set[SignalLevel]]:
@@ -321,6 +324,7 @@ def check_multi_signal_confirmation(
 # ---------------------------------------------------------------------------
 # Trend score computation
 # ---------------------------------------------------------------------------
+
 
 def compute_trend_score(signals: Sequence[TrendSignal]) -> float:
     """Compute the weighted trend score for a niche.
@@ -410,6 +414,7 @@ def has_purchase_intent(niche: str, signals: Sequence[TrendSignal]) -> bool:
 # ---------------------------------------------------------------------------
 # Main analysis pipeline
 # ---------------------------------------------------------------------------
+
 
 def analyze_niche(
     niche: str,

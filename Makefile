@@ -10,22 +10,26 @@ EXPORTS_DIR=$(DATA_DIR)/exports
 LOGS_DIR=$(DATA_DIR)/logs
 DB_DIR=$(DATA_DIR)/db
 
-.PHONY: help venv install bootstrap fmt lint test clean dirs dry-run staging status tail-logs backup
+.PHONY: help venv install bootstrap fmt lint fix test clean dirs dry-run staging status tail-logs backup precommit-install precommit-run
 
 help:
 	@echo ""
 	@echo "OpenClaw Affiliate Bot — Commands"
-	@echo "  make bootstrap   One-command setup (venv + deps + env + init)"
-	@echo "  make venv        Create local venv"
-	@echo "  make install     Install dependencies"
-	@echo "  make test        Run tests"
-	@echo "  make lint        Run ruff + mypy"
-	@echo "  make dry-run     Run local DRY_RUN pipeline"
-	@echo "  make staging     Run SAFE_STAGING pipeline (requires env + ALLOW_PUBLISHING=true)"
-	@echo "  make status      Print system status"
-	@echo "  make tail-logs   Tail logs"
-	@echo "  make backup      Run a local backup snapshot"
-	@echo "  make clean       Remove venv + local data (DANGEROUS)"
+	@echo "  make bootstrap          One-command setup (venv + deps + env + pre-commit + init)"
+	@echo "  make venv               Create local venv"
+	@echo "  make install            Install dependencies"
+	@echo "  make test               Run tests"
+	@echo "  make lint               Run ruff check + ruff format --check + mypy"
+	@echo "  make fix                Auto-fix lint issues (ruff --fix + format)"
+	@echo "  make fmt                Auto-format code (ruff format)"
+	@echo "  make dry-run            Run local DRY_RUN pipeline"
+	@echo "  make staging            Run SAFE_STAGING pipeline"
+	@echo "  make status             Print system status"
+	@echo "  make tail-logs          Tail logs"
+	@echo "  make backup             Run a local backup snapshot"
+	@echo "  make precommit-install  Install pre-commit git hooks"
+	@echo "  make precommit-run      Run all pre-commit hooks on every file"
+	@echo "  make clean              Remove venv + local data (DANGEROUS)"
 	@echo ""
 
 venv:
@@ -41,7 +45,7 @@ install: venv
 		echo "No pyproject.toml or requirements.txt found."; \
 	fi
 
-bootstrap: install dirs
+bootstrap: install dirs precommit-install
 	@if [ ! -f .env ]; then \
 		echo "Copying .env.example -> .env"; \
 		cp .env.example .env; \
@@ -54,11 +58,20 @@ bootstrap: install dirs
 	@echo "Bootstrap complete. Next steps:"
 	@echo "  make dry-run    — run a DRY_RUN cycle"
 	@echo "  make test       — run the test suite"
-	@echo "  make staging    — publish to WP staging (set WP env vars first)"
+	@echo "  make fix        — auto-fix lint before pushing"
 
 lint:
-	$(PYTHON) -m ruff check src/ tests/
+	$(PYTHON) -m ruff check .
+	$(PYTHON) -m ruff format --check .
 	$(PYTHON) -m mypy src/ --ignore-missing-imports
+
+fix:
+	$(PYTHON) -m ruff check . --fix
+	$(PYTHON) -m ruff check . --fix --unsafe-fixes
+	$(PYTHON) -m ruff format .
+
+fmt:
+	$(PYTHON) -m ruff format .
 
 dirs:
 	@mkdir -p $(EXPORTS_DIR) $(LOGS_DIR) $(DB_DIR)
@@ -82,6 +95,13 @@ backup: dirs
 
 test:
 	$(PYTHON) -m pytest -q
+
+precommit-install:
+	$(PIP) install -U pre-commit
+	$(VENV)/bin/pre-commit install
+
+precommit-run:
+	$(VENV)/bin/pre-commit run --all-files
 
 clean:
 	@echo "This removes .venv and ./data. CTRL+C to cancel."

@@ -35,7 +35,6 @@ from typing import Any, Dict, List, Optional
 from src.core.constants import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT
 from src.core.errors import (
     APIAuthenticationError,
-    APIRateLimitError,
     IntegrationError,
 )
 from src.core.logger import get_logger, log_event
@@ -53,6 +52,7 @@ _API_VERSION = "Mediapartners"
 # ---------------------------------------------------------------------------
 # Data containers
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ImpactOffer:
@@ -177,6 +177,7 @@ class ImpactPerformance:
 # ---------------------------------------------------------------------------
 # ImpactIntegration client
 # ---------------------------------------------------------------------------
+
 
 class ImpactIntegration:
     """Client for the Impact partnership management API.
@@ -391,10 +392,8 @@ class ImpactIntegration:
         )
         self._track_request()
 
-        headers = self._build_headers()
-        logger.debug(
-            "Impact GET %s with %d params", url, len(params)
-        )
+        self._build_headers()
+        logger.debug("Impact GET %s with %d params", url, len(params))
 
         # Production: async HTTP GET with params and headers, parse JSON response.
         # campaigns = response_json.get("Campaigns", [])
@@ -461,7 +460,7 @@ class ImpactIntegration:
         )
         self._track_request()
 
-        headers = self._build_headers()
+        self._build_headers()
         logger.debug("Impact GET %s with %d params", url, len(params))
 
         # Production: async HTTP GET, parse Actions array.
@@ -498,9 +497,7 @@ class ImpactIntegration:
             If the campaign is not found or link generation fails.
         """
         if not campaign_id:
-            raise IntegrationError(
-                "campaign_id is required to generate tracking links"
-            )
+            raise IntegrationError("campaign_id is required to generate tracking links")
 
         url = self._build_url(f"/Campaigns/{campaign_id}/TrackingLinks")
         params: Dict[str, str] = {}
@@ -517,7 +514,7 @@ class ImpactIntegration:
         )
         self._track_request()
 
-        headers = self._build_headers()
+        self._build_headers()
         logger.debug("Impact GET %s", url)
 
         # Production: parse TrackingLinks from response.
@@ -576,7 +573,7 @@ class ImpactIntegration:
         )
         self._track_request()
 
-        headers = self._build_headers()
+        self._build_headers()
         logger.debug("Impact GET %s with group_by=%s", url, group_by)
 
         # Production: parse performance records from response.

@@ -233,9 +233,7 @@ class BrowserTool:
         )
 
         try:
-            await self._page.wait_for_selector(
-                selector, timeout=effective_timeout
-            )
+            await self._page.wait_for_selector(selector, timeout=effective_timeout)
             logger.debug("Selector '%s' found.", selector)
             return True
         except Exception:

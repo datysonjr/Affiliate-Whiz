@@ -1,12 +1,12 @@
 """Unit tests for agent modules."""
 
-import pytest
-from src.agents.base_agent import BaseAgent, RunResult, AgentStatus
+from src.agents.base_agent import BaseAgent, AgentStatus
 
 
 # ---------------------------------------------------------------------------
 # Test agent implementations
 # ---------------------------------------------------------------------------
+
 
 class SuccessAgent(BaseAgent):
     """Agent that always succeeds."""
@@ -53,6 +53,7 @@ class DryRunAgent(BaseAgent):
 # ---------------------------------------------------------------------------
 # BaseAgent lifecycle tests
 # ---------------------------------------------------------------------------
+
 
 class TestBaseAgent:
     def test_successful_run(self):
@@ -123,9 +124,11 @@ class TestBaseAgent:
 # Queue tests
 # ---------------------------------------------------------------------------
 
+
 class TestTaskQueue:
     def test_enqueue_dequeue(self):
         from src.core.queue import InProcessQueue, QueuedTask
+
         q = InProcessQueue()
         task = QueuedTask(task_id="t1", agent_name="research", priority=1)
         q.enqueue(task)
@@ -137,6 +140,7 @@ class TestTaskQueue:
 
     def test_priority_ordering(self):
         from src.core.queue import InProcessQueue, QueuedTask
+
         q = InProcessQueue()
         q.enqueue(QueuedTask(task_id="low", agent_name="a", priority=10))
         q.enqueue(QueuedTask(task_id="high", agent_name="a", priority=1))
@@ -148,12 +152,14 @@ class TestTaskQueue:
 
     def test_dequeue_timeout(self):
         from src.core.queue import InProcessQueue
+
         q = InProcessQueue()
         result = q.dequeue(timeout=0.01)
         assert result is None
 
     def test_clear(self):
         from src.core.queue import InProcessQueue, QueuedTask
+
         q = InProcessQueue()
         for i in range(5):
             q.enqueue(QueuedTask(task_id=f"t{i}", agent_name="a"))
@@ -167,9 +173,11 @@ class TestTaskQueue:
 # Database tests
 # ---------------------------------------------------------------------------
 
+
 class TestDatabase:
     def test_connect_and_migrate(self, tmp_path):
         from src.data.db import Database
+
         db = Database(db_path=str(tmp_path / "test.db"))
         db.connect()
         applied = db.migrate()
@@ -180,6 +188,7 @@ class TestDatabase:
 
     def test_insert_and_query(self, tmp_path):
         from src.data.db import Database
+
         db = Database(db_path=str(tmp_path / "test.db"))
         db.connect()
         db.migrate()
@@ -195,6 +204,7 @@ class TestDatabase:
 
     def test_transaction_rollback(self, tmp_path):
         from src.data.db import Database
+
         db = Database(db_path=str(tmp_path / "test.db"))
         db.connect()
         db.migrate()

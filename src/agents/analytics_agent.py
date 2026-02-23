@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TrafficSnapshot:
     """A point-in-time traffic measurement.
@@ -123,6 +124,7 @@ class AnalyticsExecutionResult:
 # Agent implementation
 # ---------------------------------------------------------------------------
 
+
 class AnalyticsAgent(BaseAgent):
     """Collects and summarises performance analytics from traffic and revenue sources.
 
@@ -207,12 +209,16 @@ class AnalyticsAgent(BaseAgent):
                     result.traffic[site] = snapshot
                     self.logger.info(
                         "Traffic collected for site '%s': %d page views, %d visitors.",
-                        site, snapshot.page_views, snapshot.unique_visitors,
+                        site,
+                        snapshot.page_views,
+                        snapshot.unique_visitors,
                     )
                 except Exception as exc:
                     result.errors.append(f"Traffic collection for site '{site}': {exc}")
                     self.logger.error(
-                        "Traffic collection failed for site '%s': %s", site, exc,
+                        "Traffic collection failed for site '%s': %s",
+                        site,
+                        exc,
                     )
 
         if plan.collect_revenue:
@@ -222,17 +228,25 @@ class AnalyticsAgent(BaseAgent):
                     result.revenue[network] = snapshot
                     self.logger.info(
                         "Revenue collected for network '%s': $%.2f (%d conversions).",
-                        network, snapshot.revenue, snapshot.conversions,
+                        network,
+                        snapshot.revenue,
+                        snapshot.conversions,
                     )
                 except Exception as exc:
-                    result.errors.append(f"Revenue collection for network '{network}': {exc}")
+                    result.errors.append(
+                        f"Revenue collection for network '{network}': {exc}"
+                    )
                     self.logger.error(
-                        "Revenue collection failed for network '%s': %s", network, exc,
+                        "Revenue collection failed for network '%s': %s",
+                        network,
+                        exc,
                     )
 
         return result
 
-    def report(self, plan: AnalyticsPlan, result: AnalyticsExecutionResult) -> Dict[str, Any]:
+    def report(
+        self, plan: AnalyticsPlan, result: AnalyticsExecutionResult
+    ) -> Dict[str, Any]:
         """Generate performance summaries and log key metrics.
 
         Parameters:
@@ -316,13 +330,13 @@ class AnalyticsAgent(BaseAgent):
             return TrafficSnapshot(site=site)
 
         now = datetime.now(timezone.utc)
-        period_start = datetime(
-            now.year, now.month, now.day, tzinfo=timezone.utc
-        )
+        period_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
 
         self.logger.debug(
             "Collecting traffic for site '%s' (lookback=%dh, ga_property=%s).",
-            site, lookback_hours, self._ga_property_id,
+            site,
+            lookback_hours,
+            self._ga_property_id,
         )
 
         # Placeholder: real implementation calls GA4 API
@@ -349,14 +363,14 @@ class AnalyticsAgent(BaseAgent):
             return RevenueSnapshot(network=network)
 
         now = datetime.now(timezone.utc)
-        period_start = datetime(
-            now.year, now.month, now.day, tzinfo=timezone.utc
-        )
+        period_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
 
         api_key = self._revenue_api_keys.get(network, "")
         self.logger.debug(
             "Collecting revenue for network '%s' (lookback=%dh, key_present=%s).",
-            network, lookback_hours, bool(api_key),
+            network,
+            lookback_hours,
+            bool(api_key),
         )
 
         # Placeholder: real implementation calls the network API

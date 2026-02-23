@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from src.core.constants import DEFAULT_REQUEST_TIMEOUT
 from src.core.errors import IntegrationError
@@ -34,6 +34,7 @@ logger = get_logger("integrations.email.mailbox")
 # ---------------------------------------------------------------------------
 # Data containers
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class EmailMessage:
@@ -101,14 +102,13 @@ class DeliveryResult:
     recipients_accepted: int = 0
     recipients_rejected: int = 0
     error: str = ""
-    sent_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    sent_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ---------------------------------------------------------------------------
 # MailboxManager
 # ---------------------------------------------------------------------------
+
 
 class MailboxManager:
     """Manages email delivery for alerts, reports, and notifications.
@@ -170,8 +170,10 @@ class MailboxManager:
         self.logger: logging.Logger = get_logger("integrations.email.mailbox")
 
         log_event(
-            logger, "mailbox.init",
-            smtp_host=smtp_host, smtp_port=smtp_port,
+            logger,
+            "mailbox.init",
+            smtp_host=smtp_host,
+            smtp_port=smtp_port,
             from_address=from_address,
         )
 
@@ -230,9 +232,7 @@ class MailboxManager:
         """
         all_recipients = message.to + message.cc + message.bcc
         if not all_recipients:
-            return DeliveryResult(
-                success=False, error="No recipients specified"
-            )
+            return DeliveryResult(success=False, error="No recipients specified")
 
         mime = self._build_mime(message)
 
@@ -270,9 +270,7 @@ class MailboxManager:
             )
 
         except Exception as exc:
-            self.logger.error(
-                "Email delivery failed: %s", str(exc), exc_info=True
-            )
+            self.logger.error("Email delivery failed: %s", str(exc), exc_info=True)
             return DeliveryResult(
                 success=False,
                 error=str(exc),
@@ -311,7 +309,11 @@ class MailboxManager:
         DeliveryResult
             Delivery status.
         """
-        severity_emoji = {"info": "[INFO]", "warning": "[WARNING]", "critical": "[CRITICAL]"}
+        severity_emoji = {
+            "info": "[INFO]",
+            "warning": "[WARNING]",
+            "critical": "[CRITICAL]",
+        }
         prefix = severity_emoji.get(severity, "[ALERT]")
 
         body_text = (
@@ -337,8 +339,11 @@ class MailboxManager:
         )
 
         log_event(
-            logger, "mailbox.send_alert",
-            recipients=len(recipients), severity=severity, site_id=site_id,
+            logger,
+            "mailbox.send_alert",
+            recipients=len(recipients),
+            severity=severity,
+            site_id=site_id,
         )
 
         return self._deliver(message)
@@ -375,13 +380,16 @@ class MailboxManager:
         message = EmailMessage(
             to=recipients,
             subject=subject,
-            body_text=report_text or f"Please view this report in an HTML-capable email client.",
+            body_text=report_text
+            or "Please view this report in an HTML-capable email client.",
             body_html=report_html,
         )
 
         log_event(
-            logger, "mailbox.send_report",
-            recipients=len(recipients), period=period,
+            logger,
+            "mailbox.send_report",
+            recipients=len(recipients),
+            period=period,
         )
 
         return self._deliver(message)
@@ -420,7 +428,8 @@ class MailboxManager:
         )
 
         log_event(
-            logger, "mailbox.send_notification",
+            logger,
+            "mailbox.send_notification",
             recipients=len(recipients),
         )
 

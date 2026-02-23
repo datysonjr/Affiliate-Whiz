@@ -26,6 +26,7 @@ from src.domains.seo.article_refresh import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _money_article(**kwargs) -> ArticleStatus:
     """A money page with default attributes."""
     defaults = dict(
@@ -85,13 +86,15 @@ def _fresh_article(**kwargs) -> ArticleStatus:
 # Tests — refresh cycles
 # ---------------------------------------------------------------------------
 
-class TestRefreshCycles(unittest.TestCase):
 
+class TestRefreshCycles(unittest.TestCase):
     def test_money_page_cycle(self):
         self.assertEqual(get_refresh_cycle(PageCategory.MONEY), MONEY_PAGE_REFRESH_DAYS)
 
     def test_support_page_cycle(self):
-        self.assertEqual(get_refresh_cycle(PageCategory.SUPPORT), SUPPORT_PAGE_REFRESH_DAYS)
+        self.assertEqual(
+            get_refresh_cycle(PageCategory.SUPPORT), SUPPORT_PAGE_REFRESH_DAYS
+        )
 
     def test_informational_page_cycle(self):
         self.assertEqual(
@@ -104,8 +107,8 @@ class TestRefreshCycles(unittest.TestCase):
 # Tests — age trigger
 # ---------------------------------------------------------------------------
 
-class TestAgeTrigger(unittest.TestCase):
 
+class TestAgeTrigger(unittest.TestCase):
     def test_old_money_page_triggers(self):
         article = _money_article(published_days_ago=60)
         trigger = check_age_trigger(article)
@@ -129,8 +132,8 @@ class TestAgeTrigger(unittest.TestCase):
 # Tests — ranking plateau trigger
 # ---------------------------------------------------------------------------
 
-class TestRankingPlateau(unittest.TestCase):
 
+class TestRankingPlateau(unittest.TestCase):
     def test_plateau_detected(self):
         article = _money_article(
             current_position=18,
@@ -164,8 +167,8 @@ class TestRankingPlateau(unittest.TestCase):
 # Tests — product change trigger
 # ---------------------------------------------------------------------------
 
-class TestProductChange(unittest.TestCase):
 
+class TestProductChange(unittest.TestCase):
     def test_product_change_triggers(self):
         article = _money_article(has_product_changes=True)
         trigger = check_product_change(article)
@@ -181,8 +184,8 @@ class TestProductChange(unittest.TestCase):
 # Tests — refresh actions
 # ---------------------------------------------------------------------------
 
-class TestRefreshActions(unittest.TestCase):
 
+class TestRefreshActions(unittest.TestCase):
     def test_product_change_includes_expand_products(self):
         article = _money_article()
         actions = determine_refresh_actions(article, [RefreshTrigger.PRODUCT_CHANGE])
@@ -212,17 +215,21 @@ class TestRefreshActions(unittest.TestCase):
 # Tests — priority scoring
 # ---------------------------------------------------------------------------
 
-class TestRefreshPriority(unittest.TestCase):
 
+class TestRefreshPriority(unittest.TestCase):
     def test_product_change_is_critical(self):
         article = _money_article()
-        score, urgency = compute_refresh_priority(article, [RefreshTrigger.PRODUCT_CHANGE])
+        score, urgency = compute_refresh_priority(
+            article, [RefreshTrigger.PRODUCT_CHANGE]
+        )
         self.assertEqual(urgency, RefreshUrgency.CRITICAL)
         self.assertGreater(score, 50)
 
     def test_plateau_is_high(self):
         article = _money_article()
-        score, urgency = compute_refresh_priority(article, [RefreshTrigger.RANKING_PLATEAU])
+        score, urgency = compute_refresh_priority(
+            article, [RefreshTrigger.RANKING_PLATEAU]
+        )
         self.assertEqual(urgency, RefreshUrgency.HIGH)
 
     def test_age_only_is_normal(self):
@@ -250,8 +257,8 @@ class TestRefreshPriority(unittest.TestCase):
 # Tests — single article plan
 # ---------------------------------------------------------------------------
 
-class TestPlanRefresh(unittest.TestCase):
 
+class TestPlanRefresh(unittest.TestCase):
     def test_old_article_gets_plan(self):
         article = _money_article(published_days_ago=60)
         plan = plan_refresh(article)
@@ -287,8 +294,8 @@ class TestPlanRefresh(unittest.TestCase):
 # Tests — batch evaluation
 # ---------------------------------------------------------------------------
 
-class TestEvaluateRefreshQueue(unittest.TestCase):
 
+class TestEvaluateRefreshQueue(unittest.TestCase):
     def test_basic_queue(self):
         articles = [
             _money_article(published_days_ago=60),

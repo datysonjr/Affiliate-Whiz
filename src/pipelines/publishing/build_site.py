@@ -22,10 +22,10 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum, unique
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from src.core.constants import DEFAULT_MAX_RETRIES
-from src.core.errors import PublishingError, PipelineStepError
+from src.core.errors import PublishingError
 from src.core.logger import get_logger, log_event
 
 logger = get_logger("pipelines.publishing.build_site")
@@ -34,6 +34,7 @@ logger = get_logger("pipelines.publishing.build_site")
 # ---------------------------------------------------------------------------
 # Enumerations
 # ---------------------------------------------------------------------------
+
 
 @unique
 class SiteStatus(str, Enum):
@@ -61,6 +62,7 @@ class HostingProvider(str, Enum):
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class SiteConfig:
@@ -136,6 +138,7 @@ class BuildResult:
 # ---------------------------------------------------------------------------
 # Build functions
 # ---------------------------------------------------------------------------
+
 
 def build_site(
     site_config: SiteConfig,
@@ -260,6 +263,7 @@ def build_site(
 # Deployment
 # ---------------------------------------------------------------------------
 
+
 def deploy_to_hosting(
     site_config: SiteConfig,
     *,
@@ -373,6 +377,7 @@ def _deploy_vps(config: SiteConfig) -> str:
 # ---------------------------------------------------------------------------
 # Domain and SSL configuration
 # ---------------------------------------------------------------------------
+
 
 def configure_domain(
     domain: str,
@@ -489,9 +494,7 @@ def setup_ssl(
         return True
 
     # For custom VPS / S3, we need to provision manually
-    logger.info(
-        "Provisioning SSL certificate for %s via Let's Encrypt", domain
-    )
+    logger.info("Provisioning SSL certificate for %s via Let's Encrypt", domain)
 
     # Stub: actual Let's Encrypt / certbot integration goes here
     log_event(logger, "ssl.setup.ok", domain=domain, method="letsencrypt")
@@ -501,6 +504,7 @@ def setup_ssl(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _check_site_exists(site_config: SiteConfig) -> bool:
     """Check if a site has already been deployed.
@@ -517,7 +521,9 @@ def _check_site_exists(site_config: SiteConfig) -> bool:
     """
     # Stub: in production, this would make an HTTP request to the domain
     # or query the hosting provider's API
-    logger.debug("Checking if site %s exists at %s", site_config.site_id, site_config.domain)
+    logger.debug(
+        "Checking if site %s exists at %s", site_config.site_id, site_config.domain
+    )
     return False
 
 

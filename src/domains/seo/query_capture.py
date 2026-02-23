@@ -29,7 +29,6 @@ from enum import Enum, unique
 from typing import Any, Dict, List, Optional, Sequence
 
 from src.core.logger import get_logger, log_event
-from src.domains.seo.keyword import KeywordData, SearchIntent
 
 logger = get_logger("domains.seo.query_capture")
 
@@ -37,6 +36,7 @@ logger = get_logger("domains.seo.query_capture")
 # ---------------------------------------------------------------------------
 # Enumerations
 # ---------------------------------------------------------------------------
+
 
 @unique
 class EmergingQueryType(str, Enum):
@@ -67,6 +67,7 @@ class SignalSource(str, Enum):
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class EmergingQuery:
@@ -122,10 +123,7 @@ class EmergingQuery:
         From the spec: commercial product + clear buyer decision + limited
         existing content.
         """
-        return (
-            self.buyer_intent_rank <= 3
-            and self.content_supply < 5
-        )
+        return self.buyer_intent_rank <= 3 and self.content_supply < 5
 
 
 @dataclass
@@ -150,13 +148,15 @@ class AuthorityCluster:
     product_name: str = ""
     queries: List[EmergingQuery] = field(default_factory=list)
     cluster_score: float = 0.0
-    page_types: List[str] = field(default_factory=lambda: [
-        "review",
-        "comparison",
-        "alternatives",
-        "troubleshooting",
-        "buying_guide",
-    ])
+    page_types: List[str] = field(
+        default_factory=lambda: [
+            "review",
+            "comparison",
+            "alternatives",
+            "troubleshooting",
+            "buying_guide",
+        ]
+    )
 
     @property
     def is_complete(self) -> bool:
@@ -175,9 +175,17 @@ class AuthorityCluster:
 _BUYER_INTENT_PATTERNS: list[tuple[int, re.Pattern[str]]] = [
     (1, re.compile(r"\bbest\b", re.IGNORECASE)),
     (2, re.compile(r"\bvs\b|\bversus\b|\bcompare\b|\bcomparison\b", re.IGNORECASE)),
-    (3, re.compile(r"\bworth\s+it\b|\bshould\s+i\s+buy\b|\bworth\s+buying\b", re.IGNORECASE)),
+    (
+        3,
+        re.compile(
+            r"\bworth\s+it\b|\bshould\s+i\s+buy\b|\bworth\s+buying\b", re.IGNORECASE
+        ),
+    ),
     (4, re.compile(r"\breview\b|\breviews\b|\brated\b", re.IGNORECASE)),
-    (5, re.compile(r"\balternative\b|\balternatives\b|\binstead\s+of\b", re.IGNORECASE)),
+    (
+        5,
+        re.compile(r"\balternative\b|\balternatives\b|\binstead\s+of\b", re.IGNORECASE),
+    ),
 ]
 
 
@@ -217,10 +225,15 @@ _QUERY_TYPE_PATTERNS: dict[EmergingQueryType, list[re.Pattern[str]]] = {
     ],
     EmergingQueryType.PROBLEM_TRIGGERED: [
         re.compile(r"\bbest\s+\w+\s+for\s+\w+\s+\w+", re.IGNORECASE),
-        re.compile(r"\bfor\s+(?:back\s+pain|bad\s+credit|small\s+spaces?|beginners?)\b", re.IGNORECASE),
+        re.compile(
+            r"\bfor\s+(?:back\s+pain|bad\s+credit|small\s+spaces?|beginners?)\b",
+            re.IGNORECASE,
+        ),
     ],
     EmergingQueryType.NEW_CATEGORY: [
-        re.compile(r"\bbest\s+(?:ai|smart|portable|wireless|electric)\s+\w+", re.IGNORECASE),
+        re.compile(
+            r"\bbest\s+(?:ai|smart|portable|wireless|electric)\s+\w+", re.IGNORECASE
+        ),
     ],
 }
 
@@ -294,6 +307,7 @@ def expand_product_queries(
 # Capture score computation
 # ---------------------------------------------------------------------------
 
+
 def compute_capture_score(
     *,
     buyer_intent_rank: int,
@@ -347,6 +361,7 @@ def compute_capture_score(
 # Authority cluster builder
 # ---------------------------------------------------------------------------
 
+
 def build_authority_clusters(
     queries: Sequence[EmergingQuery],
 ) -> List[AuthorityCluster]:
@@ -397,6 +412,7 @@ def build_authority_clusters(
 # ---------------------------------------------------------------------------
 # Main pipeline entry point
 # ---------------------------------------------------------------------------
+
 
 def capture_emerging_queries(
     product_names: Sequence[str],
@@ -473,9 +489,7 @@ def capture_emerging_queries(
         products=len(product_names),
         total_queries=len(all_queries),
         clusters=len(clusters),
-        auto_publish_count=sum(
-            1 for q in all_queries if q.should_auto_publish
-        ),
+        auto_publish_count=sum(1 for q in all_queries if q.should_auto_publish),
     )
 
     return clusters

@@ -18,8 +18,8 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Sequence
 
 from src.core.logger import get_logger, log_event
 
@@ -29,6 +29,7 @@ logger = get_logger("analytics.events")
 # ---------------------------------------------------------------------------
 # Data models
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Event:
@@ -116,6 +117,7 @@ class AggregateResult:
 # EventTracker
 # ---------------------------------------------------------------------------
 
+
 class EventTracker:
     """In-memory event tracking, querying, and aggregation engine.
 
@@ -165,7 +167,9 @@ class EventTracker:
 
         logger.debug(
             "Tracked event %s: type=%s site=%s",
-            event.event_id, event.event_type, event.site_id,
+            event.event_id,
+            event.event_type,
+            event.site_id,
         )
         return event
 
@@ -188,8 +192,10 @@ class EventTracker:
             count += 1
 
         log_event(
-            logger, "event_tracker.batch",
-            batch_size=count, total=self._event_count,
+            logger,
+            "event_tracker.batch",
+            batch_size=count,
+            total=self._event_count,
         )
         return count
 
@@ -263,7 +269,10 @@ class EventTracker:
 
         logger.debug(
             "Query returned %d events (type=%s, site=%s, channel=%s)",
-            len(results), event_type or "*", site_id or "*", channel or "*",
+            len(results),
+            event_type or "*",
+            site_id or "*",
+            channel or "*",
         )
         return results
 
@@ -331,19 +340,22 @@ class EventTracker:
             values = [e.value for e in events]
             timestamps = [e.timestamp for e in events if e.timestamp]
 
-            results.append(AggregateResult(
-                group_key=key,
-                count=len(events),
-                total_value=round(sum(values), 6),
-                avg_value=round(sum(values) / len(values), 6) if values else 0.0,
-                min_timestamp=min(timestamps) if timestamps else None,
-                max_timestamp=max(timestamps) if timestamps else None,
-            ))
+            results.append(
+                AggregateResult(
+                    group_key=key,
+                    count=len(events),
+                    total_value=round(sum(values), 6),
+                    avg_value=round(sum(values) / len(values), 6) if values else 0.0,
+                    min_timestamp=min(timestamps) if timestamps else None,
+                    max_timestamp=max(timestamps) if timestamps else None,
+                )
+            )
 
         results.sort(key=lambda r: r.count, reverse=True)
 
         log_event(
-            logger, "event_tracker.aggregate",
+            logger,
+            "event_tracker.aggregate",
             group_by=group_by,
             input_events=len(filtered),
             output_groups=len(results),

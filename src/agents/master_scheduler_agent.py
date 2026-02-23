@@ -15,25 +15,24 @@ Design references:
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum, unique
 from typing import Any, Dict, List, Optional
 
-from src.agents.base_agent import BaseAgent, RunResult
+from src.agents.base_agent import BaseAgent
 from src.core.constants import (
     AgentName,
-    DEFAULT_MAX_POSTS_PER_DAY,
     DEFAULT_SCHEDULER_INTERVAL_SECONDS,
     TaskStatus,
 )
-from src.core.logger import get_logger, log_event
+from src.core.logger import log_event
 
 
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @unique
 class ScheduleFrequency(str, Enum):
@@ -112,6 +111,7 @@ class DispatchSummary:
 # Agent implementation
 # ---------------------------------------------------------------------------
 
+
 class MasterSchedulerAgent(BaseAgent):
     """Creates daily/weekly task lists and dispatches them to other agents.
 
@@ -161,7 +161,9 @@ class MasterSchedulerAgent(BaseAgent):
             schedule_window_end=now,
         )
 
-        log_event(self.logger, "scheduler.plan.start", window_start=plan.schedule_window_start)
+        log_event(
+            self.logger, "scheduler.plan.start", window_start=plan.schedule_window_start
+        )
 
         # Evaluate each agent's schedule
         for agent_name in AgentName:
@@ -213,7 +215,9 @@ class MasterSchedulerAgent(BaseAgent):
         summary = DispatchSummary()
 
         for task in plan.tasks:
-            if self._check_dry_run(f"dispatch task {task.task_id} to {task.target_agent}"):
+            if self._check_dry_run(
+                f"dispatch task {task.task_id} to {task.target_agent}"
+            ):
                 task.status = TaskStatus.SKIPPED
                 task.dispatch_result = "dry_run"
                 summary.skipped += 1

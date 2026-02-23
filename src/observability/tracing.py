@@ -221,8 +221,11 @@ class Tracer:
             self._traces[trace_id].append(span_id)
 
         log_event(
-            logger, "span.started",
-            span_id=span_id, name=name, trace_id=trace_id,
+            logger,
+            "span.started",
+            span_id=span_id,
+            name=name,
+            trace_id=trace_id,
         )
         return span_id
 
@@ -272,8 +275,10 @@ class Tracer:
                 self._on_trace_completed(trace_id)
 
         log_event(
-            logger, "span.ended",
-            span_id=span_id, status=status,
+            logger,
+            "span.ended",
+            span_id=span_id,
+            status=status,
             duration_ms=span.duration_ms,
         )
         return span
@@ -308,9 +313,7 @@ class Tracer:
             with path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(trace_data, default=str) + "\n")
         except OSError as exc:
-            logger.warning(
-                "Failed to persist trace %s: %s", trace_id, exc
-            )
+            logger.warning("Failed to persist trace %s: %s", trace_id, exc)
 
     # ------------------------------------------------------------------
     # Tag operations
@@ -442,11 +445,7 @@ class Tracer:
             List of serialized active spans.
         """
         with self._lock:
-            return [
-                span.to_dict()
-                for span in self._spans.values()
-                if span.is_active
-            ]
+            return [span.to_dict() for span in self._spans.values() if span.is_active]
 
     def list_recent_traces(self, limit: int = 20) -> List[Dict[str, Any]]:
         """Return the most recently completed traces.

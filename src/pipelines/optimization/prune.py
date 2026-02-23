@@ -18,9 +18,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
-from src.core.constants import ContentStatus
 from src.core.errors import PipelineStepError
 from src.core.logger import get_logger, log_event
 from src.pipelines.optimization.measure import ContentMetrics
@@ -31,6 +30,7 @@ logger = get_logger("pipelines.optimization.prune")
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PruneCandidate:
@@ -129,6 +129,7 @@ class PruneReport:
 # Candidate identification
 # ---------------------------------------------------------------------------
 
+
 def identify_prune_candidates(
     content_metrics: List[ContentMetrics],
     *,
@@ -189,17 +190,23 @@ def identify_prune_candidates(
 
         # Check pageviews
         if metrics.pageviews < min_pageviews:
-            reasons.append(f"below_min_pageviews ({metrics.pageviews} < {min_pageviews})")
+            reasons.append(
+                f"below_min_pageviews ({metrics.pageviews} < {min_pageviews})"
+            )
             severity_score += 2
 
         # Check revenue
         if metrics.revenue < min_revenue:
-            reasons.append(f"below_min_revenue (${metrics.revenue:.2f} < ${min_revenue:.2f})")
+            reasons.append(
+                f"below_min_revenue (${metrics.revenue:.2f} < ${min_revenue:.2f})"
+            )
             severity_score += 1
 
         # Check bounce rate
         if metrics.bounce_rate > max_bounce_rate:
-            reasons.append(f"high_bounce_rate ({metrics.bounce_rate:.2%} > {max_bounce_rate:.2%})")
+            reasons.append(
+                f"high_bounce_rate ({metrics.bounce_rate:.2%} > {max_bounce_rate:.2%})"
+            )
             severity_score += 1
 
         # Check negative ROI
@@ -241,7 +248,10 @@ def identify_prune_candidates(
     # Sort by severity (high first), then by lowest pageviews
     severity_order = {"high": 0, "medium": 1, "low": 2}
     candidates.sort(
-        key=lambda c: (severity_order.get(c.severity, 3), c.metrics.pageviews if c.metrics else 0)
+        key=lambda c: (
+            severity_order.get(c.severity, 3),
+            c.metrics.pageviews if c.metrics else 0,
+        )
     )
 
     log_event(
@@ -258,6 +268,7 @@ def identify_prune_candidates(
 # ---------------------------------------------------------------------------
 # Pruning execution
 # ---------------------------------------------------------------------------
+
 
 def prune_content(
     candidates: List[PruneCandidate],
@@ -396,6 +407,7 @@ def _apply_prune_action(post_id: str, action: str) -> None:
 # Archival
 # ---------------------------------------------------------------------------
 
+
 def archive_content(
     post_id: str,
     title: str = "",
@@ -421,7 +433,7 @@ def archive_content(
     bool
         ``True`` if archiving succeeded.
     """
-    archive_record = {
+    {
         "post_id": post_id,
         "title": title,
         "url": url,
@@ -438,6 +450,7 @@ def archive_content(
 # ---------------------------------------------------------------------------
 # Report generation
 # ---------------------------------------------------------------------------
+
 
 def generate_prune_report(
     candidates: List[PruneCandidate],
@@ -470,58 +483,74 @@ def generate_prune_report(
 
     # Build Markdown report
     lines = [
-        f"# Content Pruning Report",
-        f"",
+        "# Content Pruning Report",
+        "",
         f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
-        f"",
-        f"## Summary",
-        f"",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "",
+        "## Summary",
+        "",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Candidates identified | {len(candidates)} |",
         f"| Successfully pruned | {pruned} |",
         f"| Failed | {failed} |",
         f"| Skipped | {skipped} |",
         f"| Action applied | {action} |",
-        f"",
-        f"## Candidate Breakdown by Severity",
-        f"",
-        f"| Severity | Count |",
-        f"|----------|-------|",
+        "",
+        "## Candidate Breakdown by Severity",
+        "",
+        "| Severity | Count |",
+        "|----------|-------|",
         f"| High | {sum(1 for c in candidates if c.severity == 'high')} |",
         f"| Medium | {sum(1 for c in candidates if c.severity == 'medium')} |",
         f"| Low | {sum(1 for c in candidates if c.severity == 'low')} |",
-        f"",
+        "",
     ]
 
     if candidates:
-        lines.extend([
-            f"## Details",
-            f"",
-            f"| Post | Reason | Severity | Action | Result |",
-            f"|------|--------|----------|--------|--------|",
-        ])
+        lines.extend(
+            [
+                "## Details",
+                "",
+                "| Post | Reason | Severity | Action | Result |",
+                "|------|--------|----------|--------|--------|",
+            ]
+        )
         results_by_id = {r.post_id: r for r in results}
         for candidate in candidates:
             result = results_by_id.get(candidate.post_id)
-            status = "OK" if result and result.success else ("FAILED" if result else "SKIPPED")
-            title_short = candidate.title[:40] + "..." if len(candidate.title) > 40 else candidate.title
-            reason_short = candidate.reason[:50] + "..." if len(candidate.reason) > 50 else candidate.reason
+            status = (
+                "OK"
+                if result and result.success
+                else ("FAILED" if result else "SKIPPED")
+            )
+            title_short = (
+                candidate.title[:40] + "..."
+                if len(candidate.title) > 40
+                else candidate.title
+            )
+            reason_short = (
+                candidate.reason[:50] + "..."
+                if len(candidate.reason) > 50
+                else candidate.reason
+            )
             lines.append(
                 f"| {title_short} | {reason_short} | {candidate.severity} | "
                 f"{candidate.recommended_action} | {status} |"
             )
 
-    lines.extend([
-        f"",
-        f"## Follow-up Actions",
-        f"",
-        f"- Update sitemap to remove pruned URLs",
-        f"- Verify redirect rules are functioning correctly",
-        f"- Update internal links pointing to pruned pages",
-        f"- Monitor 404 errors over the next 7 days",
-        f"- Review analytics for traffic impact after 14 days",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Follow-up Actions",
+            "",
+            "- Update sitemap to remove pruned URLs",
+            "- Verify redirect rules are functioning correctly",
+            "- Update internal links pointing to pruned pages",
+            "- Monitor 404 errors over the next 7 days",
+            "- Review analytics for traffic impact after 14 days",
+        ]
+    )
 
     report_text = "\n".join(lines)
 

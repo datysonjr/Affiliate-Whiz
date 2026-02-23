@@ -77,6 +77,7 @@ _VERDICT_PATTERNS: list[re.Pattern[str]] = [
 # Result dataclass
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SEOValidationResult:
     """Result of the OpenClaw SEO validation pass.
@@ -112,6 +113,7 @@ class SEOValidationResult:
 # ---------------------------------------------------------------------------
 # Individual checks
 # ---------------------------------------------------------------------------
+
 
 def _check_tldr(content: str) -> bool:
     """Check that a TLDR / Quick Answer block exists near the top.
@@ -222,6 +224,7 @@ def _count_verdict_statements(content: str) -> int:
 # AI Domination Score
 # ---------------------------------------------------------------------------
 
+
 def compute_ai_domination_score(
     *,
     has_tldr: bool,
@@ -283,6 +286,7 @@ def compute_ai_domination_score(
 # Main validator
 # ---------------------------------------------------------------------------
 
+
 def validate_seo(content: str, *, is_fresh: bool = True) -> SEOValidationResult:
     """Run all OpenClaw SEO validation checks on article content.
 
@@ -317,10 +321,14 @@ def validate_seo(content: str, *, is_fresh: bool = True) -> SEOValidationResult:
         )
 
     if not has_table:
-        failures.append("Comparison table missing — article needs a product comparison table")
+        failures.append(
+            "Comparison table missing — article needs a product comparison table"
+        )
 
     if not has_faq:
-        failures.append("FAQ section missing — article needs an FAQ heading with questions")
+        failures.append(
+            "FAQ section missing — article needs an FAQ heading with questions"
+        )
 
     if not has_enough_links:
         failures.append(

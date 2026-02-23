@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from src.core.constants import AgentName, NodeRole
 from src.core.errors import RoutingError
@@ -56,6 +56,7 @@ _DEFAULT_NODE_ADDRESSES: Dict[NodeRole, str] = {
 # ---------------------------------------------------------------------------
 # Route descriptor
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class RouteDecision:
@@ -89,6 +90,7 @@ class RouteDecision:
 # Router
 # ---------------------------------------------------------------------------
 
+
 class Router:
     """Route tasks to the correct agent and cluster node.
 
@@ -114,10 +116,14 @@ class Router:
         self._logger: logging.Logger = get_logger("orchestrator.router")
         self._local_role: NodeRole = local_role
         self._agent_node_map: Dict[str, NodeRole] = (
-            agent_node_map if agent_node_map is not None else dict(_DEFAULT_AGENT_NODE_MAP)
+            agent_node_map
+            if agent_node_map is not None
+            else dict(_DEFAULT_AGENT_NODE_MAP)
         )
         self._node_addresses: Dict[NodeRole, str] = (
-            node_addresses if node_addresses is not None else dict(_DEFAULT_NODE_ADDRESSES)
+            node_addresses
+            if node_addresses is not None
+            else dict(_DEFAULT_NODE_ADDRESSES)
         )
 
         log_event(
@@ -265,7 +271,9 @@ class Router:
     # Top-level routing
     # ------------------------------------------------------------------
 
-    def route_task(self, task_type: str, *, payload: Optional[Dict[str, Any]] = None) -> RouteDecision:
+    def route_task(
+        self, task_type: str, *, payload: Optional[Dict[str, Any]] = None
+    ) -> RouteDecision:
         """Determine routing for a task and optionally forward it.
 
         This is the primary entry-point called by the orchestrator controller

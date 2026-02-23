@@ -21,9 +21,9 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum, unique
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from src.core.errors import ContentValidationError, PipelineStepError
+from src.core.errors import ContentValidationError
 from src.core.logger import get_logger, log_event
 
 logger = get_logger("pipelines.content.fact_check")
@@ -33,13 +33,14 @@ logger = get_logger("pipelines.content.fact_check")
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class ClaimSeverity(str, Enum):
     """Severity level of a flagged claim."""
 
-    INFO = "info"          # Minor observation, not blocking
-    WARNING = "warning"    # Should be reviewed before publish
-    ERROR = "error"        # Must be fixed before publish
+    INFO = "info"  # Minor observation, not blocking
+    WARNING = "warning"  # Should be reviewed before publish
+    ERROR = "error"  # Must be fixed before publish
 
 
 @unique
@@ -55,6 +56,7 @@ class ClaimStatus(str, Enum):
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class FactCheckResult:
@@ -124,16 +126,16 @@ class FactCheckReport:
 
 # Patterns that often indicate factual claims in affiliate content
 _PRICE_PATTERN = re.compile(
-    r'\$[\d,]+(?:\.\d{2})?(?:\s*(?:per|/)\s*(?:month|year|mo|yr))?',
+    r"\$[\d,]+(?:\.\d{2})?(?:\s*(?:per|/)\s*(?:month|year|mo|yr))?",
     re.IGNORECASE,
 )
-_PERCENTAGE_PATTERN = re.compile(r'\d+(?:\.\d+)?\s*%')
+_PERCENTAGE_PATTERN = re.compile(r"\d+(?:\.\d+)?\s*%")
 _NUMERIC_CLAIM_PATTERN = re.compile(
-    r'(?:up to|over|more than|less than|approximately|about|around)\s+\d+',
+    r"(?:up to|over|more than|less than|approximately|about|around)\s+\d+",
     re.IGNORECASE,
 )
 _GUARANTEE_PATTERN = re.compile(
-    r'(?:guarantee|warranty|money.?back|refund|free trial|risk.?free)',
+    r"(?:guarantee|warranty|money.?back|refund|free trial|risk.?free)",
     re.IGNORECASE,
 )
 
@@ -154,7 +156,7 @@ def _extract_claims(text: str) -> List[str]:
     list[str]
         Sentences containing potential factual claims.
     """
-    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     claims: List[str] = []
 
     for sentence in sentences:
@@ -175,6 +177,7 @@ def _extract_claims(text: str) -> List[str]:
 # ---------------------------------------------------------------------------
 # Verification functions
 # ---------------------------------------------------------------------------
+
 
 def verify_product_details(
     claim: str,
@@ -276,7 +279,7 @@ def check_price_accuracy(
         )
 
     for price_str in price_matches:
-        cleaned = re.sub(r'[^\d.]', '', price_str.split("/")[0].split("per")[0])
+        cleaned = re.sub(r"[^\d.]", "", price_str.split("/")[0].split("per")[0])
         try:
             claimed_price = float(cleaned)
         except ValueError:
@@ -291,7 +294,7 @@ def check_price_accuracy(
                 source="price_check",
                 details=(
                     f"Claimed price ${claimed_price:.2f} is within "
-                    f"{tolerance_pct*100:.0f}% of reference AOV ${aov:.2f}."
+                    f"{tolerance_pct * 100:.0f}% of reference AOV ${aov:.2f}."
                 ),
             )
         else:
@@ -302,7 +305,7 @@ def check_price_accuracy(
                 source="price_check",
                 details=(
                     f"Claimed price ${claimed_price:.2f} deviates "
-                    f"{deviation*100:.1f}% from reference AOV ${aov:.2f}."
+                    f"{deviation * 100:.1f}% from reference AOV ${aov:.2f}."
                 ),
                 suggestion=(
                     f"Update the price to reflect the current value of "
@@ -345,8 +348,16 @@ def flag_unverifiable_claims(
 
     # Check for superlative/absolute claims
     superlatives = [
-        "best", "worst", "fastest", "cheapest", "most popular",
-        "number one", "#1", "guaranteed", "proven", "clinically",
+        "best",
+        "worst",
+        "fastest",
+        "cheapest",
+        "most popular",
+        "number one",
+        "#1",
+        "guaranteed",
+        "proven",
+        "clinically",
     ]
     for word in superlatives:
         if word in claim_lower:
@@ -365,7 +376,14 @@ def flag_unverifiable_claims(
     # Check for unattributed statistics
     if _PERCENTAGE_PATTERN.search(claim) or _NUMERIC_CLAIM_PATTERN.search(claim):
         # See if the claim includes attribution
-        attribution_markers = ["according to", "based on", "reported by", "study", "survey", "data from"]
+        attribution_markers = [
+            "according to",
+            "based on",
+            "reported by",
+            "study",
+            "survey",
+            "data from",
+        ]
         has_attribution = any(marker in claim_lower for marker in attribution_markers)
         if not has_attribution:
             return FactCheckResult(
@@ -401,6 +419,7 @@ def flag_unverifiable_claims(
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
+
 
 def fact_check_claims(
     article_text: str,
@@ -494,7 +513,11 @@ def fact_check_claims(
             details={
                 "article_title": article_title,
                 "errors": [
-                    {"claim": r.claim_text, "details": r.details, "suggestion": r.suggestion}
+                    {
+                        "claim": r.claim_text,
+                        "details": r.details,
+                        "suggestion": r.suggestion,
+                    }
                     for r in error_claims
                 ],
             },

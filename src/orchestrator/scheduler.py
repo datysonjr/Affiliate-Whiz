@@ -26,15 +26,14 @@ import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 try:
     import yaml  # type: ignore[import-untyped]
 except ImportError:
     yaml = None  # type: ignore[assignment]
 
-from src.core.constants import CONFIG_DIR, DEFAULT_SCHEDULER_INTERVAL_SECONDS
+from src.core.constants import CONFIG_DIR
 from src.core.errors import SchedulerError
 from src.core.logger import get_logger, log_event
 
@@ -42,6 +41,7 @@ from src.core.logger import get_logger, log_event
 # ---------------------------------------------------------------------------
 # Cron helpers
 # ---------------------------------------------------------------------------
+
 
 def _match_cron_field(field_expr: str, value: int, min_val: int, max_val: int) -> bool:
     """Return ``True`` if *value* matches a single cron field expression.
@@ -133,6 +133,7 @@ def cron_matches(cron_expr: str, dt: datetime) -> bool:
 # Scheduled task descriptor
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ScheduledTask:
     """Descriptor for a single scheduled item.
@@ -163,6 +164,7 @@ class ScheduledTask:
 # ---------------------------------------------------------------------------
 # Scheduler
 # ---------------------------------------------------------------------------
+
 
 class Scheduler:
     """Manages cron-based scheduling for the OpenClaw system.

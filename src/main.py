@@ -27,9 +27,7 @@ import json
 import signal
 import sys
 import threading
-import time
-from datetime import datetime, timezone
-from typing import NoReturn, Optional
+from typing import NoReturn
 
 from src.core.constants import (
     APP_NAME,
@@ -55,6 +53,7 @@ _shutdown_event = threading.Event()
 # Signal handling
 # ---------------------------------------------------------------------------
 
+
 def _handle_shutdown_signal(signum: int, _frame: object) -> None:
     sig_name = signal.Signals(signum).name
     log_event(logger, "shutdown.signal_received", signal=sig_name)
@@ -72,6 +71,7 @@ def install_signal_handlers() -> None:
 # Agent factory
 # ---------------------------------------------------------------------------
 
+
 def _create_agents(dry_run: bool, pipeline_filter: str = "", real_agents: bool = False):
     """Create and return agent instances for the current node role.
 
@@ -86,7 +86,6 @@ def _create_agents(dry_run: bool, pipeline_filter: str = "", real_agents: bool =
         use LLMTool, CMSTool, etc.  When False (default), use lightweight
         Local* stubs that simulate the flow without real integrations.
     """
-    from src.agents.base_agent import BaseAgent, RunResult
 
     # Build agent config with dry_run flag
     base_config: dict = {"enabled": True, "dry_run": dry_run, "risk_level": "low"}
@@ -128,7 +127,10 @@ def _create_real_agents(base_config: dict, pipeline_filter: str = "") -> list:
         "max_articles_per_run": 3,
         "target_word_count": 1500,
         "quality_threshold": 0.7,
-        "default_topics": ["best wireless earbuds 2026", "home office desk setup guide"],
+        "default_topics": [
+            "best wireless earbuds 2026",
+            "home office desk setup guide",
+        ],
     }
 
     # Publishing config (CMSTool reads keys from env)
@@ -198,34 +200,65 @@ def _create_stub_agents(base_config: dict, pipeline_filter: str = "") -> list:
     class LocalResearchAgent(BaseAgent):
         def plan(self):
             self.logger.info("[%s] Planning: scan for niche opportunities", self.name)
-            return {"keywords": ["best wireless earbuds 2025", "home office desk setup"], "niches": ["tech accessories"]}
+            return {
+                "keywords": ["best wireless earbuds 2025", "home office desk setup"],
+                "niches": ["tech accessories"],
+            }
 
         def execute(self, plan):
-            self.logger.info("[%s] Executing: researching %d keywords", self.name, len(plan["keywords"]))
+            self.logger.info(
+                "[%s] Executing: researching %d keywords",
+                self.name,
+                len(plan["keywords"]),
+            )
             if self._check_dry_run("call SERP API"):
-                return {"offers_found": 5, "keywords_analyzed": len(plan["keywords"]), "dry_run": True}
+                return {
+                    "offers_found": 5,
+                    "keywords_analyzed": len(plan["keywords"]),
+                    "dry_run": True,
+                }
             return {"offers_found": 5, "keywords_analyzed": len(plan["keywords"])}
 
         def report(self, plan, result):
             self._log_metric("keywords.analyzed", result["keywords_analyzed"])
             self._log_metric("offers.found", result.get("offers_found", 0))
-            return {"summary": f"Researched {result['keywords_analyzed']} keywords, found {result.get('offers_found', 0)} offers"}
+            return {
+                "summary": f"Researched {result['keywords_analyzed']} keywords, found {result.get('offers_found', 0)} offers"
+            }
 
     class LocalContentAgent(BaseAgent):
         def plan(self):
-            self.logger.info("[%s] Planning: generate content from approved briefs", self.name)
-            return {"briefs": [{"title": "Top 5 Wireless Earbuds for 2025", "type": "roundup", "target_words": 1500}]}
+            self.logger.info(
+                "[%s] Planning: generate content from approved briefs", self.name
+            )
+            return {
+                "briefs": [
+                    {
+                        "title": "Top 5 Wireless Earbuds for 2025",
+                        "type": "roundup",
+                        "target_words": 1500,
+                    }
+                ]
+            }
 
         def execute(self, plan):
-            self.logger.info("[%s] Executing: drafting %d articles", self.name, len(plan["briefs"]))
+            self.logger.info(
+                "[%s] Executing: drafting %d articles", self.name, len(plan["briefs"])
+            )
             if self._check_dry_run("call LLM API for content generation"):
-                return {"articles_drafted": len(plan["briefs"]), "total_words": 1500, "dry_run": True}
+                return {
+                    "articles_drafted": len(plan["briefs"]),
+                    "total_words": 1500,
+                    "dry_run": True,
+                }
             return {"articles_drafted": len(plan["briefs"]), "total_words": 1500}
 
         def report(self, plan, result):
             self._log_metric("articles.drafted", result["articles_drafted"])
             self._log_metric("words.written", result["total_words"])
-            return {"summary": f"Drafted {result['articles_drafted']} articles ({result['total_words']} words)"}
+            return {
+                "summary": f"Drafted {result['articles_drafted']} articles ({result['total_words']} words)"
+            }
 
     class LocalPublishingAgent(BaseAgent):
         def plan(self):
@@ -233,7 +266,9 @@ def _create_stub_agents(base_config: dict, pipeline_filter: str = "") -> list:
             return {"posts_ready": 1, "target_site": "example-niche.com"}
 
         def execute(self, plan):
-            self.logger.info("[%s] Executing: publishing %d posts", self.name, plan["posts_ready"])
+            self.logger.info(
+                "[%s] Executing: publishing %d posts", self.name, plan["posts_ready"]
+            )
             if self._check_dry_run("publish to WordPress CMS"):
                 return {"published": 0, "skipped": plan["posts_ready"], "dry_run": True}
             return {"published": plan["posts_ready"], "skipped": 0}
@@ -241,7 +276,9 @@ def _create_stub_agents(base_config: dict, pipeline_filter: str = "") -> list:
         def report(self, plan, result):
             self._log_metric("posts.published", result.get("published", 0))
             self._log_metric("posts.skipped", result.get("skipped", 0))
-            return {"summary": f"Published {result.get('published', 0)}, skipped {result.get('skipped', 0)}"}
+            return {
+                "summary": f"Published {result.get('published', 0)}, skipped {result.get('skipped', 0)}"
+            }
 
     class LocalAnalyticsAgent(BaseAgent):
         def plan(self):
@@ -249,7 +286,11 @@ def _create_stub_agents(base_config: dict, pipeline_filter: str = "") -> list:
             return {"sites": ["example-niche.com"], "period": "24h"}
 
         def execute(self, plan):
-            self.logger.info("[%s] Executing: gathering analytics for %d sites", self.name, len(plan["sites"]))
+            self.logger.info(
+                "[%s] Executing: gathering analytics for %d sites",
+                self.name,
+                len(plan["sites"]),
+            )
             if self._check_dry_run("query analytics APIs"):
                 return {"pageviews": 0, "clicks": 0, "revenue": 0.0, "dry_run": True}
             return {"pageviews": 142, "clicks": 23, "revenue": 4.50}
@@ -258,7 +299,9 @@ def _create_stub_agents(base_config: dict, pipeline_filter: str = "") -> list:
             self._log_metric("pageviews", result.get("pageviews", 0))
             self._log_metric("clicks", result.get("clicks", 0))
             self._log_metric("revenue_usd", result.get("revenue", 0.0))
-            return {"summary": f"Traffic: {result.get('pageviews', 0)} PV, {result.get('clicks', 0)} clicks, ${result.get('revenue', 0.0):.2f} revenue"}
+            return {
+                "summary": f"Traffic: {result.get('pageviews', 0)} PV, {result.get('clicks', 0)} clicks, ${result.get('revenue', 0.0):.2f} revenue"
+            }
 
     # Map pipeline names to agent sets
     pipeline_agents = {
@@ -292,6 +335,7 @@ def _create_stub_agents(base_config: dict, pipeline_filter: str = "") -> list:
 # Main loop
 # ---------------------------------------------------------------------------
 
+
 def main_loop(
     node_role: NodeRole,
     dry_run: bool = True,
@@ -324,7 +368,9 @@ def main_loop(
     controller = OrchestratorController(dry_run=dry_run)
 
     # Create and register agents
-    agents = _create_agents(dry_run=dry_run, pipeline_filter=pipeline, real_agents=real_agents)
+    agents = _create_agents(
+        dry_run=dry_run, pipeline_filter=pipeline, real_agents=real_agents
+    )
     for agent in agents:
         controller.register_agent(agent)
 
@@ -345,7 +391,7 @@ def main_loop(
     agent_sequence = agent_names  # Run agents in registration order
 
     agent_mode = "REAL" if real_agents else "STUB"
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  {APP_NAME} v{APP_VERSION} -- Local Dev Mode")
     print(f"  Node role: {node_role.value}")
     print(f"  DRY_RUN: {dry_run}")
@@ -353,7 +399,7 @@ def main_loop(
     print(f"  Heartbeat: {heartbeat_interval}s")
     if max_ticks:
         print(f"  Max ticks: {max_ticks}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     try:
         while not _shutdown_event.is_set():
@@ -378,24 +424,42 @@ def main_loop(
                             (
                                 result.run_id,
                                 result.agent_name,
-                                result.status.value if hasattr(result.status, 'value') else str(result.status),
+                                result.status.value
+                                if hasattr(result.status, "value")
+                                else str(result.status),
                                 1 if dry_run else 0,
                                 result.duration_s,
-                                json.dumps(result.plan_output, default=str) if result.plan_output else None,
-                                json.dumps(result.exec_output, default=str) if result.exec_output else None,
-                                json.dumps(result.report_output, default=str) if result.report_output else None,
+                                json.dumps(result.plan_output, default=str)
+                                if result.plan_output
+                                else None,
+                                json.dumps(result.exec_output, default=str)
+                                if result.exec_output
+                                else None,
+                                json.dumps(result.report_output, default=str)
+                                if result.report_output
+                                else None,
                                 result.error,
-                                result.started_at.isoformat() if result.started_at else None,
-                                result.finished_at.isoformat() if result.finished_at else None,
+                                result.started_at.isoformat()
+                                if result.started_at
+                                else None,
+                                result.finished_at.isoformat()
+                                if result.finished_at
+                                else None,
                             ),
                         )
                     except Exception as db_err:
                         logger.warning("Failed to record run to DB: %s", db_err)
 
-                    status_str = result.status.value if hasattr(result.status, 'value') else str(result.status)
+                    status_str = (
+                        result.status.value
+                        if hasattr(result.status, "value")
+                        else str(result.status)
+                    )
                     logger.info(
                         "Agent '%s' completed: status=%s duration=%.3fs",
-                        agent_name, status_str, result.duration_s,
+                        agent_name,
+                        status_str,
+                        result.duration_s,
                     )
 
                 except KillSwitchActiveError:
@@ -429,42 +493,58 @@ def main_loop(
 # Argument parsing
 # ---------------------------------------------------------------------------
 
+
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="openclaw",
         description=f"{APP_NAME} v{APP_VERSION} -- Affiliate Marketing Automation System",
     )
-    parser.add_argument("--version", action="version", version=f"{APP_NAME} {APP_VERSION}")
     parser.add_argument(
-        "--dry-run", action="store_true", default=False,
+        "--version", action="version", version=f"{APP_NAME} {APP_VERSION}"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
         help="Run all agents in dry-run mode (no side-effects).",
     )
     parser.add_argument(
-        "--node-role", type=str, choices=[r.value for r in NodeRole],
+        "--node-role",
+        type=str,
+        choices=[r.value for r in NodeRole],
         default="core",
         help="Role of this node (default: core).",
     )
     parser.add_argument(
-        "--pipeline", type=str, default="",
+        "--pipeline",
+        type=str,
+        default="",
         choices=["", "content", "publishing", "analytics"],
         help="Run only agents for a specific pipeline.",
     )
     parser.add_argument(
-        "--log-level", type=str, default=None,
+        "--log-level",
+        type=str,
+        default=None,
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Override the log level.",
     )
     parser.add_argument(
-        "--heartbeat-interval", type=int,
+        "--heartbeat-interval",
+        type=int,
         default=DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
         help=f"Seconds between heartbeat ticks (default: {DEFAULT_HEARTBEAT_INTERVAL_SECONDS}).",
     )
     parser.add_argument(
-        "--max-ticks", type=int, default=0,
+        "--max-ticks",
+        type=int,
+        default=0,
         help="Exit after N ticks (0 = run forever). Useful for testing.",
     )
     parser.add_argument(
-        "--real-agents", action="store_true", default=False,
+        "--real-agents",
+        action="store_true",
+        default=False,
         help="Use real agent classes with actual tool integrations (LLM, CMS, etc.).",
     )
     return parser
@@ -473,6 +553,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main(argv: list[str] | None = None) -> NoReturn:
     parser = build_argument_parser()
@@ -483,7 +564,11 @@ def main(argv: list[str] | None = None) -> NoReturn:
 
     logger.info(
         "Starting %s v%s  node_role=%s  dry_run=%s  pipeline=%s",
-        APP_NAME, APP_VERSION, args.node_role, args.dry_run, args.pipeline or "all",
+        APP_NAME,
+        APP_VERSION,
+        args.node_role,
+        args.dry_run,
+        args.pipeline or "all",
     )
 
     # -- Settings

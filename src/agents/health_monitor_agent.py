@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @unique
 class HealthStatus(str, Enum):
     """Overall health verdict for a single check."""
@@ -158,6 +159,7 @@ class HealthExecutionResult:
 # Agent implementation
 # ---------------------------------------------------------------------------
 
+
 class HealthMonitorAgent(BaseAgent):
     """Monitors system health across the cluster and sends alerts on degradation.
 
@@ -187,9 +189,14 @@ class HealthMonitorAgent(BaseAgent):
         self._queue_depth_critical: int = config.get("queue_depth_critical", 500)
         self._error_rate_threshold: int = config.get("error_rate_threshold", 50)
         self._alert_webhook_url: str = config.get("alert_webhook_url", "")
-        self._queue_names: List[str] = config.get("queue_names", [
-            "content_pipeline", "publish_queue", "analytics_queue",
-        ])
+        self._queue_names: List[str] = config.get(
+            "queue_names",
+            [
+                "content_pipeline",
+                "publish_queue",
+                "analytics_queue",
+            ],
+        )
 
     # ------------------------------------------------------------------
     # BaseAgent lifecycle
@@ -299,7 +306,9 @@ class HealthMonitorAgent(BaseAgent):
 
                 except Exception as exc:
                     result.errors.append(f"Queue check for '{queue_name}': {exc}")
-                    self.logger.error("Queue check failed for '%s': %s", queue_name, exc)
+                    self.logger.error(
+                        "Queue check failed for '%s': %s", queue_name, exc
+                    )
 
         # --- Error log scanning ---
         if plan.check_errors:
@@ -361,10 +370,14 @@ class HealthMonitorAgent(BaseAgent):
 
         self._log_metric("health.overall_status", result.overall_status.value)
         self._log_metric("health.alerts", len(result.alerts))
-        self._log_metric("health.nodes_healthy", sum(
-            1 for nh in result.node_health.values()
-            if nh.status == HealthStatus.HEALTHY
-        ))
+        self._log_metric(
+            "health.nodes_healthy",
+            sum(
+                1
+                for nh in result.node_health.values()
+                if nh.status == HealthStatus.HEALTHY
+            ),
+        )
 
         # Dispatch alerts if webhook is configured
         if result.alerts and self._alert_webhook_url:
@@ -451,12 +464,14 @@ class HealthMonitorAgent(BaseAgent):
             else:
                 status = HealthStatus.HEALTHY
 
-            snapshots.append(DiskHealth(
-                node_id=node_id,
-                mount_point=mount,
-                usage_percent=usage_pct,
-                status=status,
-            ))
+            snapshots.append(
+                DiskHealth(
+                    node_id=node_id,
+                    mount_point=mount,
+                    usage_percent=usage_pct,
+                    status=status,
+                )
+            )
 
         return snapshots
 
@@ -523,7 +538,8 @@ class HealthMonitorAgent(BaseAgent):
 
         self.logger.info(
             "Sending %d alert(s) to webhook %s.",
-            len(alerts), self._alert_webhook_url,
+            len(alerts),
+            self._alert_webhook_url,
         )
 
         # Placeholder: real implementation calls requests.post(...)

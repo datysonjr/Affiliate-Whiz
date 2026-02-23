@@ -1,7 +1,6 @@
 """Unit tests for pipeline modules."""
 
 import unittest
-from unittest.mock import patch, MagicMock
 
 
 class TestOfferDiscoveryPipeline(unittest.TestCase):

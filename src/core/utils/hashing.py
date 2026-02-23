@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Optional
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 
@@ -32,11 +31,26 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 # =====================================================================
 
 # Query parameters to strip when computing URL fingerprints (tracking params).
-_TRACKING_PARAMS = frozenset({
-    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-    "ref", "fbclid", "gclid", "msclkid", "dclid", "twclid",
-    "mc_cid", "mc_eid", "affiliate_id", "aff_id", "click_id",
-})
+_TRACKING_PARAMS = frozenset(
+    {
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_term",
+        "utm_content",
+        "ref",
+        "fbclid",
+        "gclid",
+        "msclkid",
+        "dclid",
+        "twclid",
+        "mc_cid",
+        "mc_eid",
+        "affiliate_id",
+        "aff_id",
+        "click_id",
+    }
+)
 
 # Default hash algorithm.
 _DEFAULT_ALGORITHM = "sha256"
@@ -45,6 +59,7 @@ _DEFAULT_ALGORITHM = "sha256"
 # =====================================================================
 # Core helpers
 # =====================================================================
+
 
 def _hash_bytes(data: bytes, algorithm: str = _DEFAULT_ALGORITHM) -> str:
     """Return the hex digest of *data* using the specified algorithm.
@@ -91,6 +106,7 @@ def _normalize_text(text: str) -> str:
 # =====================================================================
 # Public API
 # =====================================================================
+
 
 def content_hash(
     text: str,
@@ -180,8 +196,7 @@ def url_fingerprint(
     query_params = parse_qs(parsed.query, keep_blank_values=True)
     if strip_tracking:
         query_params = {
-            k: v for k, v in query_params.items()
-            if k.lower() not in _TRACKING_PARAMS
+            k: v for k, v in query_params.items() if k.lower() not in _TRACKING_PARAMS
         }
 
     # Sort query parameters for deterministic ordering

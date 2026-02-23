@@ -18,12 +18,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from src.core.errors import IntegrationError
 from src.core.logger import get_logger, log_event
@@ -34,6 +33,7 @@ logger = get_logger("integrations.storage.local_disk")
 # ---------------------------------------------------------------------------
 # Data containers
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class FileInfo:
@@ -104,6 +104,7 @@ class DiskUsage:
 # LocalDiskStorage
 # ---------------------------------------------------------------------------
 
+
 class LocalDiskStorage:
     """Local filesystem storage backend.
 
@@ -137,7 +138,8 @@ class LocalDiskStorage:
         self._root_dir.mkdir(parents=True, exist_ok=True)
 
         log_event(
-            logger, "local_disk.init",
+            logger,
+            "local_disk.init",
             root_dir=str(self._root_dir),
             max_size_mb=max_size_bytes / (1024 * 1024) if max_size_bytes else 0,
         )
@@ -207,6 +209,7 @@ class LocalDiskStorage:
         content_hash = hashlib.sha256(data).hexdigest()
 
         import mimetypes as mt
+
         mime_type = mt.guess_type(target.name)[0] or "application/octet-stream"
 
         info = FileInfo(
@@ -222,7 +225,9 @@ class LocalDiskStorage:
 
         self.logger.info(
             "Saved file: %s (%d bytes, hash=%s...)",
-            relative_path, len(data), content_hash[:12],
+            relative_path,
+            len(data),
+            content_hash[:12],
         )
         return info
 
@@ -293,18 +298,23 @@ class LocalDiskStorage:
             stat = path.stat()
             rel_path = str(path.relative_to(self._root_dir))
 
-            files.append(FileInfo(
-                path=str(path),
-                relative_path=rel_path,
-                filename=path.name,
-                size_bytes=stat.st_size,
-                created_at=datetime.fromtimestamp(stat.st_ctime, tz=timezone.utc),
-                modified_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
-            ))
+            files.append(
+                FileInfo(
+                    path=str(path),
+                    relative_path=rel_path,
+                    filename=path.name,
+                    size_bytes=stat.st_size,
+                    created_at=datetime.fromtimestamp(stat.st_ctime, tz=timezone.utc),
+                    modified_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+                )
+            )
 
         self.logger.debug(
             "Listed %d files under '%s' (recursive=%s, ext=%s)",
-            len(files), prefix or "/", recursive, extension or "*",
+            len(files),
+            prefix or "/",
+            recursive,
+            extension or "*",
         )
         return files
 
@@ -371,7 +381,8 @@ class LocalDiskStorage:
         )
 
         log_event(
-            logger, "local_disk.usage",
+            logger,
+            "local_disk.usage",
             files=file_count,
             storage_mb=round(storage_used / (1024 * 1024), 2),
             usage_pct=result.usage_percent,

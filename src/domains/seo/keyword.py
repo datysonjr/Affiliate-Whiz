@@ -32,6 +32,7 @@ logger = get_logger("seo.keyword")
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class SearchIntent(str, Enum):
     """Classification of the searcher's intent behind a keyword.
@@ -52,6 +53,7 @@ class SearchIntent(str, Enum):
 # ---------------------------------------------------------------------------
 # KeywordData
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class KeywordData:
@@ -123,6 +125,7 @@ class KeywordData:
 # ---------------------------------------------------------------------------
 # Keyword grouping
 # ---------------------------------------------------------------------------
+
 
 def group_keywords(
     keywords: Sequence[KeywordData],
@@ -200,13 +203,41 @@ def _extract_root(phrase: str) -> str:
         Simplified root key for grouping.
     """
     stop_words = {
-        "a", "an", "the", "is", "are", "was", "for", "of", "in", "on",
-        "to", "and", "or", "with", "vs", "versus",
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "for",
+        "of",
+        "in",
+        "on",
+        "to",
+        "and",
+        "or",
+        "with",
+        "vs",
+        "versus",
     }
     modifiers = {
-        "best", "top", "cheap", "affordable", "review", "reviews",
-        "guide", "how", "what", "why", "buy", "compare", "comparison",
-        "rated", "recommended", "ultimate", "complete",
+        "best",
+        "top",
+        "cheap",
+        "affordable",
+        "review",
+        "reviews",
+        "guide",
+        "how",
+        "what",
+        "why",
+        "buy",
+        "compare",
+        "comparison",
+        "rated",
+        "recommended",
+        "ultimate",
+        "complete",
     }
 
     words = phrase.lower().split()
@@ -225,6 +256,7 @@ def _extract_root(phrase: str) -> str:
 # ---------------------------------------------------------------------------
 # Keyword expansion
 # ---------------------------------------------------------------------------
+
 
 def expand_keywords(
     seed_keywords: Sequence[str],
@@ -263,9 +295,20 @@ def expand_keywords(
     True
     """
     default_modifiers = [
-        "best", "top", "review", "cheap", "affordable", "vs",
-        "comparison", "alternative", "guide", "for home",
-        "for office", "under 500", "under 1000", "worth it",
+        "best",
+        "top",
+        "review",
+        "cheap",
+        "affordable",
+        "vs",
+        "comparison",
+        "alternative",
+        "guide",
+        "for home",
+        "for office",
+        "under 500",
+        "under 1000",
+        "worth it",
     ]
     mods = modifiers or default_modifiers
 
@@ -291,15 +334,14 @@ def expand_keywords(
                 expanded.add(f"{prefix} {seed_lower}")
 
     result = sorted(expanded)
-    logger.debug(
-        "Expanded %d seeds into %d keywords", len(seed_keywords), len(result)
-    )
+    logger.debug("Expanded %d seeds into %d keywords", len(seed_keywords), len(result))
     return result
 
 
 # ---------------------------------------------------------------------------
 # Keyword prioritisation
 # ---------------------------------------------------------------------------
+
 
 def prioritize_keywords(
     keywords: Sequence[KeywordData],

@@ -95,9 +95,7 @@ class AnalyticsTool:
             )
         return self._client
 
-    def _resolve_period(
-        self, period: Union[str, dict[str, str]]
-    ) -> tuple[str, str]:
+    def _resolve_period(self, period: Union[str, dict[str, str]]) -> tuple[str, str]:
         """Resolve a period specification into a start and end date.
 
         Args:
@@ -118,9 +116,7 @@ class AnalyticsTool:
             start = period.get("start", "")
             end = period.get("end", "")
             if not start or not end:
-                raise ValueError(
-                    "Period dict must contain both 'start' and 'end' keys"
-                )
+                raise ValueError("Period dict must contain both 'start' and 'end' keys")
             return start, end
 
         if isinstance(period, str):
@@ -236,7 +232,10 @@ class AnalyticsTool:
         )
 
         cache_key = self._cache_key(
-            "get_clicks", site_id=effective_site, start=start, end=end,
+            "get_clicks",
+            site_id=effective_site,
+            start=start,
+            end=end,
             group_by=group_by,
         )
         cached = self._get_cached(cache_key)
@@ -301,7 +300,10 @@ class AnalyticsTool:
         )
 
         cache_key = self._cache_key(
-            "get_conversions", site_id=effective_site, start=start, end=end,
+            "get_conversions",
+            site_id=effective_site,
+            start=start,
+            end=end,
             group_by=group_by,
         )
         cached = self._get_cached(cache_key)
@@ -367,7 +369,10 @@ class AnalyticsTool:
         )
 
         cache_key = self._cache_key(
-            "get_traffic", site_id=effective_site, start=start, end=end,
+            "get_traffic",
+            site_id=effective_site,
+            start=start,
+            end=end,
             group_by=group_by,
         )
         cached = self._get_cached(cache_key)
@@ -438,8 +443,12 @@ class AnalyticsTool:
         )
 
         cache_key = self._cache_key(
-            "get_revenue", site_id=effective_site, start=start, end=end,
-            group_by=group_by, network=network,
+            "get_revenue",
+            site_id=effective_site,
+            start=start,
+            end=end,
+            group_by=group_by,
+            network=network,
         )
         cached = self._get_cached(cache_key)
         if cached is not None:
@@ -507,7 +516,10 @@ class AnalyticsTool:
         )
 
         cache_key = self._cache_key(
-            "get_page_performance", page_url=page_url, start=start, end=end,
+            "get_page_performance",
+            page_url=page_url,
+            start=start,
+            end=end,
         )
         cached = self._get_cached(cache_key)
         if cached is not None:

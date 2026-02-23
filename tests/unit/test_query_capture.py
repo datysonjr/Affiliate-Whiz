@@ -3,10 +3,8 @@
 import unittest
 
 from src.domains.seo.query_capture import (
-    AuthorityCluster,
     EmergingQuery,
     EmergingQueryType,
-    SignalSource,
     build_authority_clusters,
     capture_emerging_queries,
     classify_buyer_intent,
@@ -20,8 +18,8 @@ from src.domains.seo.query_capture import (
 # Tests — buyer intent classification
 # ---------------------------------------------------------------------------
 
-class TestClassifyBuyerIntent(unittest.TestCase):
 
+class TestClassifyBuyerIntent(unittest.TestCase):
     def test_best_is_rank_1(self):
         self.assertEqual(classify_buyer_intent("best wireless earbuds"), 1)
 
@@ -51,8 +49,8 @@ class TestClassifyBuyerIntent(unittest.TestCase):
 # Tests — query type classification
 # ---------------------------------------------------------------------------
 
-class TestClassifyQueryType(unittest.TestCase):
 
+class TestClassifyQueryType(unittest.TestCase):
     def test_new_product_release(self):
         qt = classify_query_type("does iPhone 16 support USB-C")
         self.assertEqual(qt, EmergingQueryType.NEW_PRODUCT_RELEASE)
@@ -74,8 +72,8 @@ class TestClassifyQueryType(unittest.TestCase):
 # Tests — autocomplete expansion
 # ---------------------------------------------------------------------------
 
-class TestExpandProductQueries(unittest.TestCase):
 
+class TestExpandProductQueries(unittest.TestCase):
     def test_expansion_count(self):
         queries = expand_product_queries("Sony WF-1000XM5")
         self.assertEqual(len(queries), 10)
@@ -97,8 +95,8 @@ class TestExpandProductQueries(unittest.TestCase):
 # Tests — capture score
 # ---------------------------------------------------------------------------
 
-class TestComputeCaptureScore(unittest.TestCase):
 
+class TestComputeCaptureScore(unittest.TestCase):
     def test_perfect_conditions(self):
         score = compute_capture_score(
             buyer_intent_rank=1,
@@ -119,18 +117,24 @@ class TestComputeCaptureScore(unittest.TestCase):
 
     def test_trending_bonus(self):
         base = compute_capture_score(
-            buyer_intent_rank=3, content_supply=2, days_since_trigger=10,
+            buyer_intent_rank=3,
+            content_supply=2,
+            days_since_trigger=10,
             is_trending=False,
         )
         with_trend = compute_capture_score(
-            buyer_intent_rank=3, content_supply=2, days_since_trigger=10,
+            buyer_intent_rank=3,
+            content_supply=2,
+            days_since_trigger=10,
             is_trending=True,
         )
         self.assertEqual(with_trend - base, 15.0)
 
     def test_score_in_range(self):
         score = compute_capture_score(
-            buyer_intent_rank=3, content_supply=5, days_since_trigger=20,
+            buyer_intent_rank=3,
+            content_supply=5,
+            days_since_trigger=20,
         )
         self.assertGreaterEqual(score, 0)
         self.assertLessEqual(score, 100)
@@ -140,12 +144,14 @@ class TestComputeCaptureScore(unittest.TestCase):
 # Tests — authority clusters
 # ---------------------------------------------------------------------------
 
-class TestBuildAuthorityClusters(unittest.TestCase):
 
+class TestBuildAuthorityClusters(unittest.TestCase):
     def test_groups_by_product(self):
         queries = [
             EmergingQuery(query="best Widget", product_name="Widget", capture_score=80),
-            EmergingQuery(query="Widget review", product_name="Widget", capture_score=70),
+            EmergingQuery(
+                query="Widget review", product_name="Widget", capture_score=70
+            ),
             EmergingQuery(query="best Gadget", product_name="Gadget", capture_score=90),
         ]
         clusters = build_authority_clusters(queries)
@@ -165,8 +171,8 @@ class TestBuildAuthorityClusters(unittest.TestCase):
 # Tests — full pipeline
 # ---------------------------------------------------------------------------
 
-class TestCaptureEmergingQueries(unittest.TestCase):
 
+class TestCaptureEmergingQueries(unittest.TestCase):
     def test_basic_pipeline(self):
         clusters = capture_emerging_queries(["Sony WF-1000XM5"])
         self.assertGreater(len(clusters), 0)

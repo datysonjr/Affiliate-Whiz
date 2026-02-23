@@ -23,6 +23,7 @@ from typing import Any
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class OfferTier(str, Enum):
     """Quality tier assigned to discovered affiliate offers.
@@ -68,6 +69,7 @@ class OfferTier(str, Enum):
 # ---------------------------------------------------------------------------
 # OfferScore
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class OfferScore:
@@ -155,6 +157,7 @@ class OfferScore:
 # ---------------------------------------------------------------------------
 # Offer
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Offer:

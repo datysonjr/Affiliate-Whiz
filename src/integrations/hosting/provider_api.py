@@ -41,6 +41,7 @@ logger = get_logger("integrations.hosting.provider_api")
 # Data containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class DeploymentResult:
     """Result of a site deployment operation.
@@ -160,6 +161,7 @@ class SSLConfiguration:
 # ---------------------------------------------------------------------------
 # Abstract base class
 # ---------------------------------------------------------------------------
+
 
 class HostingProvider(ABC):
     """Abstract interface for hosting provider integrations.
@@ -338,6 +340,7 @@ class HostingProvider(ABC):
 # Concrete providers
 # ---------------------------------------------------------------------------
 
+
 class CloudflarePagesProvider(HostingProvider):
     """Cloudflare Pages hosting provider implementation.
 
@@ -380,10 +383,6 @@ class CloudflarePagesProvider(HostingProvider):
         environment: str = "production",
     ) -> DeploymentResult:
         """Trigger a Cloudflare Pages deployment."""
-        url = (
-            f"{self._BASE_URL}/accounts/{self._account_id}"
-            f"/pages/projects/{project_name}/deployments"
-        )
         log_event(
             logger,
             "cloudflare_pages.deploy",
@@ -403,10 +402,6 @@ class CloudflarePagesProvider(HostingProvider):
 
     async def get_status(self, project_name: str) -> ProjectStatus:
         """Get Cloudflare Pages project status."""
-        url = (
-            f"{self._BASE_URL}/accounts/{self._account_id}"
-            f"/pages/projects/{project_name}"
-        )
         log_event(logger, "cloudflare_pages.get_status", project=project_name)
         self._track_request()
 
@@ -415,10 +410,6 @@ class CloudflarePagesProvider(HostingProvider):
 
     async def get_domains(self, project_name: str) -> List[DomainInfo]:
         """List domains for a Cloudflare Pages project."""
-        url = (
-            f"{self._BASE_URL}/accounts/{self._account_id}"
-            f"/pages/projects/{project_name}/domains"
-        )
         log_event(logger, "cloudflare_pages.get_domains", project=project_name)
         self._track_request()
 
@@ -648,7 +639,9 @@ def register_provider(name: str, provider_class: type) -> None:
     TypeError
         If *provider_class* does not extend :class:`HostingProvider`.
     """
-    if not (isinstance(provider_class, type) and issubclass(provider_class, HostingProvider)):
+    if not (
+        isinstance(provider_class, type) and issubclass(provider_class, HostingProvider)
+    ):
         raise TypeError(
             f"provider_class must be a subclass of HostingProvider, got {provider_class!r}"
         )

@@ -7,7 +7,6 @@ from src.domains.seo.validator import (
     AI_DOMINATION_SCORE_MIN,
     MIN_INTERNAL_LINKS,
     MIN_VERDICT_STATEMENTS,
-    SEOValidationResult,
     compute_ai_domination_score,
     enforce_seo,
     validate_seo,
@@ -17,6 +16,7 @@ from src.domains.seo.validator import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _build_passing_article() -> str:
     """Return a minimal article that passes all SEO validation checks."""
@@ -77,12 +77,15 @@ Our final verdict: Sony WF-1000XM5 is the best overall.
 # Tests — validate_seo
 # ---------------------------------------------------------------------------
 
+
 class TestValidateSeo(unittest.TestCase):
     """Tests for validate_seo()."""
 
     def test_passing_article(self):
         result = validate_seo(_build_passing_article())
-        self.assertTrue(result.passed, f"Expected pass, got failures: {result.failures}")
+        self.assertTrue(
+            result.passed, f"Expected pass, got failures: {result.failures}"
+        )
         self.assertTrue(result.has_tldr)
         self.assertTrue(result.has_comparison_table)
         self.assertTrue(result.has_faq)
@@ -116,6 +119,7 @@ class TestValidateSeo(unittest.TestCase):
 
     def test_insufficient_internal_links(self):
         import re
+
         content = _build_passing_article()
         links = list(re.finditer(r"\[([^\]]+)\]\(([^)]+)\)", content))
         for link in links[2:]:
@@ -153,12 +157,15 @@ A: Yes.
     def test_stale_content_lowers_score(self):
         result_fresh = validate_seo(_build_passing_article(), is_fresh=True)
         result_stale = validate_seo(_build_passing_article(), is_fresh=False)
-        self.assertGreater(result_fresh.ai_domination_score, result_stale.ai_domination_score)
+        self.assertGreater(
+            result_fresh.ai_domination_score, result_stale.ai_domination_score
+        )
 
 
 # ---------------------------------------------------------------------------
 # Tests — AI Domination Score
 # ---------------------------------------------------------------------------
+
 
 class TestAIDominationScore(unittest.TestCase):
     """Tests for compute_ai_domination_score()."""
@@ -214,6 +221,7 @@ class TestAIDominationScore(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Tests — enforce_seo
 # ---------------------------------------------------------------------------
+
 
 class TestEnforceSeo(unittest.TestCase):
     """Tests for enforce_seo() which raises on failure."""

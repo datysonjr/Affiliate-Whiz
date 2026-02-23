@@ -6,8 +6,6 @@ from src.domains.seo.competitor_scanner import (
     ATTACKABLE_WEAKNESS_THRESHOLD,
     AttackPriority,
     CompetitorPage,
-    PageWeaknessReport,
-    SERPWeaknessReport,
     WeaknessType,
     classify_attack_priority,
     detect_bad_ux,
@@ -25,6 +23,7 @@ from src.domains.seo.competitor_scanner import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _strong_page(**kwargs) -> CompetitorPage:
     """A strong competitor page with no weaknesses."""
@@ -68,8 +67,8 @@ def _weak_page(**kwargs) -> CompetitorPage:
 # Tests — thin content detection
 # ---------------------------------------------------------------------------
 
-class TestDetectThinContent(unittest.TestCase):
 
+class TestDetectThinContent(unittest.TestCase):
     def test_short_article_scores_high(self):
         page = _weak_page(word_count=200, heading_count=1)
         signal = detect_thin_content(page)
@@ -91,8 +90,8 @@ class TestDetectThinContent(unittest.TestCase):
 # Tests — outdated detection
 # ---------------------------------------------------------------------------
 
-class TestDetectOutdated(unittest.TestCase):
 
+class TestDetectOutdated(unittest.TestCase):
     def test_old_year_scores_high(self):
         page = _weak_page(last_updated_year=2022)
         signal = detect_outdated(page)
@@ -114,8 +113,8 @@ class TestDetectOutdated(unittest.TestCase):
 # Tests — poor linking detection
 # ---------------------------------------------------------------------------
 
-class TestDetectPoorLinking(unittest.TestCase):
 
+class TestDetectPoorLinking(unittest.TestCase):
     def test_zero_links_scores_max(self):
         page = _weak_page(internal_link_count=0)
         signal = detect_poor_linking(page)
@@ -136,8 +135,8 @@ class TestDetectPoorLinking(unittest.TestCase):
 # Tests — weak domain detection
 # ---------------------------------------------------------------------------
 
-class TestDetectWeakDomain(unittest.TestCase):
 
+class TestDetectWeakDomain(unittest.TestCase):
     def test_low_da_scores_high(self):
         page = _weak_page(domain_authority=5)
         signal = detect_weak_domain(page)
@@ -153,8 +152,8 @@ class TestDetectWeakDomain(unittest.TestCase):
 # Tests — bad UX detection
 # ---------------------------------------------------------------------------
 
-class TestDetectBadUX(unittest.TestCase):
 
+class TestDetectBadUX(unittest.TestCase):
     def test_all_ux_problems(self):
         page = _weak_page(
             has_comparison_table=False,
@@ -185,8 +184,8 @@ class TestDetectBadUX(unittest.TestCase):
 # Tests — page-level scoring
 # ---------------------------------------------------------------------------
 
-class TestScoreCompetitorPage(unittest.TestCase):
 
+class TestScoreCompetitorPage(unittest.TestCase):
     def test_weak_page_high_score(self):
         report = score_competitor_page(_weak_page())
         self.assertGreater(report.total_score, 50)
@@ -206,8 +205,8 @@ class TestScoreCompetitorPage(unittest.TestCase):
 # Tests — attack strategy
 # ---------------------------------------------------------------------------
 
-class TestAttackStrategy(unittest.TestCase):
 
+class TestAttackStrategy(unittest.TestCase):
     def test_generates_5_articles(self):
         strategy = generate_attack_strategy("standing desks")
         self.assertEqual(len(strategy), 5)
@@ -222,8 +221,8 @@ class TestAttackStrategy(unittest.TestCase):
 # Tests — attack priority
 # ---------------------------------------------------------------------------
 
-class TestAttackPriority(unittest.TestCase):
 
+class TestAttackPriority(unittest.TestCase):
     def test_immediate(self):
         self.assertEqual(classify_attack_priority(70), AttackPriority.IMMEDIATE)
 
@@ -241,8 +240,8 @@ class TestAttackPriority(unittest.TestCase):
 # Tests — SERP-level scanning
 # ---------------------------------------------------------------------------
 
-class TestScanSERPWeaknesses(unittest.TestCase):
 
+class TestScanSERPWeaknesses(unittest.TestCase):
     def test_weak_serp_is_attackable(self):
         competitors = [_weak_page(position=i) for i in range(1, 6)]
         report = scan_serp_weaknesses("best widgets", competitors)
@@ -275,8 +274,8 @@ class TestScanSERPWeaknesses(unittest.TestCase):
 # Tests — batch scanning
 # ---------------------------------------------------------------------------
 
-class TestScanMultipleSERPs(unittest.TestCase):
 
+class TestScanMultipleSERPs(unittest.TestCase):
     def test_filters_non_attackable(self):
         serp_data = {
             "weak keyword": [_weak_page(position=i) for i in range(1, 4)],
@@ -293,7 +292,9 @@ class TestScanMultipleSERPs(unittest.TestCase):
         }
         reports = scan_multiple_serps(serp_data)
         if len(reports) >= 2:
-            self.assertGreaterEqual(reports[0].weakness_total, reports[1].weakness_total)
+            self.assertGreaterEqual(
+                reports[0].weakness_total, reports[1].weakness_total
+            )
 
     def test_empty_input(self):
         reports = scan_multiple_serps({})

@@ -43,7 +43,7 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List
 
 from src.core.logger import get_logger, log_event
 
@@ -227,8 +227,13 @@ class MetricsCollector:
         """
         if not values:
             return {
-                "min": 0.0, "max": 0.0, "mean": 0.0,
-                "median": 0.0, "p95": 0.0, "p99": 0.0, "count": 0,
+                "min": 0.0,
+                "max": 0.0,
+                "mean": 0.0,
+                "median": 0.0,
+                "p95": 0.0,
+                "p99": 0.0,
+                "count": 0,
             }
 
         sorted_vals = sorted(values)
@@ -282,7 +287,8 @@ class MetricsCollector:
             self._flush_count += 1
 
         log_event(
-            logger, "metrics.flushed",
+            logger,
+            "metrics.flushed",
             counters=len(snapshot["counters"]),
             gauges=len(snapshot["gauges"]),
             histograms=len(snapshot["histograms"]),

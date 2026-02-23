@@ -149,9 +149,7 @@ class Database:
         sqlite3.Connection
             A ready-to-use connection with ``Row`` row factory.
         """
-        conn: Optional[sqlite3.Connection] = getattr(
-            self._local, "connection", None
-        )
+        conn: Optional[sqlite3.Connection] = getattr(self._local, "connection", None)
         if conn is not None:
             return conn
 
@@ -345,7 +343,9 @@ class Database:
         target_dir = migrations_dir or self._migrations_dir
 
         if not os.path.isdir(target_dir):
-            logger.info("Migrations directory %s not found -- nothing to apply.", target_dir)
+            logger.info(
+                "Migrations directory %s not found -- nothing to apply.", target_dir
+            )
             return 0
 
         # Discover SQL files.

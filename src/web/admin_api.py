@@ -150,7 +150,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         """Handle GET requests."""
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/")
-        query = parse_qs(parsed.query)
+        parse_qs(parsed.query)
 
         routes: Dict[str, Callable[[], Tuple[int, Dict[str, Any]]]] = {
             "/status": self._handle_status,
@@ -165,11 +165,14 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             status_code, body = handler()
             self._send_json(status_code, body)
         else:
-            self._send_json(404, {
-                "error": "not_found",
-                "message": f"Unknown endpoint: {path}",
-                "available_endpoints": list(routes.keys()),
-            })
+            self._send_json(
+                404,
+                {
+                    "error": "not_found",
+                    "message": f"Unknown endpoint: {path}",
+                    "available_endpoints": list(routes.keys()),
+                },
+            )
 
     def do_POST(self) -> None:
         """Handle POST requests."""
@@ -186,10 +189,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             status_code, body = handler()
             self._send_json(status_code, body)
         else:
-            self._send_json(404, {
-                "error": "not_found",
-                "message": f"Unknown endpoint: {path}",
-            })
+            self._send_json(
+                404,
+                {
+                    "error": "not_found",
+                    "message": f"Unknown endpoint: {path}",
+                },
+            )
 
     # ------------------------------------------------------------------
     # Endpoint handlers
@@ -234,7 +240,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         """
         body = self._read_json_body()
         if body is None:
-            return 400, {"error": "invalid_json", "message": "Request body must be valid JSON"}
+            return 400, {
+                "error": "invalid_json",
+                "message": "Request body must be valid JSON",
+            }
 
         active = body.get("active")
         if active is None:
@@ -249,8 +258,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
         action = "engaged" if active else "disengaged"
         log_event(
-            logger, f"killswitch.{action}",
-            reason=reason, previous=previous,
+            logger,
+            f"killswitch.{action}",
+            reason=reason,
+            previous=previous,
         )
 
         return 200, {
@@ -276,6 +287,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         """
         try:
             from src.core.settings import settings
+
             settings.load()
             self.state.set_config(settings.as_dict())
             log_event(logger, "config.reloaded")
@@ -378,8 +390,10 @@ class AdminAPI:
         self._running = True
 
         log_event(
-            logger, "admin_api.started",
-            host=self._host, port=self._port,
+            logger,
+            "admin_api.started",
+            host=self._host,
+            port=self._port,
         )
 
     def stop(self) -> None:
@@ -405,14 +419,13 @@ class AdminAPI:
         return f"http://{self._host}:{self._port}"
 
     def __repr__(self) -> str:
-        return (
-            f"AdminAPI(url={self.url!r}, running={self._running})"
-        )
+        return f"AdminAPI(url={self.url!r}, running={self._running})"
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _format_uptime(seconds: float) -> str:
     """Format uptime seconds into a human-readable string.

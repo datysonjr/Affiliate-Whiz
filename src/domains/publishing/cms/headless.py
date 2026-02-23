@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from src.core.constants import DEFAULT_REQUEST_TIMEOUT
@@ -33,6 +33,7 @@ logger = get_logger("publishing.cms.headless")
 # ---------------------------------------------------------------------------
 # Data containers
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class CMSContent:
@@ -146,6 +147,7 @@ class ContentType:
 # ---------------------------------------------------------------------------
 # Abstract base class
 # ---------------------------------------------------------------------------
+
 
 class HeadlessCMS(ABC):
     """Abstract interface for headless CMS integrations.

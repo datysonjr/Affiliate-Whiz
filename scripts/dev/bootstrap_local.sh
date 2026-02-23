@@ -29,14 +29,24 @@ echo "Upgrading pip..."
 if [[ -f "pyproject.toml" ]]; then
   echo "Installing dependencies..."
   ./.venv/bin/pip install -e .
+elif [[ -f "requirements.txt" ]]; then
+  echo "Installing dependencies from requirements.txt..."
+  ./.venv/bin/pip install -r requirements.txt
 else
-  echo "pyproject.toml not found yet."
-  echo "That's OK if you haven't generated the Python scaffold with Claude Code yet."
-  echo "Once it exists, re-run: bash scripts/dev/bootstrap_local.sh"
+  echo "No pyproject.toml or requirements.txt found."
+  echo "Once one exists, re-run: bash scripts/dev/bootstrap_local.sh"
 fi
 
+# 5) Install pre-commit hooks
+echo "Installing pre-commit hooks..."
+./.venv/bin/pip install -U pre-commit ruff >/dev/null
+./.venv/bin/pre-commit install
+echo "Pre-commit hooks installed (ruff lint + format run on every commit)."
+
+echo ""
 echo "Bootstrap complete."
 echo ""
 echo "Next:"
-echo "  1) Generate code scaffold with Claude Code (if not done)"
-echo "  2) Run DRY_RUN: bash scripts/dev/run_local_dry.sh"
+echo "  make dry-run   — run a DRY_RUN cycle"
+echo "  make test      — run the test suite"
+echo "  make fix       — auto-fix lint before pushing"

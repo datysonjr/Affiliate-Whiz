@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PublishCandidate:
     """A content piece that is eligible for publishing.
@@ -119,6 +120,7 @@ class PublishExecutionResult:
 # Agent implementation
 # ---------------------------------------------------------------------------
 
+
 class PublishingAgent(BaseAgent):
     """Manages the CMS publishing pipeline for approved content.
 
@@ -139,11 +141,19 @@ class PublishingAgent(BaseAgent):
 
     def __init__(self, config: Dict[str, Any]) -> None:
         super().__init__(name=str(AgentName.PUBLISHING), config=config)
-        self._max_posts_per_day: int = config.get("max_posts_per_day", DEFAULT_MAX_POSTS_PER_DAY)
-        self._cadence_per_day: int = config.get("cadence_per_day", DEFAULT_POSTING_CADENCE_PER_DAY)
-        self._cooldown_minutes: int = config.get("cooldown_minutes", DEFAULT_COOLDOWN_MINUTES)
+        self._max_posts_per_day: int = config.get(
+            "max_posts_per_day", DEFAULT_MAX_POSTS_PER_DAY
+        )
+        self._cadence_per_day: int = config.get(
+            "cadence_per_day", DEFAULT_POSTING_CADENCE_PER_DAY
+        )
+        self._cooldown_minutes: int = config.get(
+            "cooldown_minutes", DEFAULT_COOLDOWN_MINUTES
+        )
         self._target_site: str = config.get("target_site", "default")
-        self._cms_api_base_url: str = config.get("cms_api_base_url", "http://localhost:8080/wp-json/wp/v2")
+        self._cms_api_base_url: str = config.get(
+            "cms_api_base_url", "http://localhost:8080/wp-json/wp/v2"
+        )
         self._posts_today: int = 0
         self._last_publish_time: Optional[datetime] = None
 
@@ -219,7 +229,8 @@ class PublishingAgent(BaseAgent):
                 result.skipped.append(candidate.content_id)
                 self.logger.info(
                     "Skipping content %s due to policy: %s",
-                    candidate.content_id, policy_reason,
+                    candidate.content_id,
+                    policy_reason,
                 )
                 continue
 
@@ -243,7 +254,8 @@ class PublishingAgent(BaseAgent):
                 else:
                     self.logger.warning(
                         "Publishing failed for content %s: %s",
-                        candidate.content_id, pub_result.error,
+                        candidate.content_id,
+                        pub_result.error,
                     )
 
             except Exception as exc:
@@ -256,12 +268,15 @@ class PublishingAgent(BaseAgent):
                 result.errors.append(f"Content {candidate.content_id}: {exc}")
                 self.logger.error(
                     "Publishing pipeline failed for content %s: %s",
-                    candidate.content_id, exc,
+                    candidate.content_id,
+                    exc,
                 )
 
         return result
 
-    def report(self, plan: PublishPlan, result: PublishExecutionResult) -> Dict[str, Any]:
+    def report(
+        self, plan: PublishPlan, result: PublishExecutionResult
+    ) -> Dict[str, Any]:
         """Log publish outcomes and return a structured summary.
 
         Parameters:
@@ -319,10 +334,15 @@ class PublishingAgent(BaseAgent):
             is permitted; ``reason`` describes why posting was blocked.
         """
         if self._posts_today >= self._max_posts_per_day:
-            return False, f"Daily cap reached ({self._posts_today}/{self._max_posts_per_day})"
+            return (
+                False,
+                f"Daily cap reached ({self._posts_today}/{self._max_posts_per_day})",
+            )
 
         if self._last_publish_time is not None:
-            elapsed = (datetime.now(timezone.utc) - self._last_publish_time).total_seconds()
+            elapsed = (
+                datetime.now(timezone.utc) - self._last_publish_time
+            ).total_seconds()
             required_seconds = plan.cooldown_minutes * 60
             if elapsed < required_seconds:
                 remaining = int(required_seconds - elapsed)
@@ -359,7 +379,8 @@ class PublishingAgent(BaseAgent):
 
         self.logger.debug(
             "Formatted CMS payload for content %s (slug=%s).",
-            candidate.content_id, slug,
+            candidate.content_id,
+            slug,
         )
         return payload
 
@@ -368,21 +389,26 @@ class PublishingAgent(BaseAgent):
         if not hasattr(self, "_cms_tool") or self._cms_tool is None:
             import os
             from src.agents.tools.cms_tool import CMSTool
-            self._cms_tool = CMSTool({
-                "cms_type": "wordpress",
-                "api_base_url": os.environ.get(
-                    "WP_STAGING_BASE_URL",
-                    self._cms_api_base_url,
-                ),
-                "username": os.environ.get("WP_STAGING_USER", ""),
-                "api_key": os.environ.get("WP_STAGING_APP_PASSWORD", ""),
-                "default_status": "draft",
-                "request_timeout": 30,
-                "verify_ssl": True,
-            })
+
+            self._cms_tool = CMSTool(
+                {
+                    "cms_type": "wordpress",
+                    "api_base_url": os.environ.get(
+                        "WP_STAGING_BASE_URL",
+                        self._cms_api_base_url,
+                    ),
+                    "username": os.environ.get("WP_STAGING_USER", ""),
+                    "api_key": os.environ.get("WP_STAGING_APP_PASSWORD", ""),
+                    "default_status": "draft",
+                    "request_timeout": 30,
+                    "verify_ssl": True,
+                }
+            )
         return self._cms_tool
 
-    def _push_to_cms(self, candidate: PublishCandidate, payload: Dict[str, Any]) -> PublishResult:
+    def _push_to_cms(
+        self, candidate: PublishCandidate, payload: Dict[str, Any]
+    ) -> PublishResult:
         """Push the formatted payload to the CMS API.
 
         Uses CMSTool for WordPress REST API when credentials are configured.
@@ -396,7 +422,9 @@ class PublishingAgent(BaseAgent):
         Returns:
             A :class:`PublishResult` indicating success or failure.
         """
-        if self._check_dry_run(f"publish content {candidate.content_id} to {self._target_site}"):
+        if self._check_dry_run(
+            f"publish content {candidate.content_id} to {self._target_site}"
+        ):
             return PublishResult(
                 content_id=candidate.content_id,
                 success=True,
@@ -407,15 +435,20 @@ class PublishingAgent(BaseAgent):
 
         # Try real CMS publishing via CMSTool
         import os
-        if os.environ.get("WP_STAGING_BASE_URL") and os.environ.get("WP_STAGING_APP_PASSWORD"):
+
+        if os.environ.get("WP_STAGING_BASE_URL") and os.environ.get(
+            "WP_STAGING_APP_PASSWORD"
+        ):
             try:
                 cms = self._get_cms_tool()
-                result = cms.create_post({
-                    "title": payload.get("title", candidate.title),
-                    "content": payload.get("content", candidate.html_body),
-                    "slug": payload.get("slug", candidate.slug),
-                    "status": payload.get("status", "draft"),
-                })
+                result = cms.create_post(
+                    {
+                        "title": payload.get("title", candidate.title),
+                        "content": payload.get("content", candidate.html_body),
+                        "slug": payload.get("slug", candidate.slug),
+                        "status": payload.get("status", "draft"),
+                    }
+                )
 
                 return PublishResult(
                     content_id=candidate.content_id,
@@ -427,7 +460,8 @@ class PublishingAgent(BaseAgent):
             except Exception as exc:
                 self.logger.error(
                     "CMS publishing failed for content %s: %s",
-                    candidate.content_id, exc,
+                    candidate.content_id,
+                    exc,
                 )
                 return PublishResult(
                     content_id=candidate.content_id,
