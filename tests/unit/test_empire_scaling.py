@@ -3,18 +3,10 @@
 import unittest
 
 from src.domains.ops.empire_scaling import (
-    AUTOMATION_THRESHOLD_SITES,
     CAPACITY_EXPANSION_PCT,
     CAPACITY_EXPERIMENTAL_PCT,
     CAPACITY_REFRESH_PCT,
     EXPANSION_TRIGGER_COUNT,
-    KILL_NO_IMPRESSIONS_DAYS,
-    KILL_NO_INDEX_DAYS,
-    MAX_INFRA_COST_RATIO,
-    MIN_WEEKS_BETWEEN_LAUNCHES,
-    CapacityAllocation,
-    DomainHealthScore,
-    ExpansionTriggerCheck,
     ScalingStage,
     SiteMaturity,
     SiteMetrics,

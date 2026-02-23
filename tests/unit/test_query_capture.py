@@ -3,10 +3,8 @@
 import unittest
 
 from src.domains.seo.query_capture import (
-    AuthorityCluster,
     EmergingQuery,
     EmergingQueryType,
-    SignalSource,
     build_authority_clusters,
     capture_emerging_queries,
     classify_buyer_intent,

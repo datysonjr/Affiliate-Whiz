@@ -32,7 +32,7 @@ import json
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, FrozenSet, List, Optional, Set
+from typing import Dict, FrozenSet, List, Set
 
 from src.core.errors import SecurityError
 from src.core.logger import get_logger, log_event

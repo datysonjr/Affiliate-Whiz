@@ -35,7 +35,6 @@ from typing import Any, Dict, List, Optional
 from src.core.constants import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT
 from src.core.errors import (
     APIAuthenticationError,
-    APIRateLimitError,
     IntegrationError,
 )
 from src.core.logger import get_logger, log_event
@@ -391,7 +390,7 @@ class ImpactIntegration:
         )
         self._track_request()
 
-        headers = self._build_headers()
+        self._build_headers()
         logger.debug(
             "Impact GET %s with %d params", url, len(params)
         )
@@ -461,7 +460,7 @@ class ImpactIntegration:
         )
         self._track_request()
 
-        headers = self._build_headers()
+        self._build_headers()
         logger.debug("Impact GET %s with %d params", url, len(params))
 
         # Production: async HTTP GET, parse Actions array.
@@ -517,7 +516,7 @@ class ImpactIntegration:
         )
         self._track_request()
 
-        headers = self._build_headers()
+        self._build_headers()
         logger.debug("Impact GET %s", url)
 
         # Production: parse TrackingLinks from response.
@@ -576,7 +575,7 @@ class ImpactIntegration:
         )
         self._track_request()
 
-        headers = self._build_headers()
+        self._build_headers()
         logger.debug("Impact GET %s with group_by=%s", url, group_by)
 
         # Production: parse performance records from response.

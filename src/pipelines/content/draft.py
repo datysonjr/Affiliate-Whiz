@@ -23,10 +23,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from src.core.constants import (
-    DEFAULT_MIN_WORD_COUNT,
-    DEFAULT_TARGET_WORD_COUNT,
-)
 from src.core.errors import PipelineStepError
 from src.core.logger import get_logger, log_event
 from src.pipelines.content.outline import ContentOutline, SectionPlan

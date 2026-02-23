@@ -21,9 +21,9 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum, unique
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from src.core.errors import ContentValidationError, PipelineStepError
+from src.core.errors import ContentValidationError
 from src.core.logger import get_logger, log_event
 
 logger = get_logger("pipelines.content.fact_check")

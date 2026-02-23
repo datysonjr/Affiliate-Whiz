@@ -19,10 +19,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from src.core.constants import DEFAULT_KEYWORD_DENSITY
-from src.core.errors import PipelineStepError
 from src.core.logger import get_logger, log_event
 from src.pipelines.content.draft import ArticleDraft
 

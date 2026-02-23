@@ -15,20 +15,18 @@ Design references:
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum, unique
 from typing import Any, Dict, List, Optional
 
-from src.agents.base_agent import BaseAgent, RunResult
+from src.agents.base_agent import BaseAgent
 from src.core.constants import (
     AgentName,
-    DEFAULT_MAX_POSTS_PER_DAY,
     DEFAULT_SCHEDULER_INTERVAL_SECONDS,
     TaskStatus,
 )
-from src.core.logger import get_logger, log_event
+from src.core.logger import log_event
 
 
 # ---------------------------------------------------------------------------

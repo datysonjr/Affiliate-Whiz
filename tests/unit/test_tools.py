@@ -1,7 +1,6 @@
 """Unit tests for LLMTool and CMSTool."""
 
-import json
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 

@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Optional
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 

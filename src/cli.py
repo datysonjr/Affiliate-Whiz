@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
-from src.core.constants import APP_NAME, APP_VERSION, AgentName
+from src.core.constants import APP_NAME, APP_VERSION
 from src.core.errors import OpenClawError
 from src.core.logger import get_logger, setup_logging
 from src.core.settings import settings
@@ -61,30 +61,30 @@ def cmd_init(args: argparse.Namespace) -> int:
         yamls = list(config_dir.glob("*.yaml"))
         print(f"  [OK] Config: {len(yamls)} YAML file(s) in config/")
     else:
-        print(f"  [WARN] Config directory 'config/' not found")
+        print("  [WARN] Config directory 'config/' not found")
 
     # 4. Check .env
     env_path = Path(".env")
     if env_path.is_file():
-        print(f"  [OK] Environment: .env file found")
+        print("  [OK] Environment: .env file found")
     else:
         # Create from template if available
         template = Path("ops/env/example.env")
         if template.is_file():
             import shutil
             shutil.copy(template, env_path)
-            print(f"  [OK] Environment: .env created from template")
+            print("  [OK] Environment: .env created from template")
         else:
-            print(f"  [WARN] No .env file (create from ops/env/example.env)")
+            print("  [WARN] No .env file (create from ops/env/example.env)")
 
     # 5. Validate settings load
     try:
         settings.load()
-        print(f"  [OK] Settings loaded successfully")
+        print("  [OK] Settings loaded successfully")
     except OpenClawError as exc:
         print(f"  [WARN] Settings: {exc}")
 
-    print(f"\n  Initialization complete. Run 'python -m src.cli run --dry-run' to test.\n")
+    print("\n  Initialization complete. Run 'python -m src.cli run --dry-run' to test.\n")
     return 0
 
 
@@ -94,7 +94,7 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     """Run the OpenClaw pipeline (delegates to main.main_loop)."""
-    from src.main import main_loop, install_signal_handlers, _shutdown_event
+    from src.main import main_loop, install_signal_handlers
     from src.core.constants import NodeRole
 
     dry_run = args.dry_run
@@ -159,7 +159,7 @@ def cmd_status(args: argparse.Namespace) -> int:
                 dr = " [DRY]" if r["dry_run"] else ""
                 print(f"  {r['agent_name']:<25} {r['status']:<12} {r['duration_s']:.3f}s     {r['started_at']}{dr}")
         else:
-            print(f"\n  No agent runs recorded yet.")
+            print("\n  No agent runs recorded yet.")
 
         # Task queue
         queued = db.fetch_one("SELECT COUNT(*) as cnt FROM task_queue WHERE status='queued'")
@@ -171,7 +171,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             "SELECT status, COUNT(*) as cnt FROM content GROUP BY status"
         )
         if content:
-            print(f"\n  Content:")
+            print("\n  Content:")
             for c in content:
                 print(f"    {c['status']}: {c['cnt']}")
 
@@ -183,7 +183,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         db.disconnect()
 
     except Exception as exc:
-        print(f"  Database:       NOT INITIALIZED (run 'python -m src.cli init' first)")
+        print("  Database:       NOT INITIALIZED (run 'python -m src.cli init' first)")
         print(f"                  Error: {exc}")
         return 1
 
@@ -193,7 +193,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         yaml_keys = list(settings._yaml.keys()) if settings._yaml else []
         print(f"\n  Config:         {len(yaml_keys)} YAML section(s) loaded: {', '.join(yaml_keys) or 'none'}")
     except OpenClawError:
-        print(f"\n  Config:         Not loaded")
+        print("\n  Config:         Not loaded")
 
     # Disk usage
     data_dir = Path("data")
@@ -270,7 +270,7 @@ def cmd_health(args: argparse.Namespace) -> int:
     if failed:
         print(f"\n  {len(failed)} check(s) failed.")
         return 1
-    print(f"\n  All checks passed.")
+    print("\n  All checks passed.")
     return 0
 
 
@@ -280,7 +280,6 @@ def cmd_health(args: argparse.Namespace) -> int:
 
 def cmd_kill_switch(args: argparse.Namespace) -> int:
     """Engage or disengage the kill switch."""
-    action = "engage" if args.engage else "disengage"
     reason = args.reason or "manual operator action"
 
     # Store kill switch state in a simple file for cross-process coordination
@@ -294,12 +293,12 @@ def cmd_kill_switch(args: argparse.Namespace) -> int:
             "engaged_at": datetime.now(timezone.utc).isoformat(),
         }))
         print(f"  Kill switch ENGAGED. Reason: {reason}")
-        print(f"  All agents will be halted on next tick.")
+        print("  All agents will be halted on next tick.")
     else:
         if ks_file.exists():
             ks_file.unlink()
         print(f"  Kill switch DISENGAGED. Reason: {reason}")
-        print(f"  Normal operations can resume.")
+        print("  Normal operations can resume.")
 
     return 0
 
@@ -314,7 +313,7 @@ def cmd_publish_canary(args: argparse.Namespace) -> int:
 
     print(f"\n  {APP_NAME} -- Canary Publish\n")
     print(f"  Title:   {args.title}")
-    print(f"  Target:  WordPress staging (draft)")
+    print("  Target:  WordPress staging (draft)")
     print()
 
     try:
@@ -324,12 +323,12 @@ def cmd_publish_canary(args: argparse.Namespace) -> int:
         logger.error("Canary publish failed: %s", exc)
         return 1
 
-    print(f"  SUCCESS!")
+    print("  SUCCESS!")
     print(f"  Post ID:  {result.get('post_id', 'N/A')}")
     print(f"  URL:      {result.get('url', 'N/A')}")
     print(f"  Status:   {result.get('status', 'N/A')}")
     print(f"  Words:    {result.get('word_count', 'N/A')}")
-    print(f"\n  Check WP Admin -> Posts -> Drafts to verify.\n")
+    print("\n  Check WP Admin -> Posts -> Drafts to verify.\n")
     return 0
 
 

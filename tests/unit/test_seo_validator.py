@@ -7,7 +7,6 @@ from src.domains.seo.validator import (
     AI_DOMINATION_SCORE_MIN,
     MIN_INTERNAL_LINKS,
     MIN_VERDICT_STATEMENTS,
-    SEOValidationResult,
     compute_ai_domination_score,
     enforce_seo,
     validate_seo,

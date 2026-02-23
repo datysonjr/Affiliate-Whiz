@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from src.core.constants import DEFAULT_REQUEST_TIMEOUT
 from src.core.errors import IntegrationError
@@ -375,7 +375,7 @@ class MailboxManager:
         message = EmailMessage(
             to=recipients,
             subject=subject,
-            body_text=report_text or f"Please view this report in an HTML-capable email client.",
+            body_text=report_text or "Please view this report in an HTML-capable email client.",
             body_html=report_html,
         )
 

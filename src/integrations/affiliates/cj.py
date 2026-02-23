@@ -33,7 +33,6 @@ from typing import Any, Dict, List, Optional
 from src.core.constants import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT
 from src.core.errors import (
     APIAuthenticationError,
-    APIRateLimitError,
     IntegrationError,
 )
 from src.core.logger import get_logger, log_event
@@ -497,7 +496,7 @@ class CJIntegration:
         )
         self._track_request()
 
-        headers = self._build_headers()
+        self._build_headers()
         logger.debug("CJ GET %s with %d params", url, len(params))
 
         # Production: async HTTP GET, parse advertiser records from XML/JSON.
@@ -561,7 +560,7 @@ class CJIntegration:
         )
         self._track_request()
 
-        headers = self._build_headers()
+        self._build_headers()
         logger.debug("CJ GET %s", url)
 
         # Production: parse link records from response.
@@ -629,7 +628,7 @@ class CJIntegration:
         )
         self._track_request()
 
-        headers = self._build_headers()
+        self._build_headers()
         logger.debug("CJ GET %s with date range %s to %s", url,
                       start_date.isoformat(), end_date.isoformat())
 
@@ -706,7 +705,7 @@ class CJIntegration:
         )
         self._track_request()
 
-        headers = self._build_headers()
+        self._build_headers()
         logger.debug("CJ GET %s for keywords=%r", url, keywords)
 
         # Production: parse product records from response.

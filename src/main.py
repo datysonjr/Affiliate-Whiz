@@ -27,9 +27,7 @@ import json
 import signal
 import sys
 import threading
-import time
-from datetime import datetime, timezone
-from typing import NoReturn, Optional
+from typing import NoReturn
 
 from src.core.constants import (
     APP_NAME,
@@ -86,7 +84,6 @@ def _create_agents(dry_run: bool, pipeline_filter: str = "", real_agents: bool =
         use LLMTool, CMSTool, etc.  When False (default), use lightweight
         Local* stubs that simulate the flow without real integrations.
     """
-    from src.agents.base_agent import BaseAgent, RunResult
 
     # Build agent config with dry_run flag
     base_config: dict = {"enabled": True, "dry_run": dry_run, "risk_level": "low"}

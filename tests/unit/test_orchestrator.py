@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from src.orchestrator.state_machine import StateMachine, SystemState
 from src.orchestrator.controller import OrchestratorController
-from src.agents.base_agent import BaseAgent, RunResult, AgentStatus
+from src.agents.base_agent import BaseAgent, AgentStatus
 from src.core.errors import (
     InvalidStateTransitionError,
     KillSwitchActiveError,

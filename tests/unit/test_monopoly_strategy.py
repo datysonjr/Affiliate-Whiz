@@ -4,11 +4,7 @@ import unittest
 
 from src.domains.seo.monopoly_strategy import (
     BuyerStage,
-    ContentFocus,
     InterlinkSafety,
-    NicheMonopolyPlan,
-    SERPOccupationPlan,
-    SiteBlueprint,
     SiteType,
     build_monopoly_plan,
     classify_interlink_safety,

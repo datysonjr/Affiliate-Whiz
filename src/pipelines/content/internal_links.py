@@ -22,9 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from src.core.constants import (
     DEFAULT_MAX_INTERNAL_LINKS,
-    DEFAULT_MIN_INTERNAL_LINKS,
 )
-from src.core.errors import PipelineStepError
 from src.core.logger import get_logger, log_event
 
 logger = get_logger("pipelines.content.internal_links")

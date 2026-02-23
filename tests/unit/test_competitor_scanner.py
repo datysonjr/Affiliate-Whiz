@@ -6,8 +6,6 @@ from src.domains.seo.competitor_scanner import (
     ATTACKABLE_WEAKNESS_THRESHOLD,
     AttackPriority,
     CompetitorPage,
-    PageWeaknessReport,
-    SERPWeaknessReport,
     WeaknessType,
     classify_attack_priority,
     detect_bad_ux,

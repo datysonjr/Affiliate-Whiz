@@ -18,9 +18,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
-from src.core.constants import ContentStatus
 from src.core.errors import PipelineStepError
 from src.core.logger import get_logger, log_event
 from src.pipelines.optimization.measure import ContentMetrics
@@ -421,7 +420,7 @@ def archive_content(
     bool
         ``True`` if archiving succeeded.
     """
-    archive_record = {
+    {
         "post_id": post_id,
         "title": title,
         "url": url,
@@ -470,36 +469,36 @@ def generate_prune_report(
 
     # Build Markdown report
     lines = [
-        f"# Content Pruning Report",
-        f"",
+        "# Content Pruning Report",
+        "",
         f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
-        f"",
-        f"## Summary",
-        f"",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "",
+        "## Summary",
+        "",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Candidates identified | {len(candidates)} |",
         f"| Successfully pruned | {pruned} |",
         f"| Failed | {failed} |",
         f"| Skipped | {skipped} |",
         f"| Action applied | {action} |",
-        f"",
-        f"## Candidate Breakdown by Severity",
-        f"",
-        f"| Severity | Count |",
-        f"|----------|-------|",
+        "",
+        "## Candidate Breakdown by Severity",
+        "",
+        "| Severity | Count |",
+        "|----------|-------|",
         f"| High | {sum(1 for c in candidates if c.severity == 'high')} |",
         f"| Medium | {sum(1 for c in candidates if c.severity == 'medium')} |",
         f"| Low | {sum(1 for c in candidates if c.severity == 'low')} |",
-        f"",
+        "",
     ]
 
     if candidates:
         lines.extend([
-            f"## Details",
-            f"",
-            f"| Post | Reason | Severity | Action | Result |",
-            f"|------|--------|----------|--------|--------|",
+            "## Details",
+            "",
+            "| Post | Reason | Severity | Action | Result |",
+            "|------|--------|----------|--------|--------|",
         ])
         results_by_id = {r.post_id: r for r in results}
         for candidate in candidates:
@@ -513,14 +512,14 @@ def generate_prune_report(
             )
 
     lines.extend([
-        f"",
-        f"## Follow-up Actions",
-        f"",
-        f"- Update sitemap to remove pruned URLs",
-        f"- Verify redirect rules are functioning correctly",
-        f"- Update internal links pointing to pruned pages",
-        f"- Monitor 404 errors over the next 7 days",
-        f"- Review analytics for traffic impact after 14 days",
+        "",
+        "## Follow-up Actions",
+        "",
+        "- Update sitemap to remove pruned URLs",
+        "- Verify redirect rules are functioning correctly",
+        "- Update internal links pointing to pruned pages",
+        "- Monitor 404 errors over the next 7 days",
+        "- Review analytics for traffic impact after 14 days",
     ])
 
     report_text = "\n".join(lines)

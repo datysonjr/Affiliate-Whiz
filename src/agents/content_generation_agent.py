@@ -24,8 +24,6 @@ from src.core.constants import (
     AgentName,
     ContentStatus,
     DEFAULT_KEYWORD_DENSITY,
-    DEFAULT_MAX_INTERNAL_LINKS,
-    DEFAULT_MIN_INTERNAL_LINKS,
     DEFAULT_MIN_WORD_COUNT,
     DEFAULT_QUALITY_THRESHOLD,
     DEFAULT_TARGET_WORD_COUNT,
@@ -541,7 +539,6 @@ class ContentGenerationAgent(BaseAgent):
 
     def _generate_draft_with_llm(self, brief: ContentBrief, outline: ContentOutline) -> ContentDraft:
         """Generate a full article draft using the LLM tool."""
-        import json
 
         llm = self._get_llm_tool()
 

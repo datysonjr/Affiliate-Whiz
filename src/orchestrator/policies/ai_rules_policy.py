@@ -26,14 +26,13 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum, unique
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from src.core.constants import (
     DEFAULT_KEYWORD_DENSITY,
     DEFAULT_MIN_WORD_COUNT,
     DEFAULT_QUALITY_THRESHOLD,
 )
-from src.core.errors import ContentPolicyViolationError
 from src.core.logger import get_logger, log_event
 
 

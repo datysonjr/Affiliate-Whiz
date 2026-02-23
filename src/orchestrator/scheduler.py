@@ -26,15 +26,14 @@ import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 try:
     import yaml  # type: ignore[import-untyped]
 except ImportError:
     yaml = None  # type: ignore[assignment]
 
-from src.core.constants import CONFIG_DIR, DEFAULT_SCHEDULER_INTERVAL_SECONDS
+from src.core.constants import CONFIG_DIR
 from src.core.errors import SchedulerError
 from src.core.logger import get_logger, log_event
 

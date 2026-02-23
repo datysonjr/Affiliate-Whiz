@@ -29,7 +29,6 @@ from enum import Enum, unique
 from typing import Any, Dict, List, Optional, Sequence
 
 from src.core.logger import get_logger, log_event
-from src.domains.seo.keyword import KeywordData, SearchIntent
 
 logger = get_logger("domains.seo.query_capture")
 

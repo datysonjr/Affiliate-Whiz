@@ -18,8 +18,8 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Sequence
 
 from src.core.logger import get_logger, log_event
 

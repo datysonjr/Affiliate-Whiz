@@ -16,7 +16,6 @@ Design references:
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum, unique
@@ -29,7 +28,6 @@ from src.core.constants import (
     DEFAULT_RETRY_BASE_DELAY,
     DEFAULT_RETRY_EXPONENTIAL_BASE,
     DEFAULT_RETRY_MAX_DELAY,
-    TaskStatus,
 )
 from src.core.logger import log_event
 

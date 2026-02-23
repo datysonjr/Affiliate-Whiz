@@ -150,7 +150,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         """Handle GET requests."""
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/")
-        query = parse_qs(parsed.query)
+        parse_qs(parsed.query)
 
         routes: Dict[str, Callable[[], Tuple[int, Dict[str, Any]]]] = {
             "/status": self._handle_status,

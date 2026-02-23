@@ -380,10 +380,6 @@ class CloudflarePagesProvider(HostingProvider):
         environment: str = "production",
     ) -> DeploymentResult:
         """Trigger a Cloudflare Pages deployment."""
-        url = (
-            f"{self._BASE_URL}/accounts/{self._account_id}"
-            f"/pages/projects/{project_name}/deployments"
-        )
         log_event(
             logger,
             "cloudflare_pages.deploy",
@@ -403,10 +399,6 @@ class CloudflarePagesProvider(HostingProvider):
 
     async def get_status(self, project_name: str) -> ProjectStatus:
         """Get Cloudflare Pages project status."""
-        url = (
-            f"{self._BASE_URL}/accounts/{self._account_id}"
-            f"/pages/projects/{project_name}"
-        )
         log_event(logger, "cloudflare_pages.get_status", project=project_name)
         self._track_request()
 
@@ -415,10 +407,6 @@ class CloudflarePagesProvider(HostingProvider):
 
     async def get_domains(self, project_name: str) -> List[DomainInfo]:
         """List domains for a Cloudflare Pages project."""
-        url = (
-            f"{self._BASE_URL}/accounts/{self._account_id}"
-            f"/pages/projects/{project_name}/domains"
-        )
         log_event(logger, "cloudflare_pages.get_domains", project=project_name)
         self._track_request()
 

@@ -21,7 +21,6 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from src.core.constants import (
-    DEFAULT_MIN_WORD_COUNT,
     DEFAULT_TARGET_WORD_COUNT,
 )
 from src.core.errors import PipelineStepError

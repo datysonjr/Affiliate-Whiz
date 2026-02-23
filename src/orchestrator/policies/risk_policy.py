@@ -19,11 +19,9 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from enum import Enum, unique
 from typing import Any, Dict, FrozenSet, List, Optional, Set
 
 from src.core.constants import RiskLevel
-from src.core.errors import RiskPolicyViolationError
 from src.core.logger import get_logger, log_event
 
 

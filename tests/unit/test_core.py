@@ -1,7 +1,6 @@
 """Unit tests for core modules."""
 
 import unittest
-from unittest.mock import patch, MagicMock
 
 
 class TestSettings(unittest.TestCase):

@@ -36,7 +36,6 @@ from typing import Any, Dict, List, Optional
 from src.core.constants import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT
 from src.core.errors import (
     APIAuthenticationError,
-    APIRateLimitError,
     IntegrationError,
 )
 from src.core.logger import get_logger, log_event
@@ -577,7 +576,7 @@ class ShareASaleIntegration:
         if merchant_id:
             extra["merchantId"] = merchant_id
 
-        params = self._build_params("activity", extra)
+        self._build_params("activity", extra)
 
         log_event(
             logger,
@@ -636,7 +635,7 @@ class ShareASaleIntegration:
             "page": max(page, 1),
             "rowsPerPage": min(page_size, 200),
         }
-        params = self._build_params("getLinks", extra)
+        self._build_params("getLinks", extra)
 
         log_event(
             logger,

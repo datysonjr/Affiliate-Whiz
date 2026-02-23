@@ -16,12 +16,11 @@ Design references:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from src.agents.base_agent import BaseAgent
-from src.core.constants import AgentName, DEFAULT_MIN_OFFER_SCORE, TaskStatus
-from src.core.logger import get_logger, log_event
+from src.core.constants import AgentName, DEFAULT_MIN_OFFER_SCORE
+from src.core.logger import log_event
 
 
 # ---------------------------------------------------------------------------

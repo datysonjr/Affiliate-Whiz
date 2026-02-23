@@ -24,8 +24,6 @@ from typing import Any, Dict
 from src.core.errors import (
     CMSConnectionError,
     ConfigError,
-    ContentValidationError,
-    PublishingError,
 )
 from src.core.logger import get_logger, log_event
 from src.domains.seo.validator import enforce_seo

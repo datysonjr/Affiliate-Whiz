@@ -19,12 +19,11 @@ Design references:
 
 from __future__ import annotations
 
-import math
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from src.core.constants import DEFAULT_MAX_INTERNAL_LINKS, DEFAULT_MIN_INTERNAL_LINKS
+from src.core.constants import DEFAULT_MIN_INTERNAL_LINKS
 from src.core.logger import get_logger
 
 logger = get_logger("seo.internal_linking")

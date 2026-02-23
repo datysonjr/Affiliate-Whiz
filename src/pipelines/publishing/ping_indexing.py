@@ -24,8 +24,7 @@ from datetime import datetime, timezone
 from enum import Enum, unique
 from typing import Any, Dict, List, Optional
 
-from src.core.constants import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT
-from src.core.errors import IntegrationError, PipelineStepError
+from src.core.constants import DEFAULT_REQUEST_TIMEOUT
 from src.core.logger import get_logger, log_event
 
 logger = get_logger("pipelines.publishing.ping_indexing")
@@ -169,10 +168,6 @@ def ping_google(
     )
 
     # Build the API request payload
-    api_payload = {
-        "url": url,
-        "type": action.value,
-    }
 
     # Stub: actual HTTP call to https://indexing.googleapis.com/v3/urlNotifications:publish
     # would go here, using the service account credentials for OAuth2 authentication
@@ -247,7 +242,7 @@ def ping_bing(
 
     # Build IndexNow request
     # POST https://www.bing.com/indexnow
-    indexnow_payload = {
+    {
         "host": site_url.replace("https://", "").replace("http://", "").rstrip("/"),
         "key": api_key,
         "urlList": [url],

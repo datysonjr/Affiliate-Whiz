@@ -3,12 +3,9 @@
 import unittest
 
 from src.domains.seo.authority_snowball import (
-    EXPANSION_MAX_PAGES,
-    SEED_MAX_PAGES,
     TRUST_MAX_PAGES,
     GrowthStage,
     PageType,
-    PublishingPlan,
     SiteSnapshot,
     SnowballSignals,
     build_publishing_plan,

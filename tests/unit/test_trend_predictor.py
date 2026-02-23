@@ -3,9 +3,7 @@
 import unittest
 
 from src.domains.seo.trend_predictor import (
-    ACTIVATION_THRESHOLD,
     NichePriority,
-    NicheTrendReport,
     SignalLevel,
     SignalSource,
     TrendSignal,

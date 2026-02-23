@@ -27,7 +27,6 @@ from src.core.constants import (
 )
 from src.core.errors import PipelineStepError
 from src.core.logger import get_logger, log_event
-from src.domains.offers.models import Offer, OfferScore, OfferTier
 
 logger = get_logger("pipelines.offer_discovery.score")
 

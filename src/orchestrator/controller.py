@@ -26,12 +26,10 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from src.core.constants import (
     DEFAULT_COOLDOWN_MINUTES,
-    DEFAULT_MAX_POSTS_PER_DAY,
-    RiskLevel,
     TaskStatus,
 )
 from src.core.errors import (

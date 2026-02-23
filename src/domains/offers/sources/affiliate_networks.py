@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from src.core.errors import IntegrationError
 from src.core.logger import get_logger
 from src.domains.offers.models import Offer
 

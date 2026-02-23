@@ -1,7 +1,6 @@
 """Unit tests for agent modules."""
 
-import pytest
-from src.agents.base_agent import BaseAgent, RunResult, AgentStatus
+from src.agents.base_agent import BaseAgent, AgentStatus
 
 
 # ---------------------------------------------------------------------------

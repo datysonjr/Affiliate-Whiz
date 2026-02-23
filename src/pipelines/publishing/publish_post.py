@@ -23,8 +23,6 @@ from src.core.constants import ContentStatus
 from src.core.errors import (
     CMSConnectionError,
     ContentValidationError,
-    DuplicateContentError,
-    PublishingError,
 )
 from src.core.logger import get_logger, log_event
 from src.domains.seo.validator import enforce_seo

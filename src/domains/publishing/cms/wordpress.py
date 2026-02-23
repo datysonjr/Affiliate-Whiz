@@ -21,12 +21,9 @@ from __future__ import annotations
 import base64
 import logging
 import mimetypes
-import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import urljoin
 
 from src.core.constants import DEFAULT_REQUEST_TIMEOUT
 from src.core.errors import CMSConnectionError, IntegrationError, PublishingError

@@ -41,7 +41,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from src.core.errors import SecurityError, CredentialExpiredError
 from src.core.logger import get_logger, log_event
 
 logger = get_logger("security.key_rotation")

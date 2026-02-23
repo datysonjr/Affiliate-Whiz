@@ -15,17 +15,15 @@ Design references:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import mimetypes
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from src.core.constants import DEFAULT_REQUEST_TIMEOUT
-from src.core.errors import IntegrationError, APIAuthenticationError
+from src.core.errors import IntegrationError
 from src.core.logger import get_logger, log_event
 
 # ---------------------------------------------------------------------------

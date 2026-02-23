@@ -34,10 +34,10 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote_plus, urlencode
+from urllib.parse import quote_plus
 
 from src.core.constants import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT
-from src.core.errors import IntegrationError, APIRateLimitError, APIAuthenticationError
+from src.core.errors import IntegrationError, APIAuthenticationError
 from src.core.logger import get_logger, log_event
 
 logger = get_logger("integrations.affiliates.amazon_associates")
@@ -51,7 +51,7 @@ _DEFAULT_HOST = "webservices.amazon.com"
 _DEFAULT_MARKETPLACE = "www.amazon.com"
 _PA_API_SERVICE = "ProductAdvertisingAPI"
 _PA_API_VERSION = "v1"
-_PA_API_PATH = f"/paapi5/"
+_PA_API_PATH = "/paapi5/"
 
 # Commission rate schedule (approximate, subject to change by Amazon)
 _COMMISSION_SCHEDULE: Dict[str, float] = {
@@ -467,7 +467,7 @@ class AmazonAssociates:
         # For now, we prepare the request structure and return an empty list
         # until the HTTP transport layer is wired in.
         timestamp = datetime.now(timezone.utc)
-        headers = self._sign_request("SearchItems", payload, timestamp)
+        self._sign_request("SearchItems", payload, timestamp)
         endpoint = f"https://{self._host}{_PA_API_PATH}searchitems"
 
         logger.debug(
@@ -547,7 +547,7 @@ class AmazonAssociates:
         self._track_request()
 
         timestamp = datetime.now(timezone.utc)
-        headers = self._sign_request("GetItems", payload, timestamp)
+        self._sign_request("GetItems", payload, timestamp)
         endpoint = f"https://{self._host}{_PA_API_PATH}getitems"
 
         logger.debug(

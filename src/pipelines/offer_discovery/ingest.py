@@ -21,7 +21,6 @@ from typing import Any, Dict, Iterator, List, Optional
 
 from src.core.constants import (
     DEFAULT_MAX_RETRIES,
-    DEFAULT_REQUEST_TIMEOUT,
     DEFAULT_RETRY_BASE_DELAY,
     DEFAULT_RETRY_EXPONENTIAL_BASE,
     DEFAULT_RETRY_MAX_DELAY,
