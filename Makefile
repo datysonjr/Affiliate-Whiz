@@ -10,14 +10,16 @@ EXPORTS_DIR=$(DATA_DIR)/exports
 LOGS_DIR=$(DATA_DIR)/logs
 DB_DIR=$(DATA_DIR)/db
 
-.PHONY: help venv install fmt lint test clean dirs dry-run staging status tail-logs backup
+.PHONY: help venv install bootstrap fmt lint test clean dirs dry-run staging status tail-logs backup
 
 help:
 	@echo ""
 	@echo "OpenClaw Affiliate Bot — Commands"
+	@echo "  make bootstrap   One-command setup (venv + deps + env + init)"
 	@echo "  make venv        Create local venv"
 	@echo "  make install     Install dependencies"
 	@echo "  make test        Run tests"
+	@echo "  make lint        Run ruff + mypy"
 	@echo "  make dry-run     Run local DRY_RUN pipeline"
 	@echo "  make staging     Run SAFE_STAGING pipeline (requires env + ALLOW_PUBLISHING=true)"
 	@echo "  make status      Print system status"
@@ -33,9 +35,30 @@ install: venv
 	$(PIP) install --upgrade pip
 	@if [ -f pyproject.toml ]; then \
 		$(PIP) install -e .; \
+	elif [ -f requirements.txt ]; then \
+		$(PIP) install -r requirements.txt; \
 	else \
-		echo "pyproject.toml not found yet (Claude Code will generate)."; \
+		echo "No pyproject.toml or requirements.txt found."; \
 	fi
+
+bootstrap: install dirs
+	@if [ ! -f .env ]; then \
+		echo "Copying .env.example -> .env"; \
+		cp .env.example .env; \
+	else \
+		echo ".env already exists, skipping copy."; \
+	fi
+	@echo "Running init..."
+	$(PYTHON) -m src.cli init || echo "Init completed (or cli not fully wired yet)."
+	@echo ""
+	@echo "Bootstrap complete. Next steps:"
+	@echo "  make dry-run    — run a DRY_RUN cycle"
+	@echo "  make test       — run the test suite"
+	@echo "  make staging    — publish to WP staging (set WP env vars first)"
+
+lint:
+	$(PYTHON) -m ruff check src/ tests/
+	$(PYTHON) -m mypy src/ --ignore-missing-imports
 
 dirs:
 	@mkdir -p $(EXPORTS_DIR) $(LOGS_DIR) $(DB_DIR)

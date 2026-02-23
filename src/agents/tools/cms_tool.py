@@ -6,7 +6,11 @@ CMS solutions, etc.). Designed for automated affiliate content publishing.
 """
 
 import logging
+import mimetypes
+import os
 from typing import Any, Optional
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +34,11 @@ class CMSTool:
         default_author_id (int, optional): Default author ID for new posts.
         request_timeout (int): Timeout for API requests in seconds (default 30).
         verify_ssl (bool): Whether to verify SSL certificates (default True).
+        max_retries (int): Max retry attempts for transient failures (default 3).
+        retry_backoff (float): Base backoff in seconds between retries (default 1.0).
     """
 
     def __init__(self, config: dict[str, Any]) -> None:
-        """Initialize the CMS tool with API connection details.
-
-        Args:
-            config: Dictionary containing CMS connection settings and
-                publishing defaults. See class docstring for supported keys.
-        """
         self.config = config
 
         # Connection settings
@@ -55,9 +55,11 @@ class CMSTool:
         # Request settings
         self.request_timeout: int = config.get("request_timeout", 30)
         self.verify_ssl: bool = config.get("verify_ssl", True)
+        self.max_retries: int = config.get("max_retries", 3)
+        self.retry_backoff: float = config.get("retry_backoff", 1.0)
 
         # Session placeholder (lazily initialized)
-        self._session: Any = None
+        self._session: Optional[requests.Session] = None
 
         logger.info(
             "CMSTool initialized (cms_type=%s, api_base_url=%s)",
@@ -69,54 +71,150 @@ class CMSTool:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _get_session(self) -> Any:
-        """Lazily create and return an HTTP session with authentication headers.
-
-        Returns:
-            A configured ``requests.Session`` (or equivalent) with auth
-            headers pre-set.
-        """
+    def _get_session(self) -> requests.Session:
+        """Lazily create and return an HTTP session with authentication."""
         if self._session is None:
-            # TODO: Initialize an authenticated HTTP session
-            # Example with requests:
-            #   import requests
-            #   self._session = requests.Session()
-            #   self._session.headers["Authorization"] = f"Bearer {self.api_key}"
-            #   self._session.verify = self.verify_ssl
             logger.debug("Creating new HTTP session for CMS API")
-            raise NotImplementedError("HTTP session initialization not yet implemented")
+            session = requests.Session()
+            session.verify = self.verify_ssl
+
+            # WordPress uses Basic Auth with username + application password
+            if self.cms_type == "wordpress" and self.username and self.api_key:
+                session.auth = (self.username, self.api_key)
+            elif self.api_key:
+                session.headers["Authorization"] = f"Bearer {self.api_key}"
+
+            session.headers["User-Agent"] = "OpenClaw/0.1.0"
+            session.headers["Accept"] = "application/json"
+
+            self._session = session
         return self._session
 
     def _build_url(self, endpoint: str) -> str:
-        """Construct a full API URL from a relative endpoint path.
-
-        Args:
-            endpoint: The relative API path (e.g. "/posts", "/media").
-
-        Returns:
-            The fully qualified URL.
-        """
+        """Construct a full API URL from a relative endpoint path."""
         base = self.api_base_url.rstrip("/")
         endpoint = endpoint.lstrip("/")
         return f"{base}/{endpoint}"
 
-    def _handle_response(self, response: Any) -> dict[str, Any]:
-        """Validate an HTTP response and return parsed JSON.
+    def _request(
+        self,
+        method: str,
+        endpoint: str,
+        *,
+        json_data: Optional[dict[str, Any]] = None,
+        params: Optional[dict[str, Any]] = None,
+        data: Any = None,
+        headers: Optional[dict[str, str]] = None,
+    ) -> dict[str, Any] | list[dict[str, Any]]:
+        """Send an HTTP request with retry logic.
 
         Args:
-            response: The HTTP response object.
+            method: HTTP method (GET, POST, PATCH, DELETE).
+            endpoint: Relative API path.
+            json_data: JSON body payload.
+            params: Query parameters.
+            data: Raw body data (for file uploads).
+            headers: Extra headers to merge.
 
         Returns:
-            Parsed JSON response as a dictionary.
+            Parsed JSON response.
+
+        Raises:
+            RuntimeError: If the request fails after all retries.
+        """
+        session = self._get_session()
+        url = self._build_url(endpoint)
+        last_error: Optional[Exception] = None
+
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                response = session.request(
+                    method=method,
+                    url=url,
+                    json=json_data,
+                    params=params,
+                    data=data,
+                    headers=headers,
+                    timeout=self.request_timeout,
+                )
+                return self._handle_response(response)
+            except requests.exceptions.ConnectionError as exc:
+                last_error = exc
+                logger.warning(
+                    "Connection error on attempt %d/%d for %s %s: %s",
+                    attempt, self.max_retries, method, endpoint, exc,
+                )
+            except requests.exceptions.Timeout as exc:
+                last_error = exc
+                logger.warning(
+                    "Timeout on attempt %d/%d for %s %s: %s",
+                    attempt, self.max_retries, method, endpoint, exc,
+                )
+            except RuntimeError:
+                raise
+            except Exception as exc:
+                last_error = exc
+                logger.warning(
+                    "Request error on attempt %d/%d for %s %s: %s",
+                    attempt, self.max_retries, method, endpoint, exc,
+                )
+
+            if attempt < self.max_retries:
+                import time
+                delay = self.retry_backoff * (2 ** (attempt - 1))
+                logger.debug("Retrying in %.1fs", delay)
+                time.sleep(delay)
+
+        raise RuntimeError(
+            f"CMS API request failed after {self.max_retries} attempts: "
+            f"{method} {endpoint} — {last_error}"
+        )
+
+    def _handle_response(self, response: requests.Response) -> Any:
+        """Validate an HTTP response and return parsed JSON.
 
         Raises:
             RuntimeError: If the response indicates an error (non-2xx status).
         """
-        # TODO: Implement response validation and JSON parsing
-        # Example:
-        #   response.raise_for_status()
-        #   return response.json()
-        raise NotImplementedError("Response handling not yet implemented")
+        if response.status_code == 401:
+            raise RuntimeError(
+                f"CMS authentication failed (401). Check credentials. "
+                f"Response: {response.text[:200]}"
+            )
+        if response.status_code == 403:
+            raise RuntimeError(
+                f"CMS permission denied (403). User may lack required role. "
+                f"Response: {response.text[:200]}"
+            )
+
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as exc:
+            raise RuntimeError(
+                f"CMS API error ({response.status_code}): {response.text[:300]}"
+            ) from exc
+
+        if response.status_code == 204:
+            return {}
+
+        return response.json()
+
+    def _normalize_wp_post(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Normalize a WordPress REST API post response to a standard format."""
+        title = raw.get("title", {})
+        if isinstance(title, dict):
+            title = title.get("rendered", "")
+
+        link = raw.get("link", "")
+        return {
+            "id": raw.get("id"),
+            "url": link,
+            "title": title,
+            "slug": raw.get("slug", ""),
+            "status": raw.get("status", ""),
+            "created_at": raw.get("date", ""),
+            "updated_at": raw.get("modified", ""),
+        }
 
     # ------------------------------------------------------------------
     # Post management
@@ -126,29 +224,13 @@ class CMSTool:
         """Create a new post in the CMS.
 
         Args:
-            data: Post data dictionary. Common fields:
-                - title (str): Post title.
-                - content (str): Post body (HTML or Markdown depending on CMS).
-                - excerpt (str, optional): Short summary / meta description.
-                - status (str, optional): Publication status. Defaults to
-                  ``self.default_status``.
-                - slug (str, optional): URL slug.
-                - categories (list[int], optional): Category IDs.
-                - tags (list[int], optional): Tag IDs.
-                - featured_media (int, optional): Featured image media ID.
-                - meta (dict, optional): Custom meta fields (SEO title, etc.).
-                - author (int, optional): Author ID. Defaults to
-                  ``self.default_author_id``.
+            data: Post data with title, content, status, slug, etc.
 
         Returns:
-            Dict representing the created post, including at minimum:
-                - id (int): The new post ID.
-                - url (str): The post permalink.
-                - status (str): The publication status.
-                - created_at (str): ISO-8601 creation timestamp.
+            Normalized post dict with id, url, title, status, created_at.
 
         Raises:
-            ValueError: If required fields (title, content) are missing.
+            ValueError: If required fields are missing.
             RuntimeError: If the CMS API returns an error.
         """
         if not data.get("title"):
@@ -156,7 +238,6 @@ class CMSTool:
         if not data.get("content"):
             raise ValueError("Post content is required")
 
-        # Apply defaults
         data.setdefault("status", self.default_status)
         if self.default_author_id and "author" not in data:
             data["author"] = self.default_author_id
@@ -167,12 +248,10 @@ class CMSTool:
             data["status"],
         )
 
-        # TODO: Send POST request to CMS API
-        # session = self._get_session()
-        # url = self._build_url("/posts")
-        # response = session.post(url, json=data, timeout=self.request_timeout)
-        # return self._handle_response(response)
-        raise NotImplementedError("CMS create_post not yet implemented")
+        result = self._request("POST", "/posts", json_data=data)
+        if isinstance(result, dict):
+            return self._normalize_wp_post(result)
+        return result
 
     def update_post(
         self, post_id: int, data: dict[str, Any]
@@ -181,60 +260,36 @@ class CMSTool:
 
         Args:
             post_id: The ID of the post to update.
-            data: Dictionary of fields to update. Supports the same fields
-                as ``create_post``. Only provided fields will be modified;
-                omitted fields remain unchanged.
+            data: Fields to update.
 
         Returns:
-            Dict representing the updated post with the same structure as
-            ``create_post`` return value.
-
-        Raises:
-            ValueError: If post_id is invalid.
-            RuntimeError: If the CMS API returns an error (e.g. post not found).
+            Normalized updated post dict.
         """
         if not isinstance(post_id, int) or post_id <= 0:
             raise ValueError(f"Invalid post_id: {post_id}")
 
-        logger.info(
-            "Updating post %d with %d field(s)", post_id, len(data)
-        )
-
-        # TODO: Send PUT/PATCH request to CMS API
-        # session = self._get_session()
-        # url = self._build_url(f"/posts/{post_id}")
-        # response = session.patch(url, json=data, timeout=self.request_timeout)
-        # return self._handle_response(response)
-        raise NotImplementedError("CMS update_post not yet implemented")
+        logger.info("Updating post %d with %d field(s)", post_id, len(data))
+        result = self._request("PATCH", f"/posts/{post_id}", json_data=data)
+        if isinstance(result, dict):
+            return self._normalize_wp_post(result)
+        return result
 
     def delete_post(self, post_id: int, force: bool = False) -> bool:
-        """Delete a post from the CMS.
+        """Delete (or trash) a post from the CMS.
 
         Args:
             post_id: The ID of the post to delete.
-            force: If True, bypass trash and permanently delete. Default is
-                False (move to trash).
+            force: If True, permanently delete instead of trashing.
 
         Returns:
-            True if the post was successfully deleted or trashed.
-
-        Raises:
-            ValueError: If post_id is invalid.
-            RuntimeError: If the CMS API returns an error.
+            True if successful.
         """
         if not isinstance(post_id, int) or post_id <= 0:
             raise ValueError(f"Invalid post_id: {post_id}")
 
         logger.info("Deleting post %d (force=%s)", post_id, force)
-
-        # TODO: Send DELETE request to CMS API
-        # session = self._get_session()
-        # url = self._build_url(f"/posts/{post_id}")
-        # params = {"force": force}
-        # response = session.delete(url, params=params, timeout=self.request_timeout)
-        # self._handle_response(response)
-        # return True
-        raise NotImplementedError("CMS delete_post not yet implemented")
+        self._request("DELETE", f"/posts/{post_id}", params={"force": force})
+        return True
 
     def get_posts(
         self, filters: Optional[dict[str, Any]] = None
@@ -242,40 +297,18 @@ class CMSTool:
         """Retrieve posts from the CMS, optionally filtered.
 
         Args:
-            filters: Optional dictionary of filter parameters. Common filters:
-                - status (str): Filter by status ("publish", "draft", etc.).
-                - categories (list[int]): Filter by category IDs.
-                - tags (list[int]): Filter by tag IDs.
-                - search (str): Full-text search query.
-                - per_page (int): Number of posts per page (default 10).
-                - page (int): Page number for pagination (default 1).
-                - orderby (str): Sort field (e.g. "date", "title").
-                - order (str): Sort direction ("asc" or "desc").
-                - after (str): ISO-8601 date; only posts after this date.
-                - before (str): ISO-8601 date; only posts before this date.
-                - author (int): Filter by author ID.
+            filters: Query parameters (status, search, per_page, page, etc.)
 
         Returns:
-            List of post dicts, each containing at minimum:
-                - id (int): Post ID.
-                - title (str): Post title.
-                - url (str): Post permalink.
-                - status (str): Publication status.
-                - created_at (str): ISO-8601 creation timestamp.
-                - updated_at (str): ISO-8601 last-modified timestamp.
-
-        Raises:
-            RuntimeError: If the CMS API returns an error.
+            List of normalized post dicts.
         """
         filters = filters or {}
         logger.info("Fetching posts with filters: %s", filters)
 
-        # TODO: Send GET request to CMS API
-        # session = self._get_session()
-        # url = self._build_url("/posts")
-        # response = session.get(url, params=filters, timeout=self.request_timeout)
-        # return self._handle_response(response)
-        raise NotImplementedError("CMS get_posts not yet implemented")
+        result = self._request("GET", "/posts", params=filters)
+        if isinstance(result, list):
+            return [self._normalize_wp_post(p) for p in result]
+        return []
 
     # ------------------------------------------------------------------
     # Media management
@@ -288,46 +321,47 @@ class CMSTool:
         alt_text: Optional[str] = None,
         caption: Optional[str] = None,
     ) -> str:
-        """Upload a media file (image, video, document) to the CMS.
+        """Upload a media file to the CMS.
 
         Args:
-            file_path: Local filesystem path to the file to upload.
+            file_path: Local path to the file.
             title: Optional title for the media item.
-            alt_text: Optional alt text for accessibility.
-            caption: Optional caption for display beneath the media.
+            alt_text: Optional alt text.
+            caption: Optional caption.
 
         Returns:
-            The public URL of the uploaded media file.
-
-        Raises:
-            FileNotFoundError: If ``file_path`` does not exist.
-            RuntimeError: If the CMS API returns an error.
-            ValueError: If the file type is not supported by the CMS.
+            The public URL of the uploaded media.
         """
-        import os
-
         if not os.path.isfile(file_path):
             raise FileNotFoundError(f"Media file not found: {file_path}")
 
         filename = os.path.basename(file_path)
-        logger.info("Uploading media: %s", filename)
+        mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+        logger.info("Uploading media: %s (%s)", filename, mime_type)
 
-        # TODO: Send multipart POST request to CMS media endpoint
-        # import mimetypes
-        # mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
-        # session = self._get_session()
-        # url = self._build_url("/media")
-        # with open(file_path, "rb") as f:
-        #     headers = {
-        #         "Content-Disposition": f'attachment; filename="{filename}"',
-        #         "Content-Type": mime_type,
-        #     }
-        #     response = session.post(
-        #         url, data=f, headers=headers, timeout=self.request_timeout
-        #     )
-        # result = self._handle_response(response)
-        # return result.get("source_url", result.get("url", ""))
-        raise NotImplementedError("CMS upload_media not yet implemented")
+        with open(file_path, "rb") as f:
+            file_data = f.read()
+
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": mime_type,
+        }
+        result = self._request("POST", "/media", data=file_data, headers=headers)
+
+        if isinstance(result, dict):
+            url = result.get("source_url", result.get("url", ""))
+            # Set alt text if provided
+            if alt_text and result.get("id"):
+                try:
+                    self._request(
+                        "PATCH",
+                        f"/media/{result['id']}",
+                        json_data={"alt_text": alt_text},
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to set alt text: %s", exc)
+            return url
+        return ""
 
     # ------------------------------------------------------------------
     # Category / taxonomy management
@@ -339,29 +373,58 @@ class CMSTool:
         """Retrieve categories from the CMS.
 
         Args:
-            parent_id: If provided, only return child categories of this
-                parent category ID.
+            parent_id: If provided, only return child categories.
 
         Returns:
-            List of category dicts, each containing:
-                - id (int): Category ID.
-                - name (str): Category name.
-                - slug (str): URL slug.
-                - parent (int | None): Parent category ID, or None if top-level.
-                - count (int): Number of posts in this category.
-                - description (str): Category description.
-
-        Raises:
-            RuntimeError: If the CMS API returns an error.
+            List of category dicts with id, name, slug, parent, count.
         """
         logger.info("Fetching categories (parent_id=%s)", parent_id)
+        params: dict[str, Any] = {"per_page": 100}
+        if parent_id is not None:
+            params["parent"] = parent_id
 
-        # TODO: Send GET request to CMS categories endpoint
-        # session = self._get_session()
-        # url = self._build_url("/categories")
-        # params = {}
-        # if parent_id is not None:
-        #     params["parent"] = parent_id
-        # response = session.get(url, params=params, timeout=self.request_timeout)
-        # return self._handle_response(response)
-        raise NotImplementedError("CMS get_categories not yet implemented")
+        result = self._request("GET", "/categories", params=params)
+        if isinstance(result, list):
+            return result
+        return []
+
+    def ensure_category(self, name: str) -> int:
+        """Get or create a category by name. Returns the category ID.
+
+        Args:
+            name: Category name to find or create.
+
+        Returns:
+            The category ID (int).
+        """
+        categories = self._request("GET", "/categories", params={"search": name})
+        if isinstance(categories, list):
+            for cat in categories:
+                if cat.get("name", "").lower() == name.lower():
+                    return cat["id"]
+
+        # Create it
+        result = self._request("POST", "/categories", json_data={"name": name})
+        if isinstance(result, dict):
+            return result["id"]
+        raise RuntimeError(f"Failed to create category: {name}")
+
+    def ensure_tag(self, name: str) -> int:
+        """Get or create a tag by name. Returns the tag ID.
+
+        Args:
+            name: Tag name to find or create.
+
+        Returns:
+            The tag ID (int).
+        """
+        tags = self._request("GET", "/tags", params={"search": name})
+        if isinstance(tags, list):
+            for tag in tags:
+                if tag.get("name", "").lower() == name.lower():
+                    return tag["id"]
+
+        result = self._request("POST", "/tags", json_data={"name": name})
+        if isinstance(result, dict):
+            return result["id"]
+        raise RuntimeError(f"Failed to create tag: {name}")

@@ -560,8 +560,8 @@ def _submit_to_cms(
 ) -> tuple[str, str]:
     """Submit the formatted payload to the CMS API.
 
-    Stub for actual CMS integration.  In production, this dispatches to
-    WordPress REST API, Ghost Admin API, etc.
+    Uses CMSTool for WordPress REST API integration.  Falls back to a
+    stub response when api_key is not configured (local dev).
 
     Parameters
     ----------
@@ -575,10 +575,41 @@ def _submit_to_cms(
     tuple[str, str]
         (post_id, post_url) from the CMS response.
     """
+    # If CMS credentials are configured, use real integration
+    if config.base_url and config.api_key:
+        from src.agents.tools.cms_tool import CMSTool
+
+        cms = CMSTool({
+            "cms_type": config.cms_type,
+            "api_base_url": config.base_url,
+            "api_key": config.api_key,
+            "username": config.username,
+            "default_status": config.default_status,
+        })
+
+        post_data = {
+            "title": payload.get("title", ""),
+            "content": payload.get("content", ""),
+            "excerpt": payload.get("excerpt", ""),
+            "status": payload.get("status", config.default_status),
+            "slug": payload.get("slug", ""),
+        }
+
+        result = cms.create_post(post_data)
+        post_id = str(result.get("id", ""))
+        post_url = result.get("url", "")
+
+        logger.info(
+            "Published to %s CMS via API: %s -> %s",
+            config.cms_type, post_id, post_url,
+        )
+        return post_id, post_url
+
+    # Fallback: no credentials configured (local dev / dry-run-like)
     post_id = uuid.uuid4().hex[:12]
     slug = payload.get("slug", "post")
     base = config.base_url.rstrip("/") if config.base_url else "https://example.com"
     post_url = f"{base}/{slug}/"
 
-    logger.info("Submitted post to %s CMS: %s -> %s", config.cms_type, post_id, post_url)
+    logger.info("Submitted post to %s CMS (stub): %s -> %s", config.cms_type, post_id, post_url)
     return post_id, post_url

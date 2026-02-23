@@ -363,11 +363,31 @@ class PublishingAgent(BaseAgent):
         )
         return payload
 
+    def _get_cms_tool(self):
+        """Lazily initialize and return a CMSTool reading config from env."""
+        if not hasattr(self, "_cms_tool") or self._cms_tool is None:
+            import os
+            from src.agents.tools.cms_tool import CMSTool
+            self._cms_tool = CMSTool({
+                "cms_type": "wordpress",
+                "api_base_url": os.environ.get(
+                    "WP_STAGING_BASE_URL",
+                    self._cms_api_base_url,
+                ),
+                "username": os.environ.get("WP_STAGING_USER", ""),
+                "api_key": os.environ.get("WP_STAGING_APP_PASSWORD", ""),
+                "default_status": "draft",
+                "request_timeout": 30,
+                "verify_ssl": True,
+            })
+        return self._cms_tool
+
     def _push_to_cms(self, candidate: PublishCandidate, payload: Dict[str, Any]) -> PublishResult:
         """Push the formatted payload to the CMS API.
 
-        In production this makes an HTTP POST to the CMS REST API.  The
-        scaffold returns a dry-run placeholder.
+        Uses CMSTool for WordPress REST API when credentials are configured.
+        In dry-run mode, returns a placeholder. Falls back gracefully when
+        no CMS credentials are available.
 
         Parameters:
             candidate: The content being published.
@@ -385,16 +405,45 @@ class PublishingAgent(BaseAgent):
                 published_at=datetime.now(timezone.utc),
             )
 
-        # Placeholder: real implementation calls requests.post(...)
-        self.logger.debug(
-            "Would POST to %s/posts with payload for content %s.",
-            self._cms_api_base_url, candidate.content_id,
-        )
+        # Try real CMS publishing via CMSTool
+        import os
+        if os.environ.get("WP_STAGING_BASE_URL") and os.environ.get("WP_STAGING_APP_PASSWORD"):
+            try:
+                cms = self._get_cms_tool()
+                result = cms.create_post({
+                    "title": payload.get("title", candidate.title),
+                    "content": payload.get("content", candidate.html_body),
+                    "slug": payload.get("slug", candidate.slug),
+                    "status": payload.get("status", "draft"),
+                })
 
+                return PublishResult(
+                    content_id=candidate.content_id,
+                    success=True,
+                    published_url=result.get("url", ""),
+                    cms_post_id=str(result.get("id", "")),
+                    published_at=datetime.now(timezone.utc),
+                )
+            except Exception as exc:
+                self.logger.error(
+                    "CMS publishing failed for content %s: %s",
+                    candidate.content_id, exc,
+                )
+                return PublishResult(
+                    content_id=candidate.content_id,
+                    success=False,
+                    error=f"CMS publishing failed: {exc}",
+                )
+
+        # No CMS credentials configured
+        self.logger.warning(
+            "No CMS credentials configured (WP_STAGING_BASE_URL / WP_STAGING_APP_PASSWORD). "
+            "Set them in .env to enable real publishing."
+        )
         return PublishResult(
             content_id=candidate.content_id,
             success=False,
-            error="CMS integration not yet implemented.",
+            error="No CMS credentials configured. Set WP_STAGING_BASE_URL and WP_STAGING_APP_PASSWORD in .env.",
         )
 
     @staticmethod

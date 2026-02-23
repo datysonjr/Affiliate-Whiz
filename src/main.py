@@ -72,16 +72,128 @@ def install_signal_handlers() -> None:
 # Agent factory
 # ---------------------------------------------------------------------------
 
-def _create_agents(dry_run: bool, pipeline_filter: str = ""):
+def _create_agents(dry_run: bool, pipeline_filter: str = "", real_agents: bool = False):
     """Create and return agent instances for the current node role.
 
-    In local dev mode all agents run on the same machine.
-    The pipeline_filter limits which agents are instantiated.
+    Parameters
+    ----------
+    dry_run:
+        When True, agents will skip real side-effects.
+    pipeline_filter:
+        Restrict to a specific pipeline ("content", "publishing", "analytics").
+    real_agents:
+        When True, instantiate real agent classes from src/agents/*.py that
+        use LLMTool, CMSTool, etc.  When False (default), use lightweight
+        Local* stubs that simulate the flow without real integrations.
     """
     from src.agents.base_agent import BaseAgent, RunResult
 
-    # Lightweight agent stubs that produce mock output in dry-run mode.
-    # These prove the full flow works without needing real integrations.
+    # Build agent config with dry_run flag
+    base_config: dict = {"enabled": True, "dry_run": dry_run, "risk_level": "low"}
+
+    if real_agents:
+        return _create_real_agents(base_config, pipeline_filter)
+
+    return _create_stub_agents(base_config, pipeline_filter)
+
+
+def _create_real_agents(base_config: dict, pipeline_filter: str = "") -> list:
+    """Instantiate real agent classes that use actual tools (LLM, CMS, etc.).
+
+    These agents are from src/agents/*.py and will make real API calls
+    when not in dry-run mode.
+    """
+    import os
+
+    from src.agents.research_agent import ResearchAgent
+    from src.agents.content_generation_agent import ContentGenerationAgent
+    from src.agents.publishing_agent import PublishingAgent
+    from src.agents.analytics_agent import AnalyticsAgent
+    from src.agents.health_monitor_agent import HealthMonitorAgent
+    from src.agents.error_recovery_agent import ErrorRecoveryAgent
+
+    # Research agent config
+    research_config = {
+        **base_config,
+        "niches": ["tech accessories", "home office"],
+        "seed_keywords": ["wireless earbuds", "standing desk", "ergonomic keyboard"],
+        "max_keywords": 50,
+        "competitor_domains": [],
+        "research_depth": "normal",
+    }
+
+    # Content generation config (LLMTool reads keys from env)
+    content_config = {
+        **base_config,
+        "max_articles_per_run": 3,
+        "target_word_count": 1500,
+        "quality_threshold": 0.7,
+        "default_topics": ["best wireless earbuds 2026", "home office desk setup guide"],
+    }
+
+    # Publishing config (CMSTool reads keys from env)
+    publishing_config = {
+        **base_config,
+        "max_posts_per_day": 5,
+        "cadence_per_day": 3,
+        "cooldown_minutes": 0,
+        "target_site": os.environ.get("WP_STAGING_BASE_URL", "staging.example.com"),
+        "cms_api_base_url": os.environ.get(
+            "WP_STAGING_BASE_URL",
+            "http://localhost:8080/wp-json/wp/v2",
+        ),
+    }
+
+    # Analytics config
+    analytics_config = {
+        **base_config,
+        "sites": ["default"],
+    }
+
+    # Health monitor config
+    health_config = {
+        **base_config,
+    }
+
+    # Error recovery config
+    error_config = {
+        **base_config,
+    }
+
+    # Map pipeline names to agent sets
+    pipeline_agents: dict[str, list] = {
+        "": [  # all agents
+            ResearchAgent(config=research_config),
+            ContentGenerationAgent(config=content_config),
+            PublishingAgent(config=publishing_config),
+            AnalyticsAgent(config=analytics_config),
+            HealthMonitorAgent(config=health_config),
+            ErrorRecoveryAgent(config=error_config),
+        ],
+        "content": [
+            ResearchAgent(config=research_config),
+            ContentGenerationAgent(config=content_config),
+        ],
+        "publishing": [
+            PublishingAgent(config=publishing_config),
+        ],
+        "analytics": [
+            AnalyticsAgent(config=analytics_config),
+        ],
+    }
+
+    agents = pipeline_agents.get(pipeline_filter, pipeline_agents[""])
+    logger.info(
+        "Created %d REAL agent(s) for pipeline=%s",
+        len(agents),
+        pipeline_filter or "all",
+    )
+    return agents
+
+
+def _create_stub_agents(base_config: dict, pipeline_filter: str = "") -> list:
+    """Create lightweight stub agents that simulate the flow without real integrations."""
+    from src.agents.base_agent import BaseAgent
 
     class LocalResearchAgent(BaseAgent):
         def plan(self):
@@ -148,12 +260,9 @@ def _create_agents(dry_run: bool, pipeline_filter: str = ""):
             self._log_metric("revenue_usd", result.get("revenue", 0.0))
             return {"summary": f"Traffic: {result.get('pageviews', 0)} PV, {result.get('clicks', 0)} clicks, ${result.get('revenue', 0.0):.2f} revenue"}
 
-    # Build agent config with dry_run flag
-    base_config = {"enabled": True, "dry_run": dry_run, "risk_level": "low"}
-
     # Map pipeline names to agent sets
     pipeline_agents = {
-        "": [  # empty = all agents
+        "": [
             (AgentName.RESEARCH.value, LocalResearchAgent),
             (AgentName.CONTENT_GENERATION.value, LocalContentAgent),
             (AgentName.PUBLISHING.value, LocalPublishingAgent),
@@ -189,6 +298,7 @@ def main_loop(
     heartbeat_interval: int = DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
     pipeline: str = "",
     max_ticks: int = 0,
+    real_agents: bool = False,
 ) -> int:
     """Run the orchestrator controller's main loop.
 
@@ -197,6 +307,9 @@ def main_loop(
     max_ticks:
         If > 0, exit after this many ticks (useful for testing).
         0 means run forever until shutdown signal.
+    real_agents:
+        If True, use real agent classes with actual tool integrations.
+        If False (default), use lightweight stub agents.
     """
     from src.orchestrator.controller import OrchestratorController
 
@@ -211,7 +324,7 @@ def main_loop(
     controller = OrchestratorController(dry_run=dry_run)
 
     # Create and register agents
-    agents = _create_agents(dry_run=dry_run, pipeline_filter=pipeline)
+    agents = _create_agents(dry_run=dry_run, pipeline_filter=pipeline, real_agents=real_agents)
     for agent in agents:
         controller.register_agent(agent)
 
@@ -231,11 +344,12 @@ def main_loop(
     tick_count = 0
     agent_sequence = agent_names  # Run agents in registration order
 
+    agent_mode = "REAL" if real_agents else "STUB"
     print(f"\n{'='*60}")
     print(f"  {APP_NAME} v{APP_VERSION} -- Local Dev Mode")
     print(f"  Node role: {node_role.value}")
     print(f"  DRY_RUN: {dry_run}")
-    print(f"  Agents: {', '.join(agent_names)}")
+    print(f"  Agents: {agent_mode} ({', '.join(agent_names)})")
     print(f"  Heartbeat: {heartbeat_interval}s")
     if max_ticks:
         print(f"  Max ticks: {max_ticks}")
@@ -349,6 +463,10 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "--max-ticks", type=int, default=0,
         help="Exit after N ticks (0 = run forever). Useful for testing.",
     )
+    parser.add_argument(
+        "--real-agents", action="store_true", default=False,
+        help="Use real agent classes with actual tool integrations (LLM, CMS, etc.).",
+    )
     return parser
 
 
@@ -386,6 +504,7 @@ def main(argv: list[str] | None = None) -> NoReturn:
         heartbeat_interval=args.heartbeat_interval,
         pipeline=args.pipeline,
         max_ticks=args.max_ticks,
+        real_agents=args.real_agents,
     )
     sys.exit(exit_code)
 
