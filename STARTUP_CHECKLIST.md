@@ -33,6 +33,31 @@
 - [ ] Verify scheduler runs and enqueues jobs
 - [ ] Verify at least one agent completes a job
 
+## D2) Canary Publish (First-Time CMS Verification)
+
+Run this once after setting up WordPress staging credentials to prove the
+real CMS integration works end-to-end.
+
+**Prerequisites:**
+- [ ] `.env` has `ALLOW_PUBLISHING=true`
+- [ ] `.env` has `STAGING_ONLY=true`
+- [ ] `.env` has `WP_STAGING_BASE_URL=https://staging.yoursite.com`
+- [ ] `.env` has `WP_STAGING_USER=openclaw-publisher`
+- [ ] `.env` has `WP_STAGING_APP_PASSWORD=xxxx xxxx xxxx xxxx`
+- [ ] Kill switch is NOT engaged
+
+**Run canary:**
+```bash
+python -m src.cli publish-canary --staging --title "My First Canary Post"
+```
+
+**Verify:**
+- [ ] CLI prints SUCCESS with a post ID and URL
+- [ ] Log in to WP Admin -> Posts -> Drafts
+- [ ] Confirm the `[CANARY]` post appears as a draft
+- [ ] Confirm the post has: TLDR, comparison table, FAQ, internal links, verdict statements, FTC disclosure
+- [ ] Delete the canary draft after verification
+
 ## E) Daily Health Checks (10 min)
 - [ ] Disk space OK on SSD
 - [ ] Queue not stuck (depth not growing forever)

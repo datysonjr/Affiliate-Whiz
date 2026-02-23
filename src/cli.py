@@ -305,6 +305,35 @@ def cmd_kill_switch(args: argparse.Namespace) -> int:
 
 
 # =====================================================================
+# Subcommand: publish-canary
+# =====================================================================
+
+def cmd_publish_canary(args: argparse.Namespace) -> int:
+    """Publish a single canary draft to WordPress staging."""
+    from src.ops.canary_publish import run_canary_publish
+
+    print(f"\n  {APP_NAME} -- Canary Publish\n")
+    print(f"  Title:   {args.title}")
+    print(f"  Target:  WordPress staging (draft)")
+    print()
+
+    try:
+        result = run_canary_publish(staging=args.staging, title=args.title)
+    except Exception as exc:
+        print(f"  FAILED: {exc}\n")
+        logger.error("Canary publish failed: %s", exc)
+        return 1
+
+    print(f"  SUCCESS!")
+    print(f"  Post ID:  {result.get('post_id', 'N/A')}")
+    print(f"  URL:      {result.get('url', 'N/A')}")
+    print(f"  Status:   {result.get('status', 'N/A')}")
+    print(f"  Words:    {result.get('word_count', 'N/A')}")
+    print(f"\n  Check WP Admin -> Posts -> Drafts to verify.\n")
+    return 0
+
+
+# =====================================================================
 # Parser construction
 # =====================================================================
 
@@ -341,6 +370,22 @@ def build_parser() -> argparse.ArgumentParser:
     # -- health
     sp_health = subparsers.add_parser("health", help="Run system health checks.")
     sp_health.set_defaults(func=cmd_health)
+
+    # -- publish-canary
+    sp_canary = subparsers.add_parser(
+        "publish-canary",
+        help="Publish a single canary draft to WordPress staging to verify CMS integration.",
+    )
+    sp_canary.add_argument(
+        "--staging", action="store_true", default=True,
+        help="Target WordPress staging (default, required for canary).",
+    )
+    sp_canary.add_argument(
+        "--title", type=str,
+        default="Best Wireless Earbuds for Running 2025 — Honest Review",
+        help="Title for the canary article.",
+    )
+    sp_canary.set_defaults(func=cmd_publish_canary)
 
     # -- kill-switch
     sp_kill = subparsers.add_parser("kill-switch", help="Engage or disengage the kill switch.")
