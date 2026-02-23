@@ -237,6 +237,7 @@ class MailboxManager:
         mime = self._build_mime(message)
 
         try:
+            server: smtplib.SMTP | smtplib.SMTP_SSL
             if self._smtp_port == 465:
                 # Direct SSL connection
                 server = smtplib.SMTP_SSL(

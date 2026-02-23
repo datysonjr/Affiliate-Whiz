@@ -127,10 +127,10 @@ class Database:
             self._pool.clear()
 
         # Close the thread-local connection if present.
-        conn = getattr(self._local, "connection", None)
-        if conn is not None:
+        local_conn: sqlite3.Connection | None = getattr(self._local, "connection", None)
+        if local_conn is not None:
             try:
-                conn.close()
+                local_conn.close()
             except sqlite3.Error:
                 pass
             self._local.connection = None

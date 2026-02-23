@@ -304,7 +304,7 @@ def _create_stub_agents(base_config: dict, pipeline_filter: str = "") -> list:
             }
 
     # Map pipeline names to agent sets
-    pipeline_agents = {
+    pipeline_agents: dict[str, list[tuple[str, type[BaseAgent]]]] = {
         "": [
             (AgentName.RESEARCH.value, LocalResearchAgent),
             (AgentName.CONTENT_GENERATION.value, LocalContentAgent),

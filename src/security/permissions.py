@@ -368,8 +368,8 @@ class Permissions:
         result: Dict[str, List[str]] = {}
         for name, perms in BUILT_IN_ROLES.items():
             result[name] = sorted(perms)
-        for name, perms in self._custom_roles.items():
-            result[name] = sorted(perms)
+        for name, custom_perms in self._custom_roles.items():
+            result[name] = sorted(custom_perms)
         return result
 
     # ------------------------------------------------------------------

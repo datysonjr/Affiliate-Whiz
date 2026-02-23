@@ -136,12 +136,12 @@ class AnalyticsTool:
             # Parse patterns like "7d", "30d", "90d", "1y"
             if period.endswith("d") and period[:-1].isdigit():
                 days = int(period[:-1])
-                start = today - timedelta(days=days)
-                return start.isoformat(), today.isoformat()
+                start_date = today - timedelta(days=days)
+                return start_date.isoformat(), today.isoformat()
             if period.endswith("y") and period[:-1].isdigit():
                 years = int(period[:-1])
-                start = today.replace(year=today.year - years)
-                return start.isoformat(), today.isoformat()
+                start_date = today.replace(year=today.year - years)
+                return start_date.isoformat(), today.isoformat()
 
         raise ValueError(f"Unrecognized period format: {period!r}")
 
