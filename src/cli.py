@@ -100,10 +100,16 @@ def cmd_run(args: argparse.Namespace) -> int:
     dry_run = args.dry_run
     pipeline = args.pipeline or ""
     ticks = args.ticks
+    real_agents = args.real_agents
 
     if not dry_run:
         print("\n  WARNING: Running in LIVE mode. Real API calls will be made.")
         print("  Use --dry-run for safe testing.\n")
+
+    if real_agents:
+        print("  Using REAL agents (LLMTool, CMSTool, etc.)")
+    else:
+        print("  Using STUB agents (no real API calls)")
 
     install_signal_handlers()
 
@@ -118,6 +124,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         heartbeat_interval=args.interval,
         pipeline=pipeline,
         max_ticks=ticks,
+        real_agents=real_agents,
     )
     return exit_code
 
@@ -324,6 +331,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp_run.add_argument("--pipeline", type=str, default="", choices=["", "content", "publishing", "analytics"], help="Run only a specific pipeline.")
     sp_run.add_argument("--ticks", type=int, default=1, help="Number of scheduler ticks to run (default: 1).")
     sp_run.add_argument("--interval", type=int, default=5, help="Seconds between ticks (default: 5).")
+    sp_run.add_argument("--real-agents", action="store_true", default=False, help="Use real agent classes with actual tool integrations (LLM, CMS, etc.).")
     sp_run.set_defaults(func=cmd_run)
 
     # -- status

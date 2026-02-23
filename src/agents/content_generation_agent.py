@@ -378,14 +378,38 @@ class ContentGenerationAgent(BaseAgent):
         return report_data
 
     # ------------------------------------------------------------------
+    # LLM Tool integration
+    # ------------------------------------------------------------------
+
+    def _get_llm_tool(self):
+        """Lazily initialize and return an LLMTool reading config from env."""
+        if not hasattr(self, "_llm_tool") or self._llm_tool is None:
+            import os
+            from src.agents.tools.llm_tool import LLMTool
+            provider = os.environ.get("LLM_PROVIDER", "anthropic")
+            self._llm_tool = LLMTool({
+                "primary_provider": provider,
+                "primary_model": os.environ.get("LLM_MODEL_DEFAULT", "claude-sonnet-4-20250514"),
+                "primary_api_key": os.environ.get("LLM_API_KEY", ""),
+                "fallback_provider": "openai" if provider != "openai" else None,
+                "fallback_model": "gpt-4o",
+                "fallback_api_key": os.environ.get("OPENAI_API_KEY", ""),
+                "default_max_tokens": 4096,
+                "temperature": 0.7,
+                "retry_attempts": 2,
+                "retry_delay": 1.0,
+            })
+        return self._llm_tool
+
+    # ------------------------------------------------------------------
     # Pipeline stages
     # ------------------------------------------------------------------
 
     def _generate_outline(self, brief: ContentBrief) -> ContentOutline:
         """Generate a structured outline from a content brief.
 
-        In production this calls the LLM tool.  The scaffold returns a
-        template outline.
+        Uses LLMTool when an API key is configured and not in dry-run mode.
+        Falls back to a template outline otherwise.
 
         Parameters:
             brief: The content brief to outline.
@@ -395,6 +419,18 @@ class ContentGenerationAgent(BaseAgent):
         """
         self.logger.debug("Generating outline for brief %s", brief.brief_id)
 
+        # Try LLM-generated outline if not dry-run and API key is set
+        import os
+        if not self._dry_run and os.environ.get("LLM_API_KEY"):
+            try:
+                return self._generate_outline_with_llm(brief)
+            except Exception as exc:
+                self.logger.warning(
+                    "LLM outline generation failed for %s, using template: %s",
+                    brief.brief_id, exc,
+                )
+
+        # Template fallback
         sections = [
             {"heading": f"Introduction to {brief.primary_keyword}", "notes": "Hook and overview"},
             {"heading": f"What is {brief.primary_keyword}?", "notes": "Definition and context"},
@@ -421,11 +457,45 @@ class ContentGenerationAgent(BaseAgent):
             faq=faq,
         )
 
+    def _generate_outline_with_llm(self, brief: ContentBrief) -> ContentOutline:
+        """Generate an outline using the LLM tool."""
+        import json
+
+        llm = self._get_llm_tool()
+        prompt = (
+            f"Create an SEO-optimized article outline for the keyword: '{brief.primary_keyword}'\n"
+            f"Content type: {brief.content_type.value}\n"
+            f"Target word count: {brief.target_word_count}\n\n"
+            "Return a JSON object with:\n"
+            '- "title": SEO-optimized H1 title\n'
+            '- "meta_desc": meta description (150-160 chars)\n'
+            '- "sections": array of {"heading": "...", "notes": "..."}\n'
+            '- "faq": array of {"question": "...", "answer": ""}\n\n'
+            "Include at least 5 sections. Include a TLDR/Quick Answer section near the top, "
+            "a comparison section, and an FAQ section. Return ONLY valid JSON."
+        )
+
+        raw = llm.generate(prompt, max_tokens=2048)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1]
+        if raw.endswith("```"):
+            raw = raw.rsplit("```", 1)[0]
+        raw = raw.strip()
+
+        data = json.loads(raw)
+        return ContentOutline(
+            title=data.get("title", f"Best {brief.primary_keyword.title()} Guide"),
+            meta_desc=data.get("meta_desc", ""),
+            sections=data.get("sections", []),
+            faq=data.get("faq", []),
+        )
+
     def _generate_draft(self, brief: ContentBrief, outline: ContentOutline) -> ContentDraft:
         """Produce a full article draft from the outline.
 
-        In production this calls the LLM tool with the outline as context.
-        The scaffold produces a minimal placeholder.
+        Uses LLMTool when an API key is configured and not in dry-run mode.
+        Falls back to placeholder HTML otherwise.
 
         Parameters:
             brief:   The content brief.
@@ -436,7 +506,18 @@ class ContentGenerationAgent(BaseAgent):
         """
         self.logger.debug("Generating draft for brief %s", brief.brief_id)
 
-        # Build placeholder HTML from outline sections
+        # Try LLM-generated draft if not dry-run and API key is set
+        import os
+        if not self._dry_run and os.environ.get("LLM_API_KEY"):
+            try:
+                return self._generate_draft_with_llm(brief, outline)
+            except Exception as exc:
+                self.logger.warning(
+                    "LLM draft generation failed for %s, using placeholder: %s",
+                    brief.brief_id, exc,
+                )
+
+        # Placeholder fallback
         html_parts = [f"<h1>{outline.title}</h1>"]
         for section in outline.sections:
             html_parts.append(f'<h2>{section["heading"]}</h2>')
@@ -449,6 +530,58 @@ class ContentGenerationAgent(BaseAgent):
                 html_parts.append(f'<p>{item.get("answer", "[Answer pending]")}</p>')
 
         html_body = "\n".join(html_parts)
+        word_count = len(html_body.split())
+
+        return ContentDraft(
+            brief_id=brief.brief_id,
+            outline=outline,
+            html_body=html_body,
+            word_count=word_count,
+        )
+
+    def _generate_draft_with_llm(self, brief: ContentBrief, outline: ContentOutline) -> ContentDraft:
+        """Generate a full article draft using the LLM tool."""
+        import json
+
+        llm = self._get_llm_tool()
+
+        sections_str = "\n".join(
+            f'- {s["heading"]}: {s.get("notes", "")}'
+            for s in outline.sections
+        )
+        faq_str = "\n".join(
+            f'- {q["question"]}' for q in outline.faq
+        ) if outline.faq else "None"
+
+        prompt = (
+            f"Write a full SEO-optimized affiliate article in HTML format.\n\n"
+            f"Title: {outline.title}\n"
+            f"Primary keyword: {brief.primary_keyword}\n"
+            f"Secondary keywords: {', '.join(brief.secondary_keywords) if brief.secondary_keywords else 'none'}\n"
+            f"Target word count: {brief.target_word_count}\n\n"
+            f"Outline sections:\n{sections_str}\n\n"
+            f"FAQ questions:\n{faq_str}\n\n"
+            "REQUIREMENTS:\n"
+            "- Start with a TLDR/Quick Answer block within the first 200 words\n"
+            "- Include a comparison table (HTML <table>) for product recommendations\n"
+            "- Include an FAQ section with proper <h3> headings for each question\n"
+            "- Include at least 3 verdict statements (e.g. 'We recommend...', 'Our top pick is...')\n"
+            "- Include an FTC affiliate disclosure near the top\n"
+            "- Use proper HTML: <h1>, <h2>, <h3>, <p>, <table>, <ul>, <li> tags\n"
+            "- Do NOT include <html>, <head>, or <body> wrapper tags\n"
+            "- Write naturally, not robotic. Be helpful and authoritative.\n"
+        )
+
+        html_body = llm.generate(prompt, max_tokens=4096)
+
+        # Strip markdown code fences if model wrapped output
+        html_body = html_body.strip()
+        if html_body.startswith("```"):
+            html_body = html_body.split("\n", 1)[-1]
+        if html_body.endswith("```"):
+            html_body = html_body.rsplit("```", 1)[0]
+        html_body = html_body.strip()
+
         word_count = len(html_body.split())
 
         return ContentDraft(

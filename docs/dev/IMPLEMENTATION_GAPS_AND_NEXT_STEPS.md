@@ -4,8 +4,11 @@ Purpose: Track what is stubbed vs implemented, and define the shortest path to a
 
 ## Status Summary
 
-The repo is architecturally complete, but several integrations were stubs. This document
-tracks P0-P2 gaps and their resolution status.
+The repo is architecturally complete. Core P0 integrations (LLMTool, CMSTool) are
+implemented and wired into both the pipeline layer and the real agent layer.
+The `--real-agents` flag enables switching from stub agents to real execution.
+
+See also: `docs/dev/BREAKPOINTS_AUDIT.md` and `docs/dev/RUN_PATHS.md`.
 
 ## P0 — Required to run end-to-end (MVP)
 
