@@ -22,7 +22,7 @@ class LLMTool:
 
     Config keys:
         primary_provider (str): Name of the primary LLM provider
-            (e.g. "openai", "anthropic", "local").
+            (e.g. "openai", "anthropic").
         primary_model (str): Model identifier for the primary provider.
         primary_api_key (str): API key for the primary provider.
         primary_base_url (str, optional): Custom API base URL for the primary provider.
@@ -37,18 +37,14 @@ class LLMTool:
         retry_delay (float): Delay between retries in seconds (default 1.0).
     """
 
-    def __init__(self, config: dict[str, Any]) -> None:
-        """Initialize the LLM tool with provider configuration.
+    SUPPORTED_PROVIDERS = ("anthropic", "openai")
 
-        Args:
-            config: Dictionary containing provider settings, API keys, and
-                generation defaults. See class docstring for supported keys.
-        """
+    def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
 
         # Primary provider settings
-        self.primary_provider: str = config.get("primary_provider", "openai")
-        self.primary_model: str = config.get("primary_model", "gpt-4")
+        self.primary_provider: str = config.get("primary_provider", "anthropic")
+        self.primary_model: str = config.get("primary_model", "claude-sonnet-4-20250514")
         self.primary_api_key: str = config.get("primary_api_key", "")
         self.primary_base_url: Optional[str] = config.get("primary_base_url")
 
@@ -88,15 +84,6 @@ class LLMTool:
     # ------------------------------------------------------------------
 
     def _get_primary_client(self) -> Any:
-        """Lazily initialize and return the primary provider client.
-
-        Returns:
-            The initialized client for the primary LLM provider.
-
-        Raises:
-            ConnectionError: If the primary provider cannot be reached.
-            ValueError: If the provider name is not recognized.
-        """
         if self._primary_client is None:
             self._primary_client = self._init_client(
                 provider=self.primary_provider,
@@ -107,16 +94,6 @@ class LLMTool:
         return self._primary_client
 
     def _get_fallback_client(self) -> Any:
-        """Lazily initialize and return the fallback provider client.
-
-        Returns:
-            The initialized client for the fallback LLM provider, or None
-            if no fallback is configured.
-
-        Raises:
-            ConnectionError: If the fallback provider cannot be reached.
-            ValueError: If the provider name is not recognized.
-        """
         if self._fallback_client is None and self.fallback_provider:
             self._fallback_client = self._init_client(
                 provider=self.fallback_provider,
@@ -136,7 +113,7 @@ class LLMTool:
         """Initialize an LLM provider client.
 
         Args:
-            provider: Provider name (e.g. "openai", "anthropic", "local").
+            provider: Provider name ("openai" or "anthropic").
             model: Model identifier string.
             api_key: Authentication key for the provider API.
             base_url: Optional custom base URL for the API.
@@ -146,22 +123,123 @@ class LLMTool:
 
         Raises:
             ValueError: If the provider is not supported.
-            ConnectionError: If the provider API cannot be reached.
         """
         logger.debug("Initializing %s client for model %s", provider, model)
-        # TODO: Implement provider-specific client initialization
-        # Example:
-        #   if provider == "openai":
-        #       import openai
-        #       return openai.OpenAI(api_key=api_key, base_url=base_url)
-        #   elif provider == "anthropic":
-        #       import anthropic
-        #       return anthropic.Anthropic(api_key=api_key)
-        raise NotImplementedError(f"Provider '{provider}' client initialization not yet implemented")
+
+        if provider == "anthropic":
+            import anthropic
+            kwargs: dict[str, Any] = {"api_key": api_key}
+            if base_url:
+                kwargs["base_url"] = base_url
+            return anthropic.Anthropic(**kwargs)
+
+        if provider == "openai":
+            import openai
+            kwargs = {"api_key": api_key}
+            if base_url:
+                kwargs["base_url"] = base_url
+            return openai.OpenAI(**kwargs)
+
+        raise ValueError(
+            f"Unsupported provider '{provider}'. Supported: {self.SUPPORTED_PROVIDERS}"
+        )
 
     # ------------------------------------------------------------------
     # Internal request handling
     # ------------------------------------------------------------------
+
+    def _call_anthropic(
+        self,
+        client: Any,
+        model: str,
+        messages: list[dict[str, str]],
+        max_tokens: int,
+        temperature: float,
+    ) -> dict[str, Any]:
+        """Send a request to the Anthropic Messages API."""
+        system_msg = ""
+        api_messages = []
+        for msg in messages:
+            if msg["role"] == "system":
+                system_msg = msg["content"]
+            else:
+                api_messages.append(msg)
+
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": api_messages,
+        }
+        if system_msg:
+            kwargs["system"] = system_msg
+
+        response = client.messages.create(**kwargs)
+
+        content = ""
+        if response.content:
+            content = response.content[0].text
+
+        prompt_tokens = getattr(response.usage, "input_tokens", 0)
+        completion_tokens = getattr(response.usage, "output_tokens", 0)
+
+        return {
+            "content": content,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "provider": "anthropic",
+            "model": model,
+        }
+
+    def _call_openai(
+        self,
+        client: Any,
+        model: str,
+        messages: list[dict[str, str]],
+        max_tokens: int,
+        temperature: float,
+    ) -> dict[str, Any]:
+        """Send a request to the OpenAI Chat Completions API."""
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+
+        content = ""
+        if response.choices:
+            content = response.choices[0].message.content or ""
+
+        prompt_tokens = 0
+        completion_tokens = 0
+        if response.usage:
+            prompt_tokens = response.usage.prompt_tokens or 0
+            completion_tokens = response.usage.completion_tokens or 0
+
+        return {
+            "content": content,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "provider": "openai",
+            "model": model,
+        }
+
+    def _dispatch_call(
+        self,
+        provider: str,
+        client: Any,
+        model: str,
+        messages: list[dict[str, str]],
+        max_tokens: int,
+        temperature: float,
+    ) -> dict[str, Any]:
+        """Dispatch an API call to the correct provider handler."""
+        if provider == "anthropic":
+            return self._call_anthropic(client, model, messages, max_tokens, temperature)
+        if provider == "openai":
+            return self._call_openai(client, model, messages, max_tokens, temperature)
+        raise ValueError(f"Cannot dispatch to unknown provider: {provider}")
 
     def _call_provider(
         self,
@@ -170,25 +248,16 @@ class LLMTool:
         temperature: Optional[float] = None,
         provider_override: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Send a request to an LLM provider and return the raw response.
-
-        Handles retry logic and automatic fallback to the secondary provider
-        when the primary is unavailable.
+        """Send a request to an LLM provider with retry + fallback.
 
         Args:
             messages: List of message dicts with "role" and "content" keys.
             max_tokens: Maximum number of tokens to generate.
-            temperature: Sampling temperature override. Uses instance default
-                if not supplied.
-            provider_override: Force a specific provider ("primary" or "fallback").
+            temperature: Sampling temperature override.
+            provider_override: Force "primary" or "fallback".
 
         Returns:
-            Dict with keys:
-                - "content" (str): The generated text.
-                - "prompt_tokens" (int): Tokens used by the prompt.
-                - "completion_tokens" (int): Tokens used by the completion.
-                - "provider" (str): Which provider handled the request.
-                - "model" (str): Which model was used.
+            Normalized response dict with content, token counts, provider, model.
 
         Raises:
             RuntimeError: If all providers fail after exhausting retries.
@@ -206,8 +275,15 @@ class LLMTool:
                         self.retry_attempts,
                     )
                     self._total_requests += 1
-                    # TODO: Implement actual API call to primary provider
-                    raise NotImplementedError("Primary provider call not yet implemented")
+                    client = self._get_primary_client()
+                    return self._dispatch_call(
+                        self.primary_provider,
+                        client,
+                        self.primary_model,
+                        messages,
+                        max_tokens,
+                        temperature,
+                    )
                 except Exception as exc:
                     last_error = exc
                     logger.warning(
@@ -222,8 +298,15 @@ class LLMTool:
                 logger.info("Falling back to %s", self.fallback_provider)
                 self._fallback_requests += 1
                 self._total_requests += 1
-                # TODO: Implement actual API call to fallback provider
-                raise NotImplementedError("Fallback provider call not yet implemented")
+                client = self._get_fallback_client()
+                return self._dispatch_call(
+                    self.fallback_provider,
+                    client,
+                    self.fallback_model or "",
+                    messages,
+                    max_tokens,
+                    temperature,
+                )
             except Exception as exc:
                 last_error = exc
                 logger.error("Fallback provider also failed: %s", exc)
@@ -234,12 +317,6 @@ class LLMTool:
         )
 
     def _track_usage(self, prompt_tokens: int, completion_tokens: int) -> None:
-        """Record token usage from a completed request.
-
-        Args:
-            prompt_tokens: Number of tokens consumed by the prompt.
-            completion_tokens: Number of tokens generated in the completion.
-        """
         self._total_prompt_tokens += prompt_tokens
         self._total_completion_tokens += completion_tokens
         logger.debug(
@@ -254,18 +331,14 @@ class LLMTool:
     # ------------------------------------------------------------------
 
     def generate(self, prompt: str, max_tokens: Optional[int] = None) -> str:
-        """Generate text from a prompt using the configured LLM provider.
-
-        This is the fundamental generation method. All other public methods
-        delegate to this after constructing an appropriate prompt.
+        """Generate text from a single prompt string.
 
         Args:
-            prompt: The input text / instruction to send to the model.
-            max_tokens: Maximum tokens to generate. Falls back to
-                ``default_max_tokens`` if not provided.
+            prompt: The input text / instruction.
+            max_tokens: Max tokens to generate (defaults to default_max_tokens).
 
         Returns:
-            The generated text string.
+            The generated text.
 
         Raises:
             RuntimeError: If all providers fail.
@@ -287,20 +360,34 @@ class LLMTool:
         self._track_usage(response["prompt_tokens"], response["completion_tokens"])
         return response["content"]
 
-    def summarize(self, text: str, max_length: Optional[int] = None) -> str:
-        """Produce a concise summary of the provided text.
+    def generate_messages(
+        self,
+        messages: list[dict[str, str]],
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Generate text from a full message list (multi-turn / system messages).
 
         Args:
-            text: The source text to summarize.
-            max_length: Optional hint for the desired summary length in tokens.
+            messages: List of message dicts with "role" and "content" keys.
+            max_tokens: Max tokens to generate.
 
         Returns:
-            A summarized version of the input text.
+            The generated text.
 
         Raises:
             RuntimeError: If all providers fail.
-            ValueError: If text is empty.
+            ValueError: If messages list is empty.
         """
+        if not messages:
+            raise ValueError("Messages list must not be empty")
+
+        effective_max_tokens = max_tokens or self.default_max_tokens
+        response = self._call_provider(messages, max_tokens=effective_max_tokens)
+        self._track_usage(response["prompt_tokens"], response["completion_tokens"])
+        return response["content"]
+
+    def summarize(self, text: str, max_length: Optional[int] = None) -> str:
+        """Produce a concise summary of the provided text."""
         if not text or not text.strip():
             raise ValueError("Text to summarize must not be empty")
 
@@ -317,20 +404,7 @@ class LLMTool:
         return self.generate(prompt, max_tokens=token_budget)
 
     def classify(self, text: str, labels: list[str]) -> str:
-        """Classify text into one of the provided labels.
-
-        Args:
-            text: The text to classify.
-            labels: A list of candidate label strings. The model must choose
-                exactly one.
-
-        Returns:
-            The selected label string (guaranteed to be one of ``labels``).
-
-        Raises:
-            RuntimeError: If all providers fail.
-            ValueError: If text or labels are empty.
-        """
+        """Classify text into one of the provided labels."""
         if not text or not text.strip():
             raise ValueError("Text to classify must not be empty")
         if not labels:
@@ -351,13 +425,11 @@ class LLMTool:
 
         result = self.generate(prompt, max_tokens=64).strip().strip('"')
 
-        # Attempt to match the model output to the closest provided label
         result_lower = result.lower()
         for label in labels:
             if label.lower() == result_lower:
                 return label
 
-        # Fuzzy fallback: return the raw result if no exact match
         logger.warning(
             "Model returned '%s' which is not an exact label match; "
             "returning raw output",
@@ -366,27 +438,7 @@ class LLMTool:
         return result
 
     def extract(self, text: str, schema: dict[str, Any]) -> dict[str, Any]:
-        """Extract structured data from text according to a provided schema.
-
-        Args:
-            text: The source text containing the information to extract.
-            schema: A dictionary describing the desired output fields and
-                their types / descriptions. Example::
-
-                    {
-                        "product_name": "string - the name of the product",
-                        "price": "float - the price in USD",
-                        "features": "list[str] - key product features",
-                    }
-
-        Returns:
-            A dictionary matching the provided schema with values populated
-            from the text. Missing values will be ``None``.
-
-        Raises:
-            RuntimeError: If all providers fail.
-            ValueError: If text or schema are empty.
-        """
+        """Extract structured data from text according to a provided schema."""
         if not text or not text.strip():
             raise ValueError("Text to extract from must not be empty")
         if not schema:
@@ -424,7 +476,6 @@ class LLMTool:
             extracted: dict[str, Any] = json.loads(raw)
         except json.JSONDecodeError as exc:
             logger.error("Failed to parse extraction result as JSON: %s", exc)
-            # Return schema keys with None values as a safe fallback
             extracted = {key: None for key in schema}
 
         return extracted
@@ -434,17 +485,6 @@ class LLMTool:
     # ------------------------------------------------------------------
 
     def get_usage_stats(self) -> dict[str, Any]:
-        """Return cumulative token usage and request statistics.
-
-        Returns:
-            Dict containing:
-                - total_prompt_tokens (int)
-                - total_completion_tokens (int)
-                - total_tokens (int)
-                - total_requests (int)
-                - failed_requests (int)
-                - fallback_requests (int)
-        """
         return {
             "total_prompt_tokens": self._total_prompt_tokens,
             "total_completion_tokens": self._total_completion_tokens,
@@ -455,7 +495,6 @@ class LLMTool:
         }
 
     def reset_usage_stats(self) -> None:
-        """Reset all accumulated usage counters to zero."""
         self._total_prompt_tokens = 0
         self._total_completion_tokens = 0
         self._total_requests = 0
