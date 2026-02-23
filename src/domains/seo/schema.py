@@ -33,6 +33,7 @@ logger = get_logger("seo.schema")
 # Helper data classes for structured inputs
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SchemaAuthor:
     """Author information for schema markup.
@@ -143,6 +144,7 @@ class BreadcrumbItem:
 # ---------------------------------------------------------------------------
 # Schema generators
 # ---------------------------------------------------------------------------
+
 
 def generate_article_schema(
     *,
@@ -410,14 +412,16 @@ def generate_faq_schema(
         if not question or not answer:
             continue
 
-        main_entity.append({
-            "@type": "Question",
-            "name": question,
-            "acceptedAnswer": {
-                "@type": "Answer",
-                "text": answer,
-            },
-        })
+        main_entity.append(
+            {
+                "@type": "Question",
+                "name": question,
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": answer,
+                },
+            }
+        )
 
     schema: Dict[str, Any] = {
         "@context": "https://schema.org",
@@ -456,12 +460,14 @@ def generate_breadcrumb_schema(
     elements: List[Dict[str, Any]] = []
 
     for item in items:
-        elements.append({
-            "@type": "ListItem",
-            "position": item.position,
-            "name": item.name,
-            "item": item.url,
-        })
+        elements.append(
+            {
+                "@type": "ListItem",
+                "position": item.position,
+                "name": item.name,
+                "item": item.url,
+            }
+        )
 
     schema: Dict[str, Any] = {
         "@context": "https://schema.org",
@@ -476,6 +482,7 @@ def generate_breadcrumb_schema(
 # ---------------------------------------------------------------------------
 # Serialisation utility
 # ---------------------------------------------------------------------------
+
 
 def schema_to_html(schema: Dict[str, Any]) -> str:
     """Wrap a JSON-LD schema dict in an HTML ``<script>`` tag.

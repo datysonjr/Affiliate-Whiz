@@ -327,9 +327,7 @@ class Vault:
             return f.encrypt(plaintext)
         else:
             # XOR fallback (not cryptographically secure)
-            key_bytes = hashlib.sha256(
-                self._master_key.encode("utf-8")
-            ).digest()
+            key_bytes = hashlib.sha256(self._master_key.encode("utf-8")).digest()
             encrypted = _xor_encrypt(plaintext, key_bytes)
             return base64.b64encode(encrypted)
 
@@ -348,9 +346,7 @@ class Vault:
                     cause=exc,
                 ) from exc
         else:
-            key_bytes = hashlib.sha256(
-                self._master_key.encode("utf-8")
-            ).digest()
+            key_bytes = hashlib.sha256(self._master_key.encode("utf-8")).digest()
             try:
                 raw = base64.b64decode(ciphertext)
                 return _xor_decrypt(raw, key_bytes)
@@ -398,7 +394,9 @@ class Vault:
                 cause=exc,
             ) from exc
 
-        log_event(logger, "vault.loaded", path=self._vault_path, keys=len(self._secrets))
+        log_event(
+            logger, "vault.loaded", path=self._vault_path, keys=len(self._secrets)
+        )
 
     # ------------------------------------------------------------------
     # Dunder helpers

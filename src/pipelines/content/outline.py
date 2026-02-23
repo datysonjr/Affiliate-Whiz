@@ -33,6 +33,7 @@ logger = get_logger("pipelines.content.outline")
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SectionPlan:
     """Blueprint for a single section within the article outline.
@@ -109,41 +110,149 @@ class ContentOutline:
 
 _SECTION_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
     "review": [
-        {"heading": "Overview", "purpose": "High-level product summary and first impressions", "target_words": 200},
-        {"heading": "Key Features", "purpose": "Detailed walkthrough of standout features", "target_words": 300},
-        {"heading": "Pros and Cons", "purpose": "Balanced assessment of strengths and weaknesses", "target_words": 200},
-        {"heading": "Pricing and Value", "purpose": "Cost analysis relative to alternatives", "target_words": 200},
-        {"heading": "Who Is It Best For?", "purpose": "Target audience and use-case fit", "target_words": 150},
-        {"heading": "Verdict", "purpose": "Final recommendation with CTA", "target_words": 150},
+        {
+            "heading": "Overview",
+            "purpose": "High-level product summary and first impressions",
+            "target_words": 200,
+        },
+        {
+            "heading": "Key Features",
+            "purpose": "Detailed walkthrough of standout features",
+            "target_words": 300,
+        },
+        {
+            "heading": "Pros and Cons",
+            "purpose": "Balanced assessment of strengths and weaknesses",
+            "target_words": 200,
+        },
+        {
+            "heading": "Pricing and Value",
+            "purpose": "Cost analysis relative to alternatives",
+            "target_words": 200,
+        },
+        {
+            "heading": "Who Is It Best For?",
+            "purpose": "Target audience and use-case fit",
+            "target_words": 150,
+        },
+        {
+            "heading": "Verdict",
+            "purpose": "Final recommendation with CTA",
+            "target_words": 150,
+        },
     ],
     "comparison": [
-        {"heading": "Quick Comparison", "purpose": "Side-by-side summary table of key specs", "target_words": 150},
-        {"heading": "Product A Overview", "purpose": "First product deep-dive", "target_words": 250},
-        {"heading": "Product B Overview", "purpose": "Second product deep-dive", "target_words": 250},
-        {"heading": "Feature-by-Feature Comparison", "purpose": "Detailed attribute comparison", "target_words": 300},
-        {"heading": "Pricing Breakdown", "purpose": "Cost comparison and value analysis", "target_words": 200},
-        {"heading": "Which Should You Choose?", "purpose": "Conditional recommendation", "target_words": 150},
+        {
+            "heading": "Quick Comparison",
+            "purpose": "Side-by-side summary table of key specs",
+            "target_words": 150,
+        },
+        {
+            "heading": "Product A Overview",
+            "purpose": "First product deep-dive",
+            "target_words": 250,
+        },
+        {
+            "heading": "Product B Overview",
+            "purpose": "Second product deep-dive",
+            "target_words": 250,
+        },
+        {
+            "heading": "Feature-by-Feature Comparison",
+            "purpose": "Detailed attribute comparison",
+            "target_words": 300,
+        },
+        {
+            "heading": "Pricing Breakdown",
+            "purpose": "Cost comparison and value analysis",
+            "target_words": 200,
+        },
+        {
+            "heading": "Which Should You Choose?",
+            "purpose": "Conditional recommendation",
+            "target_words": 150,
+        },
     ],
     "roundup": [
-        {"heading": "Our Top Picks at a Glance", "purpose": "Summary of all recommendations", "target_words": 200},
-        {"heading": "How We Evaluated", "purpose": "Methodology and selection criteria", "target_words": 150},
-        {"heading": "Detailed Reviews", "purpose": "Individual mini-reviews for each pick", "target_words": 400},
-        {"heading": "Buying Guide", "purpose": "What to look for when choosing", "target_words": 250},
-        {"heading": "Frequently Asked Questions", "purpose": "Common buyer questions", "target_words": 200},
+        {
+            "heading": "Our Top Picks at a Glance",
+            "purpose": "Summary of all recommendations",
+            "target_words": 200,
+        },
+        {
+            "heading": "How We Evaluated",
+            "purpose": "Methodology and selection criteria",
+            "target_words": 150,
+        },
+        {
+            "heading": "Detailed Reviews",
+            "purpose": "Individual mini-reviews for each pick",
+            "target_words": 400,
+        },
+        {
+            "heading": "Buying Guide",
+            "purpose": "What to look for when choosing",
+            "target_words": 250,
+        },
+        {
+            "heading": "Frequently Asked Questions",
+            "purpose": "Common buyer questions",
+            "target_words": 200,
+        },
     ],
     "how_to": [
-        {"heading": "What You Will Need", "purpose": "Prerequisites and tools required", "target_words": 150},
-        {"heading": "Step-by-Step Guide", "purpose": "Detailed walkthrough with numbered steps", "target_words": 400},
-        {"heading": "Tips for Best Results", "purpose": "Pro tips and common mistakes to avoid", "target_words": 200},
-        {"heading": "Recommended Products", "purpose": "Product recommendations with affiliate links", "target_words": 250},
-        {"heading": "Frequently Asked Questions", "purpose": "Common questions about the process", "target_words": 150},
+        {
+            "heading": "What You Will Need",
+            "purpose": "Prerequisites and tools required",
+            "target_words": 150,
+        },
+        {
+            "heading": "Step-by-Step Guide",
+            "purpose": "Detailed walkthrough with numbered steps",
+            "target_words": 400,
+        },
+        {
+            "heading": "Tips for Best Results",
+            "purpose": "Pro tips and common mistakes to avoid",
+            "target_words": 200,
+        },
+        {
+            "heading": "Recommended Products",
+            "purpose": "Product recommendations with affiliate links",
+            "target_words": 250,
+        },
+        {
+            "heading": "Frequently Asked Questions",
+            "purpose": "Common questions about the process",
+            "target_words": 150,
+        },
     ],
     "buying_guide": [
-        {"heading": "What to Look For", "purpose": "Key factors to consider before buying", "target_words": 300},
-        {"heading": "Top Recommendations", "purpose": "Curated picks across budget ranges", "target_words": 350},
-        {"heading": "Feature Deep Dive", "purpose": "Technical features explained simply", "target_words": 250},
-        {"heading": "Budget Considerations", "purpose": "Price tiers and value analysis", "target_words": 200},
-        {"heading": "Final Thoughts", "purpose": "Summary recommendation and next steps", "target_words": 150},
+        {
+            "heading": "What to Look For",
+            "purpose": "Key factors to consider before buying",
+            "target_words": 300,
+        },
+        {
+            "heading": "Top Recommendations",
+            "purpose": "Curated picks across budget ranges",
+            "target_words": 350,
+        },
+        {
+            "heading": "Feature Deep Dive",
+            "purpose": "Technical features explained simply",
+            "target_words": 250,
+        },
+        {
+            "heading": "Budget Considerations",
+            "purpose": "Price tiers and value analysis",
+            "target_words": 200,
+        },
+        {
+            "heading": "Final Thoughts",
+            "purpose": "Summary recommendation and next steps",
+            "target_words": 150,
+        },
     ],
 }
 
@@ -151,6 +260,7 @@ _SECTION_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
 # ---------------------------------------------------------------------------
 # Core functions
 # ---------------------------------------------------------------------------
+
 
 def create_heading_structure(
     content_type: str,
@@ -198,7 +308,11 @@ def create_heading_structure(
     for entry in template[:max_sections]:
         heading = entry["heading"]
         # Inject keyword into the first heading if it reads naturally
-        if primary_keyword and sections == [] and primary_keyword.lower() not in heading.lower():
+        if (
+            primary_keyword
+            and sections == []
+            and primary_keyword.lower() not in heading.lower()
+        ):
             heading = f"{heading}: {primary_keyword}"
 
         sections.append(
@@ -262,7 +376,9 @@ def plan_sections(
     for idx, section in enumerate(sections):
         # Enrich purpose with offer context
         if merchant and product_name:
-            section.notes = f"Focus on {product_name} by {merchant} in the {category} space."
+            section.notes = (
+                f"Focus on {product_name} by {merchant} in the {category} space."
+            )
 
         # Distribute secondary keywords round-robin
         if secondary:

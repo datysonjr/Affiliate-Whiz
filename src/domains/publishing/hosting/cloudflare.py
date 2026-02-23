@@ -43,6 +43,7 @@ _BASE_URL = "https://api.cloudflare.com/client/v4"
 # Data containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CloudflareDeployment:
     """A single Cloudflare Pages deployment record.
@@ -150,6 +151,7 @@ class CachePurgeResult:
 # CloudflareHosting client
 # ---------------------------------------------------------------------------
 
+
 class CloudflareHosting:
     """Client for managing hosting via the Cloudflare API v4.
 
@@ -206,14 +208,18 @@ class CloudflareHosting:
         self.logger: logging.Logger = get_logger("publishing.hosting.cloudflare")
 
         self._session = requests.Session()
-        self._session.headers.update({
-            "Authorization": f"Bearer {api_token}",
-            "Content-Type": "application/json",
-        })
+        self._session.headers.update(
+            {
+                "Authorization": f"Bearer {api_token}",
+                "Content-Type": "application/json",
+            }
+        )
 
         log_event(
-            logger, "cloudflare.init",
-            has_account_id=bool(account_id), has_zone_id=bool(zone_id),
+            logger,
+            "cloudflare.init",
+            has_account_id=bool(account_id),
+            has_zone_id=bool(zone_id),
         )
 
     # ------------------------------------------------------------------
@@ -255,8 +261,10 @@ class CloudflareHosting:
 
         try:
             response = self._session.request(
-                method=method, url=url,
-                json=json_data, params=params,
+                method=method,
+                url=url,
+                json=json_data,
+                params=params,
                 timeout=self._timeout,
             )
             response.raise_for_status()
@@ -266,7 +274,8 @@ class CloudflareHosting:
             raise IntegrationError(
                 f"Cloudflare API request failed: {method} {path}",
                 details={
-                    "method": method, "path": path,
+                    "method": method,
+                    "path": path,
                     "status_code": getattr(
                         getattr(exc, "response", None), "status_code", None
                     ),
@@ -276,9 +285,11 @@ class CloudflareHosting:
 
         if not body.get("success", False):
             errors = body.get("errors", [])
-            error_msg = "; ".join(
-                e.get("message", "Unknown error") for e in errors
-            ) if errors else "Unknown Cloudflare API error"
+            error_msg = (
+                "; ".join(e.get("message", "Unknown error") for e in errors)
+                if errors
+                else "Unknown Cloudflare API error"
+            )
             raise IntegrationError(
                 f"Cloudflare API error: {error_msg}",
                 details={"errors": errors, "path": path},
@@ -303,9 +314,9 @@ class CloudflareHosting:
         if not value:
             return None
         try:
-            return datetime.fromisoformat(
-                str(value).replace("Z", "+00:00")
-            ).astimezone(timezone.utc)
+            return datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(
+                timezone.utc
+            )
         except (ValueError, TypeError):
             return None
 
@@ -347,14 +358,13 @@ class CloudflareHosting:
             )
 
         log_event(
-            logger, "cloudflare.deploy",
-            project=project_name, branch=branch,
+            logger,
+            "cloudflare.deploy",
+            project=project_name,
+            branch=branch,
         )
 
-        path = (
-            f"/accounts/{self._account_id}"
-            f"/pages/projects/{project_name}/deployments"
-        )
+        path = f"/accounts/{self._account_id}/pages/projects/{project_name}/deployments"
         data = self._api_request("POST", path)
 
         trigger = data.get("deployment_trigger", {}).get("metadata", {})
@@ -362,7 +372,9 @@ class CloudflareHosting:
             deployment_id=data.get("id", ""),
             project_name=project_name,
             url=data.get("url", ""),
-            production_url=(data.get("aliases", [""])[0] if data.get("aliases") else ""),
+            production_url=(
+                data.get("aliases", [""])[0] if data.get("aliases") else ""
+            ),
             environment=data.get("environment", "production"),
             status=data.get("latest_stage", {}).get("status", "building"),
             created_at=self._parse_timestamp(data.get("created_on")),
@@ -401,19 +413,21 @@ class CloudflareHosting:
 
         for item in items:
             latest = item.get("latest_deployment", {}) or {}
-            domains_list = [
-                d.get("name", "") for d in (item.get("domains", []) or [])
-            ]
-            projects.append(CloudflarePagesProject(
-                project_id=item.get("id", ""),
-                name=item.get("name", ""),
-                subdomain=item.get("subdomain", ""),
-                production_branch=item.get("production_branch", "main"),
-                domains=domains_list,
-                latest_deployment_id=latest.get("id", ""),
-                latest_deployment_status=latest.get("latest_stage", {}).get("status", ""),
-                created_at=self._parse_timestamp(item.get("created_on")),
-            ))
+            domains_list = [d.get("name", "") for d in (item.get("domains", []) or [])]
+            projects.append(
+                CloudflarePagesProject(
+                    project_id=item.get("id", ""),
+                    name=item.get("name", ""),
+                    subdomain=item.get("subdomain", ""),
+                    production_branch=item.get("production_branch", "main"),
+                    domains=domains_list,
+                    latest_deployment_id=latest.get("id", ""),
+                    latest_deployment_status=latest.get("latest_stage", {}).get(
+                        "status", ""
+                    ),
+                    created_at=self._parse_timestamp(item.get("created_on")),
+                )
+            )
 
         self.logger.debug("Retrieved %d Pages projects", len(projects))
         return projects
@@ -472,8 +486,11 @@ class CloudflareHosting:
         }
 
         log_event(
-            logger, "cloudflare.configure_dns",
-            name=name, record_type=record_type, proxied=proxied,
+            logger,
+            "cloudflare.configure_dns",
+            name=name,
+            record_type=record_type,
+            proxied=proxied,
         )
 
         path = f"/zones/{effective_zone}/dns_records"
@@ -481,7 +498,10 @@ class CloudflareHosting:
 
         self.logger.info(
             "Created DNS %s record '%s' -> '%s' (proxied=%s)",
-            record_type, name, content, proxied,
+            record_type,
+            name,
+            content,
+            proxied,
         )
         return data
 
@@ -545,8 +565,10 @@ class CloudflareHosting:
             payload["purge_everything"] = True
 
         log_event(
-            logger, "cloudflare.purge_cache",
-            zone_id=effective_zone, purge_type=purge_type,
+            logger,
+            "cloudflare.purge_cache",
+            zone_id=effective_zone,
+            purge_type=purge_type,
             file_count=len(files) if files else 0,
         )
 
@@ -562,7 +584,8 @@ class CloudflareHosting:
 
         self.logger.info(
             "Cache purge completed for zone %s (type=%s)",
-            effective_zone, purge_type,
+            effective_zone,
+            purge_type,
         )
         return result
 

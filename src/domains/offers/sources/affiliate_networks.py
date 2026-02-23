@@ -26,6 +26,7 @@ from src.domains.offers.models import Offer
 # Commission rate detail
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CommissionRate:
     """Normalised commission rate returned by a network API.
@@ -54,6 +55,7 @@ class CommissionRate:
 # ---------------------------------------------------------------------------
 # Offer detail (extended metadata from a network)
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class OfferDetail:
@@ -98,6 +100,7 @@ class OfferDetail:
 # ---------------------------------------------------------------------------
 # Abstract base class
 # ---------------------------------------------------------------------------
+
 
 class AffiliateNetworkSource(ABC):
     """Abstract interface for fetching offer data from an affiliate network.

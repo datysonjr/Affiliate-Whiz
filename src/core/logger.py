@@ -58,6 +58,7 @@ _ROOT_LOGGER_NAME = "openclaw"
 # Custom JSON formatter
 # ---------------------------------------------------------------------------
 
+
 class JSONFormatter(logging.Formatter):
     """Emit each log record as a single JSON line.
 
@@ -67,7 +68,9 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         log_entry: dict[str, Any] = {
-            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(
+                record.created, tz=timezone.utc
+            ).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -84,11 +87,28 @@ class JSONFormatter(logging.Formatter):
         # Merge any extra fields that were passed explicitly
         # (stdlib attaches a lot of internal keys; filter to custom ones)
         _stdlib_keys = {
-            "name", "msg", "args", "created", "relativeCreated",
-            "exc_info", "exc_text", "stack_info", "lineno", "funcName",
-            "pathname", "filename", "module", "levelno", "levelname",
-            "message", "msecs", "processName", "process", "threadName",
-            "thread", "taskName",
+            "name",
+            "msg",
+            "args",
+            "created",
+            "relativeCreated",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "lineno",
+            "funcName",
+            "pathname",
+            "filename",
+            "module",
+            "levelno",
+            "levelname",
+            "message",
+            "msecs",
+            "processName",
+            "process",
+            "threadName",
+            "thread",
+            "taskName",
         }
         for key, value in record.__dict__.items():
             if key not in _stdlib_keys and not key.startswith("_"):
@@ -100,6 +120,7 @@ class JSONFormatter(logging.Formatter):
 # ---------------------------------------------------------------------------
 # Setup function
 # ---------------------------------------------------------------------------
+
 
 def setup_logging(
     level: str | None = None,
@@ -199,6 +220,7 @@ def setup_logging(
 # ---------------------------------------------------------------------------
 # Convenience API
 # ---------------------------------------------------------------------------
+
 
 def _configure_root() -> None:
     """One-time root logger configuration with sensible defaults."""

@@ -36,6 +36,7 @@ logger = get_logger("pipelines.optimization.scale")
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Winner:
     """A high-performing content piece identified for scaling.
@@ -144,6 +145,7 @@ class CadenceUpdate:
 # ---------------------------------------------------------------------------
 # Winner identification
 # ---------------------------------------------------------------------------
+
 
 def identify_winners(
     content_metrics: List[ContentMetrics],
@@ -285,6 +287,7 @@ def _assess_expansion_potential(metrics: ContentMetrics) -> str:
 # Expansion planning
 # ---------------------------------------------------------------------------
 
+
 def plan_expansion(
     winners: List[Winner],
     *,
@@ -320,7 +323,9 @@ def plan_expansion(
 
     for winner in winners:
         # Generate related topics from top keywords
-        related_topics = _generate_related_topics(winner.top_keywords, count=multiply_factor)
+        related_topics = _generate_related_topics(
+            winner.top_keywords, count=multiply_factor
+        )
 
         # Identify keyword gaps
         keyword_gaps = _identify_keyword_gaps(winner.top_keywords)
@@ -501,6 +506,7 @@ def _estimate_expansion_traffic(
 # Related content creation
 # ---------------------------------------------------------------------------
 
+
 def create_related_content(
     parent_title: str,
     keywords: List[str],
@@ -572,6 +578,7 @@ def create_related_content(
 # ---------------------------------------------------------------------------
 # Cadence management
 # ---------------------------------------------------------------------------
+
 
 def increase_posting_cadence(
     site_id: str,

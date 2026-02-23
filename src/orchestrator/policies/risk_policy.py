@@ -29,6 +29,7 @@ from src.core.logger import get_logger, log_event
 # Risk assessment result
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RiskAssessment:
     """Structured result of a risk evaluation.
@@ -56,14 +57,16 @@ class RiskAssessment:
 # ---------------------------------------------------------------------------
 
 # Niches that are never promoted.
-_DEFAULT_BLACKLISTED_NICHES: FrozenSet[str] = frozenset({
-    "gambling",
-    "tobacco",
-    "weapons",
-    "counterfeit",
-    "illegal_substances",
-    "adult_explicit",
-})
+_DEFAULT_BLACKLISTED_NICHES: FrozenSet[str] = frozenset(
+    {
+        "gambling",
+        "tobacco",
+        "weapons",
+        "counterfeit",
+        "illegal_substances",
+        "adult_explicit",
+    }
+)
 
 # Merchants/networks that have been banned (placeholder -- loaded from DB/config
 # in production).
@@ -76,18 +79,21 @@ _DEFAULT_BLACKLISTED_DOMAIN_PATTERNS: List[re.Pattern[str]] = [
 ]
 
 # Terms of Service keywords that indicate restricted programmes.
-_TOS_RESTRICTED_KEYWORDS: FrozenSet[str] = frozenset({
-    "incentivized traffic",
-    "cookie stuffing",
-    "trademark bidding",
-    "forced click",
-    "pop-under",
-})
+_TOS_RESTRICTED_KEYWORDS: FrozenSet[str] = frozenset(
+    {
+        "incentivized traffic",
+        "cookie stuffing",
+        "trademark bidding",
+        "forced click",
+        "pop-under",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # RiskPolicy
 # ---------------------------------------------------------------------------
+
 
 class RiskPolicy:
     """Evaluate and enforce risk rules for the OpenClaw system.
@@ -236,9 +242,7 @@ class RiskPolicy:
         for keyword in _TOS_RESTRICTED_KEYWORDS:
             if keyword in text_lower:
                 flagged_keywords.append(keyword)
-                violations.append(
-                    f"TOS-restricted keyword detected: '{keyword}'."
-                )
+                violations.append(f"TOS-restricted keyword detected: '{keyword}'.")
 
         level = RiskLevel.LOW if not violations else RiskLevel.HIGH
         allowed = self._level_within_auto_allow(level)
@@ -451,9 +455,7 @@ class RiskPolicy:
             Niche category string to blacklist.
         """
         self._blacklisted_niches.add(niche.lower())
-        log_event(
-            self._logger, "policy.risk.blacklist_add", type="niche", value=niche
-        )
+        log_event(self._logger, "policy.risk.blacklist_add", type="niche", value=niche)
 
     def add_blacklisted_merchant(self, merchant: str) -> None:
         """Add a merchant to the blacklist at runtime.

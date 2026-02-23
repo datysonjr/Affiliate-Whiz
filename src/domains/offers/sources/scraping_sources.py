@@ -48,6 +48,7 @@ except ImportError:  # pragma: no cover
 # Data containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ScrapedProduct:
     """Product data extracted from a merchant web page.
@@ -148,6 +149,7 @@ class PricingData:
 # Scraping source
 # ---------------------------------------------------------------------------
 
+
 class ScrapingSource:
     """Scrape affiliate offer data directly from merchant websites.
 
@@ -199,11 +201,13 @@ class ScrapingSource:
         self.logger: logging.Logger = get_logger("offers.sources.scraping")
 
         self._session = requests.Session()
-        self._session.headers.update({
-            "User-Agent": self.user_agent,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-        })
+        self._session.headers.update(
+            {
+                "User-Agent": self.user_agent,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+            }
+        )
         if headers:
             self._session.headers.update(headers)
 
@@ -268,7 +272,7 @@ class ScrapingSource:
             except Exception as exc:
                 last_exc = exc
                 if attempt <= self.max_retries:
-                    delay = 2.0 ** attempt
+                    delay = 2.0**attempt
                     self.logger.warning(
                         "Request to %s failed (attempt %d/%d): %s -- retrying in %.1fs",
                         url,
@@ -341,7 +345,9 @@ class ScrapingSource:
         cards = soup.select(card_selector)
 
         if not cards:
-            self.logger.info("No product cards found on %s with selector '%s'", url, card_selector)
+            self.logger.info(
+                "No product cards found on %s with selector '%s'", url, card_selector
+            )
             return products
 
         for card in cards:
@@ -382,19 +388,29 @@ class ScrapingSource:
             The extracted product data.
         """
         # Name
-        name_el = card.select_one(selectors.get("name", "h2, h3, h4, [class*='title'], [class*='name']"))
+        name_el = card.select_one(
+            selectors.get("name", "h2, h3, h4, [class*='title'], [class*='name']")
+        )
         name = name_el.get_text(strip=True) if name_el else ""
 
         # Price
-        price_el = card.select_one(selectors.get("price", "[class*='price'], .price, [data-price]"))
-        price = self._parse_price_text(price_el.get_text(strip=True)) if price_el else 0.0
+        price_el = card.select_one(
+            selectors.get("price", "[class*='price'], .price, [data-price]")
+        )
+        price = (
+            self._parse_price_text(price_el.get_text(strip=True)) if price_el else 0.0
+        )
 
         # Original price (for detecting discounts)
-        orig_el = card.select_one(selectors.get(
-            "original_price",
-            "[class*='original'], [class*='was'], [class*='list-price'], s, del",
-        ))
-        original_price = self._parse_price_text(orig_el.get_text(strip=True)) if orig_el else 0.0
+        orig_el = card.select_one(
+            selectors.get(
+                "original_price",
+                "[class*='original'], [class*='was'], [class*='list-price'], s, del",
+            )
+        )
+        original_price = (
+            self._parse_price_text(orig_el.get_text(strip=True)) if orig_el else 0.0
+        )
 
         # Image
         img_el = card.select_one(selectors.get("image", "img"))
@@ -479,7 +495,9 @@ class ScrapingSource:
             aggregate_rating = jsonld_data.get("aggregateRating", {})
             if isinstance(aggregate_rating, dict):
                 product.rating = self._safe_float(aggregate_rating.get("ratingValue"))
-                product.review_count = self._safe_int(aggregate_rating.get("reviewCount"))
+                product.review_count = self._safe_int(
+                    aggregate_rating.get("reviewCount")
+                )
 
         # -- Fallback: extract from HTML if JSON-LD was incomplete --
         if not product.name:
@@ -503,9 +521,13 @@ class ScrapingSource:
                 product.description = desc_el.get_text(strip=True)[:500]
 
         # -- Category from breadcrumbs --
-        breadcrumb = soup.select("[class*='breadcrumb'] a, [itemtype*='BreadcrumbList'] a")
+        breadcrumb = soup.select(
+            "[class*='breadcrumb'] a, [itemtype*='BreadcrumbList'] a"
+        )
         if breadcrumb:
-            crumbs = [a.get_text(strip=True) for a in breadcrumb if a.get_text(strip=True)]
+            crumbs = [
+                a.get_text(strip=True) for a in breadcrumb if a.get_text(strip=True)
+            ]
             product.category = " > ".join(crumbs)
 
         self.logger.info("Extracted product data from %s: %s", url, product.name)

@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional
 # Task descriptor
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class QueuedTask:
     """A task waiting in the queue for execution.
@@ -63,6 +64,7 @@ class QueuedTask:
 # Abstract queue interface (swap to Redis/Celery by implementing this)
 # ---------------------------------------------------------------------------
 
+
 class BaseTaskQueue(ABC):
     """Abstract interface for task queues.
 
@@ -93,6 +95,7 @@ class BaseTaskQueue(ABC):
 # ---------------------------------------------------------------------------
 # In-process priority queue implementation
 # ---------------------------------------------------------------------------
+
 
 class InProcessQueue(BaseTaskQueue):
     """Thread-safe in-process priority queue.

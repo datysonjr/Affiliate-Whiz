@@ -17,8 +17,8 @@ from src.domains.seo.monopoly_strategy import (
 # Tests — site types and buyer stages
 # ---------------------------------------------------------------------------
 
-class TestSiteTypes(unittest.TestCase):
 
+class TestSiteTypes(unittest.TestCase):
     def test_four_site_types(self):
         self.assertEqual(len(SiteType), 4)
 
@@ -35,8 +35,8 @@ class TestSiteTypes(unittest.TestCase):
 # Tests — SERP occupation planning
 # ---------------------------------------------------------------------------
 
-class TestSERPOccupation(unittest.TestCase):
 
+class TestSERPOccupation(unittest.TestCase):
     def test_plans_all_four_sites(self):
         plan = plan_serp_occupation("best standing desks", "standing desks")
         self.assertEqual(plan.sites_targeting, 4)
@@ -59,8 +59,8 @@ class TestSERPOccupation(unittest.TestCase):
 # Tests — interlink safety
 # ---------------------------------------------------------------------------
 
-class TestInterlinkSafety(unittest.TestCase):
 
+class TestInterlinkSafety(unittest.TestCase):
     def test_contextual_is_safe(self):
         self.assertEqual(
             classify_interlink_safety("contextual citation"),
@@ -96,8 +96,8 @@ class TestInterlinkSafety(unittest.TestCase):
 # Tests — monopoly plan building
 # ---------------------------------------------------------------------------
 
-class TestBuildMonopolyPlan(unittest.TestCase):
 
+class TestBuildMonopolyPlan(unittest.TestCase):
     def test_builds_4_sites(self):
         plan = build_monopoly_plan("standing desks")
         self.assertEqual(plan.site_count, 4)
@@ -156,20 +156,24 @@ class TestBuildMonopolyPlan(unittest.TestCase):
     def test_review_site_targets_comparison_queries(self):
         plan = build_monopoly_plan("standing desks")
         review = [s for s in plan.sites if s.site_type == SiteType.REVIEW][0]
-        self.assertTrue(any("vs" in q or "alternatives" in q.lower() for q in review.target_queries))
+        self.assertTrue(
+            any("vs" in q or "alternatives" in q.lower() for q in review.target_queries)
+        )
 
     def test_trend_site_targets_emerging_queries(self):
         plan = build_monopoly_plan("standing desks")
         trend = [s for s in plan.sites if s.site_type == SiteType.TREND][0]
-        self.assertTrue(any("New" in q or "Upcoming" in q for q in trend.target_queries))
+        self.assertTrue(
+            any("New" in q or "Upcoming" in q for q in trend.target_queries)
+        )
 
 
 # ---------------------------------------------------------------------------
 # Tests — network coverage evaluation
 # ---------------------------------------------------------------------------
 
-class TestNetworkCoverage(unittest.TestCase):
 
+class TestNetworkCoverage(unittest.TestCase):
     def test_single_niche(self):
         plans = [build_monopoly_plan("widgets")]
         metrics = evaluate_network_coverage(plans)

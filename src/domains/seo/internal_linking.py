@@ -33,6 +33,7 @@ logger = get_logger("seo.internal_linking")
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PageNode:
     """A single page in the internal link graph.
@@ -104,6 +105,7 @@ class LinkSuggestion:
 # ---------------------------------------------------------------------------
 # Link graph
 # ---------------------------------------------------------------------------
+
 
 class LinkGraph:
     """Directed graph of internal links for a site.
@@ -262,6 +264,7 @@ class LinkGraph:
 # Analysis functions
 # ---------------------------------------------------------------------------
 
+
 def find_link_targets(
     graph: LinkGraph,
     source_url: str,
@@ -332,13 +335,15 @@ def find_link_targets(
             else:
                 anchor = page.title
 
-            suggestions.append(LinkSuggestion(
-                source_url=source_url,
-                target_url=page.url,
-                anchor_text=anchor,
-                relevance_score=round(min(score, 1.0), 3),
-                reason="; ".join(reasons),
-            ))
+            suggestions.append(
+                LinkSuggestion(
+                    source_url=source_url,
+                    target_url=page.url,
+                    anchor_text=anchor,
+                    relevance_score=round(min(score, 1.0), 3),
+                    reason="; ".join(reasons),
+                )
+            )
 
     suggestions.sort(key=lambda s: s.relevance_score, reverse=True)
     result = suggestions[:max_suggestions]
@@ -516,8 +521,7 @@ def suggest_hub_pages(
             # Hub score: weighted combination of inbound links, outbound
             # connectivity within category, and content depth
             category_outbound = sum(
-                1 for p in pages
-                if p.url in graph.get_outbound_links(page.url)
+                1 for p in pages if p.url in graph.get_outbound_links(page.url)
             )
             coverage = category_outbound / max(len(pages) - 1, 1)
 

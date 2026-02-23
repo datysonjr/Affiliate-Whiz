@@ -52,6 +52,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 # Configuration
 # =====================================================================
 
+
 @dataclass(frozen=True)
 class RetryConfig:
     """Immutable configuration for retry behaviour.
@@ -101,7 +102,7 @@ class RetryConfig:
             Delay in seconds, clamped to :attr:`max_delay`, with
             optional jitter.
         """
-        delay = self.base_delay * (self.exponential_base ** attempt)
+        delay = self.base_delay * (self.exponential_base**attempt)
         delay = min(delay, self.max_delay)
         if self.jitter:
             delay += random.uniform(0, delay * 0.5)
@@ -111,6 +112,7 @@ class RetryConfig:
 # =====================================================================
 # Decorator
 # =====================================================================
+
 
 def retry(
     max_retries: int = DEFAULT_MAX_RETRIES,
@@ -248,6 +250,7 @@ def _execute_with_retry(
 # =====================================================================
 # Async decorator
 # =====================================================================
+
 
 def async_retry(
     max_retries: int = DEFAULT_MAX_RETRIES,

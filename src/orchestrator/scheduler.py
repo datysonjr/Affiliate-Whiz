@@ -42,6 +42,7 @@ from src.core.logger import get_logger, log_event
 # Cron helpers
 # ---------------------------------------------------------------------------
 
+
 def _match_cron_field(field_expr: str, value: int, min_val: int, max_val: int) -> bool:
     """Return ``True`` if *value* matches a single cron field expression.
 
@@ -132,6 +133,7 @@ def cron_matches(cron_expr: str, dt: datetime) -> bool:
 # Scheduled task descriptor
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ScheduledTask:
     """Descriptor for a single scheduled item.
@@ -162,6 +164,7 @@ class ScheduledTask:
 # ---------------------------------------------------------------------------
 # Scheduler
 # ---------------------------------------------------------------------------
+
 
 class Scheduler:
     """Manages cron-based scheduling for the OpenClaw system.

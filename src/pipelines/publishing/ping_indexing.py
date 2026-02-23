@@ -34,6 +34,7 @@ logger = get_logger("pipelines.publishing.ping_indexing")
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class IndexingProvider(str, Enum):
     """Supported search engine indexing providers."""
@@ -65,6 +66,7 @@ class PingStatus(str, Enum):
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PingResult:
@@ -122,6 +124,7 @@ class IndexingReport:
 # ---------------------------------------------------------------------------
 # Provider-specific ping implementations
 # ---------------------------------------------------------------------------
+
 
 def ping_google(
     url: str,
@@ -279,6 +282,7 @@ def ping_bing(
 # Batch submission
 # ---------------------------------------------------------------------------
 
+
 def submit_url_for_indexing(
     url: str,
     *,
@@ -370,6 +374,7 @@ def submit_url_for_indexing(
 # ---------------------------------------------------------------------------
 # Indexing status check
 # ---------------------------------------------------------------------------
+
 
 def check_indexing_status(
     urls: List[str],

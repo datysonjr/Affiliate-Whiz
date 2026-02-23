@@ -21,47 +21,87 @@ from src.domains.seo.trend_predictor import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _supply_signal(niche: str = "ai headphones", strength: float = 0.8) -> TrendSignal:
-    return TrendSignal(niche=niche, source=SignalSource.AMAZON_NEW_SKU, strength=strength,
-                       description="New SKUs appearing on Amazon")
 
-def _industry_signal(niche: str = "ai headphones", strength: float = 0.7) -> TrendSignal:
-    return TrendSignal(niche=niche, source=SignalSource.VC_FUNDING, strength=strength,
-                       description="$10M funding round for audio AI startup")
+def _supply_signal(niche: str = "ai headphones", strength: float = 0.8) -> TrendSignal:
+    return TrendSignal(
+        niche=niche,
+        source=SignalSource.AMAZON_NEW_SKU,
+        strength=strength,
+        description="New SKUs appearing on Amazon",
+    )
+
+
+def _industry_signal(
+    niche: str = "ai headphones", strength: float = 0.7
+) -> TrendSignal:
+    return TrendSignal(
+        niche=niche,
+        source=SignalSource.VC_FUNDING,
+        strength=strength,
+        description="$10M funding round for audio AI startup",
+    )
+
 
 def _creator_signal(niche: str = "ai headphones", strength: float = 0.6) -> TrendSignal:
-    return TrendSignal(niche=niche, source=SignalSource.YOUTUBE_COVERAGE, strength=strength,
-                       description="Multiple YouTube reviews appearing")
+    return TrendSignal(
+        niche=niche,
+        source=SignalSource.YOUTUBE_COVERAGE,
+        strength=strength,
+        description="Multiple YouTube reviews appearing",
+    )
 
-def _consumer_signal(niche: str = "ai headphones", strength: float = 0.5) -> TrendSignal:
-    return TrendSignal(niche=niche, source=SignalSource.REDDIT_SPIKE, strength=strength,
-                       description="Reddit buying questions spiking")
+
+def _consumer_signal(
+    niche: str = "ai headphones", strength: float = 0.5
+) -> TrendSignal:
+    return TrendSignal(
+        niche=niche,
+        source=SignalSource.REDDIT_SPIKE,
+        strength=strength,
+        description="Reddit buying questions spiking",
+    )
+
 
 def _search_signal(niche: str = "ai headphones", strength: float = 0.4) -> TrendSignal:
-    return TrendSignal(niche=niche, source=SignalSource.GOOGLE_TRENDS_SPIKE, strength=strength,
-                       description="Google Trends showing uptick")
+    return TrendSignal(
+        niche=niche,
+        source=SignalSource.GOOGLE_TRENDS_SPIKE,
+        strength=strength,
+        description="Google Trends showing uptick",
+    )
 
 
 # ---------------------------------------------------------------------------
 # Tests — signal level mapping
 # ---------------------------------------------------------------------------
 
-class TestSignalLevel(unittest.TestCase):
 
+class TestSignalLevel(unittest.TestCase):
     def test_amazon_is_supply(self):
-        self.assertEqual(get_signal_level(SignalSource.AMAZON_NEW_SKU), SignalLevel.SUPPLY)
+        self.assertEqual(
+            get_signal_level(SignalSource.AMAZON_NEW_SKU), SignalLevel.SUPPLY
+        )
 
     def test_vc_is_industry(self):
-        self.assertEqual(get_signal_level(SignalSource.VC_FUNDING), SignalLevel.INDUSTRY)
+        self.assertEqual(
+            get_signal_level(SignalSource.VC_FUNDING), SignalLevel.INDUSTRY
+        )
 
     def test_youtube_is_creator(self):
-        self.assertEqual(get_signal_level(SignalSource.YOUTUBE_COVERAGE), SignalLevel.CREATOR)
+        self.assertEqual(
+            get_signal_level(SignalSource.YOUTUBE_COVERAGE), SignalLevel.CREATOR
+        )
 
     def test_reddit_is_consumer(self):
-        self.assertEqual(get_signal_level(SignalSource.REDDIT_SPIKE), SignalLevel.CONSUMER)
+        self.assertEqual(
+            get_signal_level(SignalSource.REDDIT_SPIKE), SignalLevel.CONSUMER
+        )
 
     def test_google_trends_is_search(self):
-        self.assertEqual(get_signal_level(SignalSource.GOOGLE_TRENDS_SPIKE), SignalLevel.SEARCH_VOLUME)
+        self.assertEqual(
+            get_signal_level(SignalSource.GOOGLE_TRENDS_SPIKE),
+            SignalLevel.SEARCH_VOLUME,
+        )
 
     def test_signal_level_property(self):
         s = _supply_signal()
@@ -73,8 +113,8 @@ class TestSignalLevel(unittest.TestCase):
 # Tests — multi-signal confirmation
 # ---------------------------------------------------------------------------
 
-class TestMultiSignalConfirmation(unittest.TestCase):
 
+class TestMultiSignalConfirmation(unittest.TestCase):
     def test_two_levels_confirms(self):
         signals = [_supply_signal(), _creator_signal()]
         confirmed, levels = check_multi_signal_confirmation(signals)
@@ -113,8 +153,8 @@ class TestMultiSignalConfirmation(unittest.TestCase):
 # Tests — trend score
 # ---------------------------------------------------------------------------
 
-class TestComputeTrendScore(unittest.TestCase):
 
+class TestComputeTrendScore(unittest.TestCase):
     def test_max_score(self):
         # All levels at full strength: 4+3+3+2+1 = 13
         signals = [
@@ -152,8 +192,8 @@ class TestComputeTrendScore(unittest.TestCase):
 # Tests — explosion playbook
 # ---------------------------------------------------------------------------
 
-class TestExplosionPlaybook(unittest.TestCase):
 
+class TestExplosionPlaybook(unittest.TestCase):
     def test_generates_6_pages(self):
         playbook = generate_explosion_playbook("AI Headphones")
         self.assertEqual(len(playbook), 6)
@@ -180,8 +220,8 @@ class TestExplosionPlaybook(unittest.TestCase):
 # Tests — purchase intent detection
 # ---------------------------------------------------------------------------
 
-class TestPurchaseIntent(unittest.TestCase):
 
+class TestPurchaseIntent(unittest.TestCase):
     def test_supply_signal_implies_intent(self):
         self.assertTrue(has_purchase_intent("widgets", [_supply_signal("widgets")]))
 
@@ -189,16 +229,22 @@ class TestPurchaseIntent(unittest.TestCase):
         self.assertTrue(has_purchase_intent("widgets", [_industry_signal("widgets")]))
 
     def test_description_with_buy_language(self):
-        s = TrendSignal(niche="widgets", source=SignalSource.REDDIT_SPIKE,
-                        description="People asking where to buy widgets")
+        s = TrendSignal(
+            niche="widgets",
+            source=SignalSource.REDDIT_SPIKE,
+            description="People asking where to buy widgets",
+        )
         self.assertTrue(has_purchase_intent("widgets", [s]))
 
     def test_niche_name_with_review(self):
         self.assertTrue(has_purchase_intent("best widget review", [_consumer_signal()]))
 
     def test_no_intent_detected(self):
-        s = TrendSignal(niche="philosophy", source=SignalSource.REDDIT_SPIKE,
-                        description="Discussion about epistemology")
+        s = TrendSignal(
+            niche="philosophy",
+            source=SignalSource.REDDIT_SPIKE,
+            description="Discussion about epistemology",
+        )
         self.assertFalse(has_purchase_intent("philosophy", [s]))
 
 
@@ -206,12 +252,12 @@ class TestPurchaseIntent(unittest.TestCase):
 # Tests — analyze_niche
 # ---------------------------------------------------------------------------
 
-class TestAnalyzeNiche(unittest.TestCase):
 
+class TestAnalyzeNiche(unittest.TestCase):
     def test_activated_niche(self):
         signals = [
-            _supply_signal(strength=1.0),   # 4 pts
-            _creator_signal(strength=1.0),   # 3 pts
+            _supply_signal(strength=1.0),  # 4 pts
+            _creator_signal(strength=1.0),  # 3 pts
         ]
         report = analyze_niche("ai headphones", signals)
         self.assertTrue(report.confirmed)
@@ -243,8 +289,8 @@ class TestAnalyzeNiche(unittest.TestCase):
 # Tests — full pipeline
 # ---------------------------------------------------------------------------
 
-class TestPredictExplosions(unittest.TestCase):
 
+class TestPredictExplosions(unittest.TestCase):
     def test_basic_pipeline(self):
         signals = [
             _supply_signal("smart rings", 0.9),
@@ -275,10 +321,18 @@ class TestPredictExplosions(unittest.TestCase):
 
     def test_filters_no_purchase_intent(self):
         signals = [
-            TrendSignal(niche="philosophy", source=SignalSource.REDDIT_SPIKE,
-                        strength=0.8, description="Debate about ethics"),
-            TrendSignal(niche="philosophy", source=SignalSource.FORUM_QUESTIONS,
-                        strength=0.7, description="Discussion threads"),
+            TrendSignal(
+                niche="philosophy",
+                source=SignalSource.REDDIT_SPIKE,
+                strength=0.8,
+                description="Debate about ethics",
+            ),
+            TrendSignal(
+                niche="philosophy",
+                source=SignalSource.FORUM_QUESTIONS,
+                strength=0.7,
+                description="Discussion threads",
+            ),
         ]
         reports = predict_explosions(signals, require_purchase_intent=True)
         self.assertEqual(len(reports), 0)
@@ -287,10 +341,18 @@ class TestPredictExplosions(unittest.TestCase):
         # Need 2 distinct non-search levels + score >= 6
         # Supply (4) + Creator (3) = 7, confirmed with 2 levels
         signals = [
-            TrendSignal(niche="philosophy", source=SignalSource.CROWDFUNDING_LAUNCH,
-                        strength=1.0, description="New crowdfunding campaign"),
-            TrendSignal(niche="philosophy", source=SignalSource.YOUTUBE_COVERAGE,
-                        strength=1.0, description="Creator videos appearing"),
+            TrendSignal(
+                niche="philosophy",
+                source=SignalSource.CROWDFUNDING_LAUNCH,
+                strength=1.0,
+                description="New crowdfunding campaign",
+            ),
+            TrendSignal(
+                niche="philosophy",
+                source=SignalSource.YOUTUBE_COVERAGE,
+                strength=1.0,
+                description="Creator videos appearing",
+            ),
         ]
         reports = predict_explosions(signals, require_purchase_intent=False)
         self.assertEqual(len(reports), 1)

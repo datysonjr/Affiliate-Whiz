@@ -74,6 +74,7 @@ STATUS_UNKNOWN = "unknown"
 # Basic health check
 # ---------------------------------------------------------------------------
 
+
 def check_health() -> Dict[str, Any]:
     """Perform a fast liveness health check.
 
@@ -114,6 +115,7 @@ def check_health() -> Dict[str, Any]:
 # Detailed health check
 # ---------------------------------------------------------------------------
 
+
 def check_health_detailed() -> Dict[str, Any]:
     """Perform a comprehensive per-component health check.
 
@@ -150,24 +152,18 @@ def check_health_detailed() -> Dict[str, Any]:
     components["logs"] = _check_log_directory()
 
     # Determine overall status (worst wins)
-    overall = _aggregate_status(
-        [comp["status"] for comp in components.values()]
-    )
+    overall = _aggregate_status([comp["status"] for comp in components.values()])
 
     # Build summary counts
     summary = {
-        "healthy": sum(
-            1 for c in components.values() if c["status"] == STATUS_HEALTHY
-        ),
+        "healthy": sum(1 for c in components.values() if c["status"] == STATUS_HEALTHY),
         "degraded": sum(
             1 for c in components.values() if c["status"] == STATUS_DEGRADED
         ),
         "unhealthy": sum(
             1 for c in components.values() if c["status"] == STATUS_UNHEALTHY
         ),
-        "unknown": sum(
-            1 for c in components.values() if c["status"] == STATUS_UNKNOWN
-        ),
+        "unknown": sum(1 for c in components.values() if c["status"] == STATUS_UNKNOWN),
         "total": len(components),
     }
 
@@ -181,7 +177,8 @@ def check_health_detailed() -> Dict[str, Any]:
     }
 
     log_event(
-        logger, "health.detailed",
+        logger,
+        "health.detailed",
         status=overall,
         healthy=summary["healthy"],
         degraded=summary["degraded"],
@@ -194,6 +191,7 @@ def check_health_detailed() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Readiness check
 # ---------------------------------------------------------------------------
+
 
 def check_readiness() -> Dict[str, Any]:
     """Check whether the system is ready to accept and process work.
@@ -276,9 +274,7 @@ def check_readiness() -> Dict[str, Any]:
         "details": metrics_check,
     }
     if not metrics_ok:
-        reasons.append(
-            f"Metrics subsystem is {metrics_check['status']}"
-        )
+        reasons.append(f"Metrics subsystem is {metrics_check['status']}")
 
     ready = all(check["passed"] for check in checks.values())
 
@@ -292,7 +288,8 @@ def check_readiness() -> Dict[str, Any]:
     }
 
     log_event(
-        logger, "health.readiness",
+        logger,
+        "health.readiness",
         ready=ready,
         failed_checks=len(reasons),
     )
@@ -303,6 +300,7 @@ def check_readiness() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Individual component checks
 # ---------------------------------------------------------------------------
+
 
 def _check_database() -> Dict[str, Any]:
     """Check SQLite database connectivity and query performance.
@@ -332,9 +330,7 @@ def _check_database() -> Dict[str, Any]:
         cursor.fetchone()
 
         # Check table count for basic schema validation
-        cursor.execute(
-            "SELECT count(*) FROM sqlite_master WHERE type='table'"
-        )
+        cursor.execute("SELECT count(*) FROM sqlite_master WHERE type='table'")
         table_count = cursor.fetchone()[0]
 
         conn.close()
@@ -377,8 +373,8 @@ def _check_disk_space() -> Dict[str, Any]:
             check_path = Path(".")
 
         usage = shutil.disk_usage(str(check_path))
-        total_gb = usage.total / (1024 ** 3)
-        free_gb = usage.free / (1024 ** 3)
+        total_gb = usage.total / (1024**3)
+        free_gb = usage.free / (1024**3)
         free_pct = (usage.free / usage.total) * 100.0 if usage.total > 0 else 0.0
 
         if free_pct < DISK_SPACE_CRITICAL_PCT:
@@ -393,7 +389,7 @@ def _check_disk_space() -> Dict[str, Any]:
             "free_pct": round(free_pct, 1),
             "free_gb": round(free_gb, 2),
             "total_gb": round(total_gb, 2),
-            "used_gb": round((usage.total - usage.free) / (1024 ** 3), 2),
+            "used_gb": round((usage.total - usage.free) / (1024**3), 2),
         }
 
     except Exception as exc:
@@ -465,9 +461,7 @@ def _check_vault() -> Dict[str, Any]:
         stat = vault_path.stat()
         size_bytes = stat.st_size
         permissions = oct(stat.st_mode)[-3:]
-        modified = datetime.fromtimestamp(
-            stat.st_mtime, tz=timezone.utc
-        ).isoformat()
+        modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
 
         # Warn if permissions are too open (should be 600)
         status = STATUS_HEALTHY
@@ -614,6 +608,7 @@ def _check_kill_switch() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _aggregate_status(statuses: List[str]) -> str:
     """Determine overall status from a list of component statuses.

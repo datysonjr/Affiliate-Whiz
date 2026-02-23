@@ -90,6 +90,7 @@ _DEFAULT_FIELD_MAP: Dict[str, List[str]] = {
 # Extraction helpers
 # ---------------------------------------------------------------------------
 
+
 def _extract_field(
     payload: Dict[str, Any],
     candidate_keys: List[str],
@@ -183,6 +184,7 @@ def _coerce_int(value: Any, field_name: str) -> int:
 # Core normalisation functions
 # ---------------------------------------------------------------------------
 
+
 def normalize_offer(raw_offer: RawOffer) -> Dict[str, Any]:
     """Normalize a single :class:`RawOffer` into a canonical dict.
 
@@ -249,13 +251,17 @@ def normalize_offer(raw_offer: RawOffer) -> Dict[str, Any]:
     )
     avg_order_value = _coerce_float(aov_raw, "avg_order_value")
 
-    category = str(
-        _extract_field(
-            payload,
-            field_map.get("category", _DEFAULT_FIELD_MAP["category"]),
-            default="uncategorized",
+    category = (
+        str(
+            _extract_field(
+                payload,
+                field_map.get("category", _DEFAULT_FIELD_MAP["category"]),
+                default="uncategorized",
+            )
         )
-    ).lower().strip()
+        .lower()
+        .strip()
+    )
 
     url = str(
         _extract_field(
@@ -364,11 +370,13 @@ def deduplicate_offers(
         ):
             # New version is better -- swap, but keep tracking alternates
             alternates = existing.get("alternate_sources", [])
-            alternates.append({
-                "source_network": existing["source_network"],
-                "external_id": existing["external_id"],
-                "commission_rate": existing["commission_rate"],
-            })
+            alternates.append(
+                {
+                    "source_network": existing["source_network"],
+                    "external_id": existing["external_id"],
+                    "commission_rate": existing["commission_rate"],
+                }
+            )
             offer["alternate_sources"] = alternates
             offer["alternate_sources"].append(alt_entry)
             seen[fp] = offer
@@ -429,7 +437,9 @@ def merge_offer_data(
     for field_name in fill_fields:
         existing_val = existing.get(field_name)
         incoming_val = incoming.get(field_name)
-        if (not existing_val or existing_val in (0, "uncategorized", "Unknown")) and incoming_val:
+        if (
+            not existing_val or existing_val in (0, "uncategorized", "Unknown")
+        ) and incoming_val:
             existing[field_name] = incoming_val
 
     # Merge alternate sources without duplicating
@@ -443,11 +453,13 @@ def merge_offer_data(
         for alt in existing_alts
     )
     if not already_tracked and incoming_source:
-        existing_alts.append({
-            "source_network": incoming_source,
-            "external_id": incoming_ext_id,
-            "commission_rate": incoming.get("commission_rate", 0.0),
-        })
+        existing_alts.append(
+            {
+                "source_network": incoming_source,
+                "external_id": incoming_ext_id,
+                "commission_rate": incoming.get("commission_rate", 0.0),
+            }
+        )
     existing["alternate_sources"] = existing_alts
 
     # Update the fetched_at timestamp to the most recent

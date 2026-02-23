@@ -35,6 +35,7 @@ logger = get_logger("pipelines.publishing.publish_post")
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CMSConfig:
     """Configuration for a CMS connection.
@@ -105,6 +106,7 @@ class PublishResult:
 # Content formatting
 # ---------------------------------------------------------------------------
 
+
 def format_for_cms(
     draft: ArticleDraft,
     *,
@@ -143,7 +145,9 @@ def format_for_cms(
 
     # Disclosure at the top
     if include_disclosure and draft.disclosure:
-        parts.append(f'<div class="affiliate-disclosure"><p><em>{draft.disclosure}</em></p></div>')
+        parts.append(
+            f'<div class="affiliate-disclosure"><p><em>{draft.disclosure}</em></p></div>'
+        )
         parts.append("")
 
     # Introduction
@@ -171,13 +175,18 @@ def format_for_cms(
     # Schema markup
     if include_schema and schema_markup:
         import json
+
         schema_json = json.dumps(schema_markup, indent=2)
         parts.append(f'<script type="application/ld+json">{schema_json}</script>')
 
     content = "\n".join(parts)
 
     # Generate excerpt from introduction
-    excerpt = draft.introduction[:160].rstrip() + "..." if len(draft.introduction) > 160 else draft.introduction
+    excerpt = (
+        draft.introduction[:160].rstrip() + "..."
+        if len(draft.introduction) > 160
+        else draft.introduction
+    )
 
     # Generate slug
     slug = _generate_slug(draft.title)
@@ -239,14 +248,15 @@ def _generate_slug(title: str) -> str:
     str
         Lowercase hyphenated slug.
     """
-    slug = re.sub(r'[^\w\s-]', '', title.lower())
-    slug = re.sub(r'[\s_]+', '-', slug.strip())
-    return slug.strip('-')[:100]
+    slug = re.sub(r"[^\w\s-]", "", title.lower())
+    slug = re.sub(r"[\s_]+", "-", slug.strip())
+    return slug.strip("-")[:100]
 
 
 # ---------------------------------------------------------------------------
 # Featured image
 # ---------------------------------------------------------------------------
+
 
 def add_featured_image(
     post_payload: Dict[str, Any],
@@ -312,6 +322,7 @@ def add_featured_image(
 # Category and tag assignment
 # ---------------------------------------------------------------------------
 
+
 def set_categories_tags(
     post_payload: Dict[str, Any],
     offer_data: Dict[str, Any],
@@ -356,9 +367,23 @@ def set_categories_tags(
     name = offer_data.get("name", "")
     if name:
         # Extract significant words from the product name
-        stop_words = {"the", "a", "an", "and", "or", "for", "in", "on", "at", "to", "of", "is"}
+        stop_words = {
+            "the",
+            "a",
+            "an",
+            "and",
+            "or",
+            "for",
+            "in",
+            "on",
+            "at",
+            "to",
+            "of",
+            "is",
+        }
         name_tags = [
-            w.lower() for w in name.split()
+            w.lower()
+            for w in name.split()
             if w.lower() not in stop_words and len(w) > 2
         ]
         tags.extend(name_tags[:5])
@@ -392,6 +417,7 @@ def set_categories_tags(
 # ---------------------------------------------------------------------------
 # Main publishing function
 # ---------------------------------------------------------------------------
+
 
 def publish_to_cms(
     draft: ArticleDraft,
@@ -539,7 +565,9 @@ def _validate_draft(draft: ArticleDraft) -> None:
     if not draft.title:
         issues.append("Article has no title.")
     if draft.total_word_count < 100:
-        issues.append(f"Word count ({draft.total_word_count}) is below minimum threshold.")
+        issues.append(
+            f"Word count ({draft.total_word_count}) is below minimum threshold."
+        )
     if not draft.sections:
         issues.append("Article has no content sections.")
     if not draft.disclosure:
@@ -577,13 +605,15 @@ def _submit_to_cms(
     if config.base_url and config.api_key:
         from src.agents.tools.cms_tool import CMSTool
 
-        cms = CMSTool({
-            "cms_type": config.cms_type,
-            "api_base_url": config.base_url,
-            "api_key": config.api_key,
-            "username": config.username,
-            "default_status": config.default_status,
-        })
+        cms = CMSTool(
+            {
+                "cms_type": config.cms_type,
+                "api_base_url": config.base_url,
+                "api_key": config.api_key,
+                "username": config.username,
+                "default_status": config.default_status,
+            }
+        )
 
         post_data = {
             "title": payload.get("title", ""),
@@ -599,7 +629,9 @@ def _submit_to_cms(
 
         logger.info(
             "Published to %s CMS via API: %s -> %s",
-            config.cms_type, post_id, post_url,
+            config.cms_type,
+            post_id,
+            post_url,
         )
         return post_id, post_url
 
@@ -609,5 +641,7 @@ def _submit_to_cms(
     base = config.base_url.rstrip("/") if config.base_url else "https://example.com"
     post_url = f"{base}/{slug}/"
 
-    logger.info("Submitted post to %s CMS (stub): %s -> %s", config.cms_type, post_id, post_url)
+    logger.info(
+        "Submitted post to %s CMS (stub): %s -> %s", config.cms_type, post_id, post_url
+    )
     return post_id, post_url

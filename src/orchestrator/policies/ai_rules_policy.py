@@ -40,6 +40,7 @@ from src.core.logger import get_logger, log_event
 # Verdict
 # ---------------------------------------------------------------------------
 
+
 @unique
 class PolicyVerdict(str, Enum):
     """Outcome of a policy check."""
@@ -85,7 +86,10 @@ _BLACKHAT_PATTERNS: List[re.Pattern[str]] = [
     re.compile(r"display\s*:\s*none", re.IGNORECASE),
     re.compile(r"visibility\s*:\s*hidden", re.IGNORECASE),
     re.compile(r"font-size\s*:\s*0", re.IGNORECASE),
-    re.compile(r"color\s*:\s*(?:#fff(?:fff)?|white)\s*;\s*background\s*:\s*(?:#fff(?:fff)?|white)", re.IGNORECASE),
+    re.compile(
+        r"color\s*:\s*(?:#fff(?:fff)?|white)\s*;\s*background\s*:\s*(?:#fff(?:fff)?|white)",
+        re.IGNORECASE,
+    ),
 ]
 
 # Disclosure phrases that satisfy FTC requirements.
@@ -120,6 +124,7 @@ _SENSITIVE_CLAIM_PATTERNS: Dict[str, re.Pattern[str]] = {
 # ---------------------------------------------------------------------------
 # AIRulesPolicy
 # ---------------------------------------------------------------------------
+
 
 class AIRulesPolicy:
     """Enforces AI_RULES.md at runtime before content is published or claims are made.
@@ -229,9 +234,7 @@ class AIRulesPolicy:
                 blackhat_hits.append(pattern.pattern)
         if blackhat_hits:
             details["blackhat_patterns"] = blackhat_hits
-            violations.append(
-                f"Black-hat SEO patterns detected: {blackhat_hits}."
-            )
+            violations.append(f"Black-hat SEO patterns detected: {blackhat_hits}.")
 
         # Build verdict
         verdict = PolicyVerdict.ALLOW if not violations else PolicyVerdict.BLOCK
@@ -398,9 +401,14 @@ class AIRulesPolicy:
             all_details["claims"] = claim_result.details
 
         # Determine most restrictive verdict
-        if any(v.startswith("Word count") or v.startswith("Quality score")
-               or v.startswith("Keyword density") or v.startswith("Black-hat")
-               or v.startswith("No FTC") for v in all_violations):
+        if any(
+            v.startswith("Word count")
+            or v.startswith("Quality score")
+            or v.startswith("Keyword density")
+            or v.startswith("Black-hat")
+            or v.startswith("No FTC")
+            for v in all_violations
+        ):
             verdict = PolicyVerdict.BLOCK
         elif any("review required" in v.lower() for v in all_violations):
             verdict = PolicyVerdict.REVIEW

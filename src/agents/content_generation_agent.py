@@ -35,6 +35,7 @@ from src.core.logger import log_event
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @unique
 class ContentType(str, Enum):
     """Types of content the agent can produce."""
@@ -165,6 +166,7 @@ class ContentExecutionResult:
 # Agent implementation
 # ---------------------------------------------------------------------------
 
+
 class ContentGenerationAgent(BaseAgent):
     """Handles the full content creation pipeline.
 
@@ -214,7 +216,9 @@ class ContentGenerationAgent(BaseAgent):
             brief: The content brief to enqueue.
         """
         self._pending_briefs.append(brief)
-        self.logger.info("Enqueued brief %s: '%s'", brief.brief_id, brief.primary_keyword)
+        self.logger.info(
+            "Enqueued brief %s: '%s'", brief.brief_id, brief.primary_keyword
+        )
 
     # ------------------------------------------------------------------
     # BaseAgent lifecycle
@@ -316,14 +320,18 @@ class ContentGenerationAgent(BaseAgent):
                     )
 
             except Exception as exc:
-                result.errors.append(f"Pipeline failed for brief {brief.brief_id}: {exc}")
+                result.errors.append(
+                    f"Pipeline failed for brief {brief.brief_id}: {exc}"
+                )
                 self.logger.error(
                     "Content pipeline failed for brief %s: %s", brief.brief_id, exc
                 )
 
         return result
 
-    def report(self, plan: ContentPlan, result: ContentExecutionResult) -> Dict[str, Any]:
+    def report(
+        self, plan: ContentPlan, result: ContentExecutionResult
+    ) -> Dict[str, Any]:
         """Log content quality metrics and return a structured summary.
 
         Parameters:
@@ -333,13 +341,10 @@ class ContentGenerationAgent(BaseAgent):
         Returns:
             A summary dict for the orchestrator's audit log.
         """
-        passed_count = sum(
-            1 for m in result.quality_metrics.values() if m.passed
-        )
+        passed_count = sum(1 for m in result.quality_metrics.values() if m.passed)
         total_words = sum(m.word_count for m in result.quality_metrics.values())
-        avg_seo = (
-            sum(m.seo_score for m in result.quality_metrics.values())
-            / max(len(result.quality_metrics), 1)
+        avg_seo = sum(m.seo_score for m in result.quality_metrics.values()) / max(
+            len(result.quality_metrics), 1
         )
 
         report_data: Dict[str, Any] = {
@@ -384,19 +389,24 @@ class ContentGenerationAgent(BaseAgent):
         if not hasattr(self, "_llm_tool") or self._llm_tool is None:
             import os
             from src.agents.tools.llm_tool import LLMTool
+
             provider = os.environ.get("LLM_PROVIDER", "anthropic")
-            self._llm_tool = LLMTool({
-                "primary_provider": provider,
-                "primary_model": os.environ.get("LLM_MODEL_DEFAULT", "claude-sonnet-4-20250514"),
-                "primary_api_key": os.environ.get("LLM_API_KEY", ""),
-                "fallback_provider": "openai" if provider != "openai" else None,
-                "fallback_model": "gpt-4o",
-                "fallback_api_key": os.environ.get("OPENAI_API_KEY", ""),
-                "default_max_tokens": 4096,
-                "temperature": 0.7,
-                "retry_attempts": 2,
-                "retry_delay": 1.0,
-            })
+            self._llm_tool = LLMTool(
+                {
+                    "primary_provider": provider,
+                    "primary_model": os.environ.get(
+                        "LLM_MODEL_DEFAULT", "claude-sonnet-4-20250514"
+                    ),
+                    "primary_api_key": os.environ.get("LLM_API_KEY", ""),
+                    "fallback_provider": "openai" if provider != "openai" else None,
+                    "fallback_model": "gpt-4o",
+                    "fallback_api_key": os.environ.get("OPENAI_API_KEY", ""),
+                    "default_max_tokens": 4096,
+                    "temperature": 0.7,
+                    "retry_attempts": 2,
+                    "retry_delay": 1.0,
+                }
+            )
         return self._llm_tool
 
     # ------------------------------------------------------------------
@@ -419,23 +429,40 @@ class ContentGenerationAgent(BaseAgent):
 
         # Try LLM-generated outline if not dry-run and API key is set
         import os
+
         if not self._dry_run and os.environ.get("LLM_API_KEY"):
             try:
                 return self._generate_outline_with_llm(brief)
             except Exception as exc:
                 self.logger.warning(
                     "LLM outline generation failed for %s, using template: %s",
-                    brief.brief_id, exc,
+                    brief.brief_id,
+                    exc,
                 )
 
         # Template fallback
         sections = [
-            {"heading": f"Introduction to {brief.primary_keyword}", "notes": "Hook and overview"},
-            {"heading": f"What is {brief.primary_keyword}?", "notes": "Definition and context"},
-            {"heading": "Key Features and Benefits", "notes": "Core value propositions"},
+            {
+                "heading": f"Introduction to {brief.primary_keyword}",
+                "notes": "Hook and overview",
+            },
+            {
+                "heading": f"What is {brief.primary_keyword}?",
+                "notes": "Definition and context",
+            },
+            {
+                "heading": "Key Features and Benefits",
+                "notes": "Core value propositions",
+            },
             {"heading": "How to Choose", "notes": "Buyer criteria and comparison"},
-            {"heading": "Our Top Recommendations", "notes": "Curated picks with rationale"},
-            {"heading": "Frequently Asked Questions", "notes": "Address common queries"},
+            {
+                "heading": "Our Top Recommendations",
+                "notes": "Curated picks with rationale",
+            },
+            {
+                "heading": "Frequently Asked Questions",
+                "notes": "Address common queries",
+            },
             {"heading": "Final Verdict", "notes": "Summary and CTA"},
         ]
 
@@ -489,7 +516,9 @@ class ContentGenerationAgent(BaseAgent):
             faq=data.get("faq", []),
         )
 
-    def _generate_draft(self, brief: ContentBrief, outline: ContentOutline) -> ContentDraft:
+    def _generate_draft(
+        self, brief: ContentBrief, outline: ContentOutline
+    ) -> ContentDraft:
         """Produce a full article draft from the outline.
 
         Uses LLMTool when an API key is configured and not in dry-run mode.
@@ -506,26 +535,28 @@ class ContentGenerationAgent(BaseAgent):
 
         # Try LLM-generated draft if not dry-run and API key is set
         import os
+
         if not self._dry_run and os.environ.get("LLM_API_KEY"):
             try:
                 return self._generate_draft_with_llm(brief, outline)
             except Exception as exc:
                 self.logger.warning(
                     "LLM draft generation failed for %s, using placeholder: %s",
-                    brief.brief_id, exc,
+                    brief.brief_id,
+                    exc,
                 )
 
         # Placeholder fallback
         html_parts = [f"<h1>{outline.title}</h1>"]
         for section in outline.sections:
-            html_parts.append(f'<h2>{section["heading"]}</h2>')
-            html_parts.append(f'<p>[Content for: {section["notes"]}]</p>')
+            html_parts.append(f"<h2>{section['heading']}</h2>")
+            html_parts.append(f"<p>[Content for: {section['notes']}]</p>")
 
         if outline.faq:
             html_parts.append("<h2>Frequently Asked Questions</h2>")
             for item in outline.faq:
-                html_parts.append(f'<h3>{item["question"]}</h3>')
-                html_parts.append(f'<p>{item.get("answer", "[Answer pending]")}</p>')
+                html_parts.append(f"<h3>{item['question']}</h3>")
+                html_parts.append(f"<p>{item.get('answer', '[Answer pending]')}</p>")
 
         html_body = "\n".join(html_parts)
         word_count = len(html_body.split())
@@ -537,18 +568,21 @@ class ContentGenerationAgent(BaseAgent):
             word_count=word_count,
         )
 
-    def _generate_draft_with_llm(self, brief: ContentBrief, outline: ContentOutline) -> ContentDraft:
+    def _generate_draft_with_llm(
+        self, brief: ContentBrief, outline: ContentOutline
+    ) -> ContentDraft:
         """Generate a full article draft using the LLM tool."""
 
         llm = self._get_llm_tool()
 
         sections_str = "\n".join(
-            f'- {s["heading"]}: {s.get("notes", "")}'
-            for s in outline.sections
+            f"- {s['heading']}: {s.get('notes', '')}" for s in outline.sections
         )
-        faq_str = "\n".join(
-            f'- {q["question"]}' for q in outline.faq
-        ) if outline.faq else "None"
+        faq_str = (
+            "\n".join(f"- {q['question']}" for q in outline.faq)
+            if outline.faq
+            else "None"
+        )
 
         prompt = (
             f"Write a full SEO-optimized affiliate article in HTML format.\n\n"
@@ -627,7 +661,9 @@ class ContentGenerationAgent(BaseAgent):
         # Placeholder -- real implementation uses LinkTool
         return draft
 
-    def _assess_quality(self, draft: ContentDraft, brief: ContentBrief) -> QualityMetrics:
+    def _assess_quality(
+        self, draft: ContentDraft, brief: ContentBrief
+    ) -> QualityMetrics:
         """Run quality checks against configured thresholds.
 
         Parameters:
@@ -663,7 +699,11 @@ class ContentGenerationAgent(BaseAgent):
         seo_score = 0.0
         if draft.word_count >= DEFAULT_MIN_WORD_COUNT:
             seo_score += 0.3
-        if self._keyword_density_target * 0.5 <= density <= self._keyword_density_target * 2:
+        if (
+            self._keyword_density_target * 0.5
+            <= density
+            <= self._keyword_density_target * 2
+        ):
             seo_score += 0.3
         if draft.outline.meta_desc:
             seo_score += 0.2

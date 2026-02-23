@@ -23,6 +23,7 @@ APP_USER_AGENT: str = f"{APP_NAME}/{APP_VERSION}"
 # Agent names  (must match keys in config/agents.yaml)
 # ---------------------------------------------------------------------------
 
+
 @unique
 class AgentName(str, Enum):
     """Canonical agent identifiers used for logging, routing, and config lookup."""
@@ -44,6 +45,7 @@ class AgentName(str, Enum):
 # Pipeline names  (must match keys in config/pipelines.yaml)
 # ---------------------------------------------------------------------------
 
+
 @unique
 class PipelineName(str, Enum):
     """Canonical pipeline identifiers."""
@@ -60,6 +62,7 @@ class PipelineName(str, Enum):
 # ---------------------------------------------------------------------------
 # Statuses
 # ---------------------------------------------------------------------------
+
 
 @unique
 class TaskStatus(str, Enum):
@@ -121,7 +124,7 @@ class RiskLevel(str, Enum):
 class NodeRole(str, Enum):
     """Node role in the two-node Mac Mini cluster topology."""
 
-    CORE = "core"      # oc-core-01: orchestrator, research, content, db
+    CORE = "core"  # oc-core-01: orchestrator, research, content, db
     PUBLISHER = "pub"  # oc-pub-01: publishing, CMS, DNS, monitoring
 
 
@@ -131,14 +134,14 @@ class NodeRole(str, Enum):
 
 # Retry / backoff
 DEFAULT_MAX_RETRIES: int = 3
-DEFAULT_RETRY_BASE_DELAY: float = 1.0       # seconds
-DEFAULT_RETRY_MAX_DELAY: float = 60.0       # seconds
+DEFAULT_RETRY_BASE_DELAY: float = 1.0  # seconds
+DEFAULT_RETRY_MAX_DELAY: float = 60.0  # seconds
 DEFAULT_RETRY_EXPONENTIAL_BASE: float = 2.0
 
 # Content
 DEFAULT_TARGET_WORD_COUNT: int = 1500
 DEFAULT_MIN_WORD_COUNT: int = 1000
-DEFAULT_KEYWORD_DENSITY: float = 0.015       # 1.5 %
+DEFAULT_KEYWORD_DENSITY: float = 0.015  # 1.5 %
 DEFAULT_MAX_INTERNAL_LINKS: int = 8
 DEFAULT_MIN_INTERNAL_LINKS: int = 3
 DEFAULT_QUALITY_THRESHOLD: float = 0.7

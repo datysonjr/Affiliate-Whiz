@@ -53,6 +53,7 @@ _PRODUCT_API = "https://product-search.api.cj.com"
 # Data containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CJAdvertiser:
     """Normalised advertiser record from the CJ API.
@@ -226,6 +227,7 @@ class CJProduct:
 # CJIntegration client
 # ---------------------------------------------------------------------------
 
+
 class CJIntegration:
     """Client for the Commission Junction (CJ Affiliate) REST API.
 
@@ -320,8 +322,12 @@ class CJIntegration:
             name=data.get("advertiser-name", data.get("advertiserName", "")),
             category=data.get("primary-category", data.get("primaryCategory", "")),
             network_rank=int(data.get("network-rank", data.get("networkRank", 0))),
-            seven_day_epc=float(data.get("seven-day-epc", data.get("sevenDayEpc", 0.0))),
-            three_month_epc=float(data.get("three-month-epc", data.get("threeMonthEpc", 0.0))),
+            seven_day_epc=float(
+                data.get("seven-day-epc", data.get("sevenDayEpc", 0.0))
+            ),
+            three_month_epc=float(
+                data.get("three-month-epc", data.get("threeMonthEpc", 0.0))
+            ),
             commission_terms=data.get("actions", {}).get("action", {}).get("name", ""),
             cookie_days=int(data.get("cookie-days", data.get("cookieDays", 30))),
             status=data.get("relationship-status", data.get("relationshipStatus", "")),
@@ -349,7 +355,9 @@ class CJIntegration:
         raw_end = data.get("promotion-end-date", data.get("promotionEndDate"))
         if raw_start:
             try:
-                promo_start = datetime.fromisoformat(str(raw_start).replace("Z", "+00:00"))
+                promo_start = datetime.fromisoformat(
+                    str(raw_start).replace("Z", "+00:00")
+                )
             except (ValueError, TypeError):
                 promo_start = None
         if raw_end:
@@ -390,7 +398,9 @@ class CJIntegration:
         raw_date = data.get("event-date", data.get("eventDate"))
         if raw_date:
             try:
-                event_date = datetime.fromisoformat(str(raw_date).replace("Z", "+00:00"))
+                event_date = datetime.fromisoformat(
+                    str(raw_date).replace("Z", "+00:00")
+                )
             except (ValueError, TypeError):
                 event_date = None
 
@@ -399,7 +409,9 @@ class CJIntegration:
             advertiser_id=str(data.get("advertiser-id", data.get("advertiserId", ""))),
             advertiser_name=data.get("advertiser-name", data.get("advertiserName", "")),
             event_date=event_date,
-            commission_amount=float(data.get("commission-amount", data.get("commissionAmount", 0.0))),
+            commission_amount=float(
+                data.get("commission-amount", data.get("commissionAmount", 0.0))
+            ),
             sale_amount=float(data.get("sale-amount", data.get("saleAmount", 0.0))),
             currency=data.get("currency", "USD"),
             status=data.get("action-status", data.get("actionStatus", "received")),
@@ -431,7 +443,9 @@ class CJIntegration:
             currency=data.get("currency", "USD"),
             image_url=data.get("image-url", data.get("imageUrl", "")),
             buy_url=data.get("buy-url", data.get("buyUrl", "")),
-            category=data.get("advertiser-category", data.get("advertiserCategory", "")),
+            category=data.get(
+                "advertiser-category", data.get("advertiserCategory", "")
+            ),
             in_stock=data.get("in-stock", data.get("inStock", True)),
         )
 
@@ -629,8 +643,12 @@ class CJIntegration:
         self._track_request()
 
         self._build_headers()
-        logger.debug("CJ GET %s with date range %s to %s", url,
-                      start_date.isoformat(), end_date.isoformat())
+        logger.debug(
+            "CJ GET %s with date range %s to %s",
+            url,
+            start_date.isoformat(),
+            end_date.isoformat(),
+        )
 
         # Production: parse commission records from response.
         return []

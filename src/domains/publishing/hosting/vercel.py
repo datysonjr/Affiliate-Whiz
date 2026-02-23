@@ -42,6 +42,7 @@ _BASE_URL = "https://api.vercel.com"
 # Data containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class VercelDeployment:
     """A single Vercel deployment record.
@@ -149,6 +150,7 @@ class VercelProject:
 # VercelHosting client
 # ---------------------------------------------------------------------------
 
+
 class VercelHosting:
     """Client for managing hosting via the Vercel REST API.
 
@@ -200,10 +202,12 @@ class VercelHosting:
         self.logger: logging.Logger = get_logger("publishing.hosting.vercel")
 
         self._session = requests.Session()
-        self._session.headers.update({
-            "Authorization": f"Bearer {api_token}",
-            "Content-Type": "application/json",
-        })
+        self._session.headers.update(
+            {
+                "Authorization": f"Bearer {api_token}",
+                "Content-Type": "application/json",
+            }
+        )
 
         log_event(logger, "vercel.init", has_team_id=bool(team_id))
 
@@ -355,9 +359,12 @@ class VercelHosting:
             payload["files"] = files
 
         log_event(
-            logger, "vercel.deploy",
-            project=project_name, target=target,
-            has_git=bool(git_source), has_files=bool(files),
+            logger,
+            "vercel.deploy",
+            project=project_name,
+            target=target,
+            has_git=bool(git_source),
+            has_files=bool(files),
         )
 
         data = self._api_request("POST", "/v13/deployments", json_data=payload)
@@ -412,8 +419,10 @@ class VercelHosting:
             params["state"] = state
 
         log_event(
-            logger, "vercel.get_deployments",
-            project=project_name, limit=limit,
+            logger,
+            "vercel.get_deployments",
+            project=project_name,
+            limit=limit,
         )
 
         data = self._api_request("GET", "/v6/deployments", params=params)
@@ -421,18 +430,20 @@ class VercelHosting:
 
         for item in data.get("deployments", []):
             meta = item.get("meta", {})
-            deployments.append(VercelDeployment(
-                deployment_id=item.get("uid", ""),
-                name=item.get("name", ""),
-                url=item.get("url", ""),
-                state=item.get("readyState", item.get("state", "")),
-                target=item.get("target", ""),
-                created_at=self._parse_timestamp(item.get("createdAt")),
-                ready_at=self._parse_timestamp(item.get("ready")),
-                commit_sha=meta.get("githubCommitSha", ""),
-                commit_message=meta.get("githubCommitMessage", ""),
-                branch=meta.get("githubCommitRef", ""),
-            ))
+            deployments.append(
+                VercelDeployment(
+                    deployment_id=item.get("uid", ""),
+                    name=item.get("name", ""),
+                    url=item.get("url", ""),
+                    state=item.get("readyState", item.get("state", "")),
+                    target=item.get("target", ""),
+                    created_at=self._parse_timestamp(item.get("createdAt")),
+                    ready_at=self._parse_timestamp(item.get("ready")),
+                    commit_sha=meta.get("githubCommitSha", ""),
+                    commit_message=meta.get("githubCommitMessage", ""),
+                    branch=meta.get("githubCommitRef", ""),
+                )
+            )
 
         self.logger.debug(
             "Retrieved %d deployments for project %s", len(deployments), project_name
@@ -463,16 +474,20 @@ class VercelHosting:
 
         for item in data.get("domains", []):
             verification = item.get("verification", [])
-            domains.append(VercelDomain(
-                domain=item.get("name", ""),
-                project_id=item.get("projectId", project_name),
-                redirect=item.get("redirect", ""),
-                verified=item.get("verified", False),
-                ssl_configured=not any(
-                    v.get("type") == "pending" for v in verification
-                ) if verification else True,
-                created_at=self._parse_timestamp(item.get("createdAt")),
-            ))
+            domains.append(
+                VercelDomain(
+                    domain=item.get("name", ""),
+                    project_id=item.get("projectId", project_name),
+                    redirect=item.get("redirect", ""),
+                    verified=item.get("verified", False),
+                    ssl_configured=not any(
+                        v.get("type") == "pending" for v in verification
+                    )
+                    if verification
+                    else True,
+                    created_at=self._parse_timestamp(item.get("createdAt")),
+                )
+            )
 
         self.logger.debug(
             "Retrieved %d domains for project %s", len(domains), project_name
@@ -520,12 +535,16 @@ class VercelHosting:
             payload["gitBranch"] = git_branch
 
         log_event(
-            logger, "vercel.configure_domain",
-            project=project_name, domain=domain,
+            logger,
+            "vercel.configure_domain",
+            project=project_name,
+            domain=domain,
         )
 
         data = self._api_request(
-            "POST", f"/v10/projects/{project_name}/domains", json_data=payload,
+            "POST",
+            f"/v10/projects/{project_name}/domains",
+            json_data=payload,
         )
 
         result = VercelDomain(
@@ -538,7 +557,9 @@ class VercelHosting:
 
         self.logger.info(
             "Configured domain '%s' on project '%s' (verified=%s)",
-            result.domain, project_name, result.verified,
+            result.domain,
+            project_name,
+            result.verified,
         )
         return result
 
@@ -558,6 +579,5 @@ class VercelHosting:
 
     def __repr__(self) -> str:
         return (
-            f"VercelHosting(team_id={self._team_id!r}, "
-            f"requests={self._request_count})"
+            f"VercelHosting(team_id={self._team_id!r}, requests={self._request_count})"
         )

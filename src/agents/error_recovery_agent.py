@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @unique
 class ErrorSeverity(str, Enum):
     """How severe the error is."""
@@ -52,11 +53,11 @@ class ErrorSeverity(str, Enum):
 class ErrorCategory(str, Enum):
     """High-level classification of the error cause."""
 
-    TRANSIENT = "transient"       # Network timeout, rate limit, temporary outage
-    DATA = "data"                 # Invalid data, missing fields, parse errors
-    CONFIGURATION = "config"      # Bad config, missing credentials
-    INFRASTRUCTURE = "infra"      # Disk full, OOM, service down
-    LOGIC = "logic"               # Application bug, unexpected state
+    TRANSIENT = "transient"  # Network timeout, rate limit, temporary outage
+    DATA = "data"  # Invalid data, missing fields, parse errors
+    CONFIGURATION = "config"  # Bad config, missing credentials
+    INFRASTRUCTURE = "infra"  # Disk full, OOM, service down
+    LOGIC = "logic"  # Application bug, unexpected state
     UNKNOWN = "unknown"
 
 
@@ -157,6 +158,7 @@ class RecoveryExecutionResult:
 # Agent implementation
 # ---------------------------------------------------------------------------
 
+
 class ErrorRecoveryAgent(BaseAgent):
     """Identifies failed operations and attempts automated recovery.
 
@@ -177,10 +179,18 @@ class ErrorRecoveryAgent(BaseAgent):
     def __init__(self, config: Dict[str, Any]) -> None:
         super().__init__(name=str(AgentName.ERROR_RECOVERY), config=config)
         self._max_retries: int = config.get("max_retries", DEFAULT_MAX_RETRIES)
-        self._retry_base_delay: float = config.get("retry_base_delay", DEFAULT_RETRY_BASE_DELAY)
-        self._retry_max_delay: float = config.get("retry_max_delay", DEFAULT_RETRY_MAX_DELAY)
-        self._retry_exp_base: float = config.get("retry_exponential_base", DEFAULT_RETRY_EXPONENTIAL_BASE)
-        self._quarantine_after: int = config.get("quarantine_after", DEFAULT_MAX_RETRIES)
+        self._retry_base_delay: float = config.get(
+            "retry_base_delay", DEFAULT_RETRY_BASE_DELAY
+        )
+        self._retry_max_delay: float = config.get(
+            "retry_max_delay", DEFAULT_RETRY_MAX_DELAY
+        )
+        self._retry_exp_base: float = config.get(
+            "retry_exponential_base", DEFAULT_RETRY_EXPONENTIAL_BASE
+        )
+        self._quarantine_after: int = config.get(
+            "quarantine_after", DEFAULT_MAX_RETRIES
+        )
         self._escalation_severity: ErrorSeverity = ErrorSeverity(
             config.get("escalation_severity", "critical")
         )
@@ -222,7 +232,9 @@ class ErrorRecoveryAgent(BaseAgent):
             self.logger,
             "error_recovery.plan.complete",
             operations=len(plan.operations),
-            strategies={s.value: list(strategies.values()).count(s) for s in RecoveryStrategy},
+            strategies={
+                s.value: list(strategies.values()).count(s) for s in RecoveryStrategy
+            },
         )
         return plan
 
@@ -269,12 +281,16 @@ class ErrorRecoveryAgent(BaseAgent):
                 result.outcomes[op.operation_id] = outcome
                 result.errors.append(f"Recovery failed for '{op.operation_id}': {exc}")
                 self.logger.error(
-                    "Recovery failed for operation '%s': %s", op.operation_id, exc,
+                    "Recovery failed for operation '%s': %s",
+                    op.operation_id,
+                    exc,
                 )
 
         return result
 
-    def report(self, plan: RecoveryPlan, result: RecoveryExecutionResult) -> Dict[str, Any]:
+    def report(
+        self, plan: RecoveryPlan, result: RecoveryExecutionResult
+    ) -> Dict[str, Any]:
         """Log recovery outcomes and return a structured summary.
 
         Parameters:
@@ -290,8 +306,10 @@ class ErrorRecoveryAgent(BaseAgent):
             "quarantined": result.quarantined,
             "escalated": result.escalated,
             "still_failing": (
-                len(plan.operations) - result.recovered
-                - result.quarantined - result.escalated
+                len(plan.operations)
+                - result.recovered
+                - result.quarantined
+                - result.escalated
             ),
             "quarantine_size": len(self._quarantine_store),
             "per_operation": {
@@ -341,32 +359,52 @@ class ErrorRecoveryAgent(BaseAgent):
 
         # Transient: network issues, rate limits, timeouts
         transient_signals = [
-            "timeout", "timed out", "rate limit", "429", "503",
-            "connection refused", "connection reset", "retry",
+            "timeout",
+            "timed out",
+            "rate limit",
+            "429",
+            "503",
+            "connection refused",
+            "connection reset",
+            "retry",
         ]
         if any(signal in msg for signal in transient_signals):
             return ErrorCategory.TRANSIENT
 
         # Infrastructure: disk, memory, service availability
         infra_signals = [
-            "disk full", "no space", "out of memory", "oom",
-            "service unavailable", "connection pool",
+            "disk full",
+            "no space",
+            "out of memory",
+            "oom",
+            "service unavailable",
+            "connection pool",
         ]
         if any(signal in msg for signal in infra_signals):
             return ErrorCategory.INFRASTRUCTURE
 
         # Data: validation, parsing, missing fields
         data_signals = [
-            "validation", "parse error", "missing field", "invalid",
-            "json", "decode", "encoding",
+            "validation",
+            "parse error",
+            "missing field",
+            "invalid",
+            "json",
+            "decode",
+            "encoding",
         ]
         if any(signal in msg for signal in data_signals):
             return ErrorCategory.DATA
 
         # Configuration: credentials, config, environment
         config_signals = [
-            "credential", "api key", "auth", "permission", "config",
-            "not configured", "missing env",
+            "credential",
+            "api key",
+            "auth",
+            "permission",
+            "config",
+            "not configured",
+            "missing env",
         ]
         if any(signal in msg for signal in config_signals):
             return ErrorCategory.CONFIGURATION
@@ -419,7 +457,11 @@ class ErrorRecoveryAgent(BaseAgent):
 
         # Data errors with low retry count: retry once then quarantine
         if op.category == ErrorCategory.DATA:
-            return RecoveryStrategy.RETRY if op.retry_count == 0 else RecoveryStrategy.QUARANTINE
+            return (
+                RecoveryStrategy.RETRY
+                if op.retry_count == 0
+                else RecoveryStrategy.QUARANTINE
+            )
 
         # Configuration errors: escalate (need human intervention)
         if op.category == ErrorCategory.CONFIGURATION:
@@ -427,7 +469,11 @@ class ErrorRecoveryAgent(BaseAgent):
 
         # Infrastructure errors: attempt retry then escalate
         if op.category == ErrorCategory.INFRASTRUCTURE:
-            return RecoveryStrategy.RETRY if op.retry_count < 2 else RecoveryStrategy.ESCALATE
+            return (
+                RecoveryStrategy.RETRY
+                if op.retry_count < 2
+                else RecoveryStrategy.ESCALATE
+            )
 
         return RecoveryStrategy.RETRY
 
@@ -452,7 +498,8 @@ class ErrorRecoveryAgent(BaseAgent):
         if strategy == RecoveryStrategy.QUARANTINE:
             self.logger.info(
                 "Quarantining operation '%s' after %d retries.",
-                op.operation_id, op.retry_count,
+                op.operation_id,
+                op.retry_count,
             )
             return RecoveryOutcome(
                 operation_id=op.operation_id,
@@ -464,7 +511,9 @@ class ErrorRecoveryAgent(BaseAgent):
         if strategy == RecoveryStrategy.ESCALATE:
             self.logger.warning(
                 "Escalating operation '%s' (severity=%s, category=%s).",
-                op.operation_id, op.severity.value, op.category.value,
+                op.operation_id,
+                op.severity.value,
+                op.category.value,
             )
             return RecoveryOutcome(
                 operation_id=op.operation_id,
@@ -504,12 +553,15 @@ class ErrorRecoveryAgent(BaseAgent):
             )
 
         delay = min(
-            self._retry_base_delay * (self._retry_exp_base ** op.retry_count),
+            self._retry_base_delay * (self._retry_exp_base**op.retry_count),
             self._retry_max_delay,
         )
         self.logger.info(
             "Retrying operation '%s' (attempt %d/%d, delay=%.1fs).",
-            op.operation_id, op.retry_count + 1, self._max_retries, delay,
+            op.operation_id,
+            op.retry_count + 1,
+            self._max_retries,
+            delay,
         )
 
         # In production: sleep then re-queue the operation via orchestrator.

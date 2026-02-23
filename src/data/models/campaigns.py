@@ -199,9 +199,7 @@ class CampaignRepository:
         Campaign or None
             The campaign if found, otherwise ``None``.
         """
-        row = self._db.fetch_one(
-            "SELECT * FROM campaigns WHERE id = ?", (campaign_id,)
-        )
+        row = self._db.fetch_one("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
         if row is None:
             return None
         return self._row_to_campaign(row)
@@ -214,9 +212,7 @@ class CampaignRepository:
         Campaign or None
             The campaign if found, otherwise ``None``.
         """
-        row = self._db.fetch_one(
-            "SELECT * FROM campaigns WHERE name = ?", (name,)
-        )
+        row = self._db.fetch_one("SELECT * FROM campaigns WHERE name = ?", (name,))
         if row is None:
             return None
         return self._row_to_campaign(row)
@@ -327,9 +323,7 @@ class CampaignRepository:
         bool
             ``True`` if a row was deleted, ``False`` if no such campaign.
         """
-        cursor = self._db.execute(
-            "DELETE FROM campaigns WHERE id = ?", (campaign_id,)
-        )
+        cursor = self._db.execute("DELETE FROM campaigns WHERE id = ?", (campaign_id,))
         deleted = cursor.rowcount > 0
         if deleted:
             log_event(logger, "campaign.deleted", id=campaign_id)

@@ -41,6 +41,7 @@ logger = get_logger("integrations.hosting.provider_api")
 # Data containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class DeploymentResult:
     """Result of a site deployment operation.
@@ -160,6 +161,7 @@ class SSLConfiguration:
 # ---------------------------------------------------------------------------
 # Abstract base class
 # ---------------------------------------------------------------------------
+
 
 class HostingProvider(ABC):
     """Abstract interface for hosting provider integrations.
@@ -337,6 +339,7 @@ class HostingProvider(ABC):
 # ---------------------------------------------------------------------------
 # Concrete providers
 # ---------------------------------------------------------------------------
+
 
 class CloudflarePagesProvider(HostingProvider):
     """Cloudflare Pages hosting provider implementation.
@@ -636,7 +639,9 @@ def register_provider(name: str, provider_class: type) -> None:
     TypeError
         If *provider_class* does not extend :class:`HostingProvider`.
     """
-    if not (isinstance(provider_class, type) and issubclass(provider_class, HostingProvider)):
+    if not (
+        isinstance(provider_class, type) and issubclass(provider_class, HostingProvider)
+    ):
         raise TypeError(
             f"provider_class must be a subclass of HostingProvider, got {provider_class!r}"
         )

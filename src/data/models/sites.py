@@ -195,9 +195,7 @@ class SiteRepository:
         Site or None
             The site if found, otherwise ``None``.
         """
-        row = self._db.fetch_one(
-            "SELECT * FROM sites WHERE id = ?", (site_id,)
-        )
+        row = self._db.fetch_one("SELECT * FROM sites WHERE id = ?", (site_id,))
         if row is None:
             return None
         return self._row_to_site(row)
@@ -210,9 +208,7 @@ class SiteRepository:
         Site or None
             The site if found, otherwise ``None``.
         """
-        row = self._db.fetch_one(
-            "SELECT * FROM sites WHERE domain = ?", (domain,)
-        )
+        row = self._db.fetch_one("SELECT * FROM sites WHERE domain = ?", (domain,))
         if row is None:
             return None
         return self._row_to_site(row)
@@ -394,9 +390,7 @@ class SiteRepository:
         bool
             ``True`` if a row was deleted, ``False`` if no such site.
         """
-        cursor = self._db.execute(
-            "DELETE FROM sites WHERE id = ?", (site_id,)
-        )
+        cursor = self._db.execute("DELETE FROM sites WHERE id = ?", (site_id,))
         deleted = cursor.rowcount > 0
         if deleted:
             log_event(logger, "site.deleted", id=site_id)

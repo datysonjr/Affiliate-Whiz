@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PageNode:
     """Represents a single page in the site's link graph.
@@ -147,6 +148,7 @@ class TrafficRoutingResult:
 # Agent implementation
 # ---------------------------------------------------------------------------
 
+
 class TrafficRoutingAgent(BaseAgent):
     """Manages internal linking to improve site topology and organic traffic.
 
@@ -201,13 +203,11 @@ class TrafficRoutingAgent(BaseAgent):
 
         # Step 3: Identify under-linked and over-linked pages
         under_linked = [
-            p for p in pages
+            p
+            for p in pages
             if p.inbound_links < self._min_internal_links and not p.is_orphan
         ]
-        over_linked = [
-            p for p in pages
-            if p.outbound_links > self._max_internal_links
-        ]
+        over_linked = [p for p in pages if p.outbound_links > self._max_internal_links]
 
         # Step 4: Generate link suggestions
         suggestions = self._suggest_links(pages, orphan_pages, under_linked)
@@ -217,7 +217,7 @@ class TrafficRoutingAgent(BaseAgent):
             orphan_pages=orphan_pages,
             under_linked=under_linked,
             over_linked=over_linked,
-            suggestions=suggestions[:self._max_suggestions],
+            suggestions=suggestions[: self._max_suggestions],
             plan_time=datetime.now(timezone.utc),
         )
 
@@ -269,10 +269,7 @@ class TrafficRoutingAgent(BaseAgent):
                 if change.success:
                     result.links_added += 1
                     # Check if this fixed an orphan
-                    if any(
-                        p.url == suggestion.target_url
-                        for p in plan.orphan_pages
-                    ):
+                    if any(p.url == suggestion.target_url for p in plan.orphan_pages):
                         result.orphans_fixed += 1
                 else:
                     result.errors.append(
@@ -296,12 +293,16 @@ class TrafficRoutingAgent(BaseAgent):
                 )
                 self.logger.error(
                     "Failed to apply link suggestion: %s -> %s: %s",
-                    suggestion.source_url, suggestion.target_url, exc,
+                    suggestion.source_url,
+                    suggestion.target_url,
+                    exc,
                 )
 
         return result
 
-    def report(self, plan: TrafficRoutingPlan, result: TrafficRoutingResult) -> Dict[str, Any]:
+    def report(
+        self, plan: TrafficRoutingPlan, result: TrafficRoutingResult
+    ) -> Dict[str, Any]:
         """Log link structure changes and return a summary.
 
         Parameters:
@@ -389,7 +390,9 @@ class TrafficRoutingAgent(BaseAgent):
                 orphans.append(page)
 
         self.logger.info(
-            "Found %d orphan pages out of %d total.", len(orphans), len(pages),
+            "Found %d orphan pages out of %d total.",
+            len(orphans),
+            len(pages),
         )
         return orphans
 
@@ -431,13 +434,15 @@ class TrafficRoutingAgent(BaseAgent):
 
                 relevance = self._compute_relevance(source, orphan)
                 if relevance >= self._relevance_threshold:
-                    suggestions.append(LinkSuggestion(
-                        source_url=source.url,
-                        target_url=orphan.url,
-                        anchor_text=orphan.primary_keyword or orphan.title,
-                        relevance=relevance,
-                        reason=f"Orphan page in niche '{orphan.niche}'",
-                    ))
+                    suggestions.append(
+                        LinkSuggestion(
+                            source_url=source.url,
+                            target_url=orphan.url,
+                            anchor_text=orphan.primary_keyword or orphan.title,
+                            relevance=relevance,
+                            reason=f"Orphan page in niche '{orphan.niche}'",
+                        )
+                    )
 
         # Suggest links to under-linked pages
         for target in under_linked:
@@ -450,16 +455,18 @@ class TrafficRoutingAgent(BaseAgent):
 
                 relevance = self._compute_relevance(source, target)
                 if relevance >= self._relevance_threshold:
-                    suggestions.append(LinkSuggestion(
-                        source_url=source.url,
-                        target_url=target.url,
-                        anchor_text=target.primary_keyword or target.title,
-                        relevance=relevance,
-                        reason=(
-                            f"Under-linked page ({target.inbound_links} < "
-                            f"{self._min_internal_links} min)"
-                        ),
-                    ))
+                    suggestions.append(
+                        LinkSuggestion(
+                            source_url=source.url,
+                            target_url=target.url,
+                            anchor_text=target.primary_keyword or target.title,
+                            relevance=relevance,
+                            reason=(
+                                f"Under-linked page ({target.inbound_links} < "
+                                f"{self._min_internal_links} min)"
+                            ),
+                        )
+                    )
 
         # Deduplicate and sort by relevance
         seen: Set[Tuple[str, str]] = set()
@@ -474,7 +481,8 @@ class TrafficRoutingAgent(BaseAgent):
 
         self.logger.info(
             "Generated %d link suggestions (%d unique).",
-            len(suggestions), len(unique_suggestions),
+            len(suggestions),
+            len(unique_suggestions),
         )
         return unique_suggestions
 
@@ -542,7 +550,9 @@ class TrafficRoutingAgent(BaseAgent):
 
         self.logger.debug(
             "Applying link: %s -> %s (anchor='%s').",
-            suggestion.source_url, suggestion.target_url, suggestion.anchor_text,
+            suggestion.source_url,
+            suggestion.target_url,
+            suggestion.anchor_text,
         )
 
         # Placeholder: real implementation updates the CMS content

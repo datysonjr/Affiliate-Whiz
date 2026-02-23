@@ -31,6 +31,7 @@ import unicodedata
 # Slugification
 # =====================================================================
 
+
 def slugify(text: str, max_length: int = 80, separator: str = "-") -> str:
     """Convert text to a URL-safe slug.
 
@@ -85,6 +86,7 @@ def slugify(text: str, max_length: int = 80, separator: str = "-") -> str:
 # =====================================================================
 # Truncation
 # =====================================================================
+
 
 def truncate(
     text: str,
@@ -142,6 +144,7 @@ def truncate(
 # HTML stripping
 # =====================================================================
 
+
 def strip_html(html_text: str) -> str:
     """Remove HTML tags and decode entities, returning plain text.
 
@@ -168,7 +171,9 @@ def strip_html(html_text: str) -> str:
     '& <tag>'
     """
     # Remove script and style blocks entirely
-    clean = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", html_text, flags=re.DOTALL | re.IGNORECASE)
+    clean = re.sub(
+        r"<(script|style)[^>]*>.*?</\1>", "", html_text, flags=re.DOTALL | re.IGNORECASE
+    )
 
     # Remove HTML comments
     clean = re.sub(r"<!--.*?-->", "", clean, flags=re.DOTALL)
@@ -188,6 +193,7 @@ def strip_html(html_text: str) -> str:
 # =====================================================================
 # Word counting
 # =====================================================================
+
 
 def word_count(text: str) -> int:
     """Count the number of words in text.
@@ -223,6 +229,7 @@ def word_count(text: str) -> int:
 # =====================================================================
 # Keyword density
 # =====================================================================
+
 
 def keyword_density(text: str, keyword: str) -> float:
     """Calculate the density of a keyword phrase in text.
@@ -289,6 +296,7 @@ def keyword_density(text: str, keyword: str) -> float:
 # =====================================================================
 # Additional text utilities
 # =====================================================================
+
 
 def extract_sentences(text: str, max_sentences: int = 3) -> list[str]:
     """Extract the first N sentences from text.

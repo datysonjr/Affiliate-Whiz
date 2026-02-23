@@ -306,9 +306,7 @@ class ExperimentRepository:
         Experiment or None
             The experiment if found, otherwise ``None``.
         """
-        row = self._db.fetch_one(
-            "SELECT * FROM experiments WHERE name = ?", (name,)
-        )
+        row = self._db.fetch_one("SELECT * FROM experiments WHERE name = ?", (name,))
         if row is None:
             return None
         return self._row_to_experiment(row)
@@ -438,7 +436,9 @@ class ExperimentRepository:
         log_event(logger, "experiment.started", id=experiment_id)
         return self.get_by_id(experiment_id)
 
-    def complete(self, experiment_id: int, winner: Optional[str] = None) -> Optional[Experiment]:
+    def complete(
+        self, experiment_id: int, winner: Optional[str] = None
+    ) -> Optional[Experiment]:
         """Mark an experiment as completed and record the winner.
 
         Parameters
@@ -471,8 +471,10 @@ class ExperimentRepository:
             (now, winner, now, experiment_id),
         )
         log_event(
-            logger, "experiment.completed",
-            id=experiment_id, winner=winner,
+            logger,
+            "experiment.completed",
+            id=experiment_id,
+            winner=winner,
         )
         return self.get_by_id(experiment_id)
 

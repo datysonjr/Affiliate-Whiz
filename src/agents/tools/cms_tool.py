@@ -142,13 +142,21 @@ class CMSTool:
                 last_error = exc
                 logger.warning(
                     "Connection error on attempt %d/%d for %s %s: %s",
-                    attempt, self.max_retries, method, endpoint, exc,
+                    attempt,
+                    self.max_retries,
+                    method,
+                    endpoint,
+                    exc,
                 )
             except requests.exceptions.Timeout as exc:
                 last_error = exc
                 logger.warning(
                     "Timeout on attempt %d/%d for %s %s: %s",
-                    attempt, self.max_retries, method, endpoint, exc,
+                    attempt,
+                    self.max_retries,
+                    method,
+                    endpoint,
+                    exc,
                 )
             except RuntimeError:
                 raise
@@ -156,11 +164,16 @@ class CMSTool:
                 last_error = exc
                 logger.warning(
                     "Request error on attempt %d/%d for %s %s: %s",
-                    attempt, self.max_retries, method, endpoint, exc,
+                    attempt,
+                    self.max_retries,
+                    method,
+                    endpoint,
+                    exc,
                 )
 
             if attempt < self.max_retries:
                 import time
+
                 delay = self.retry_backoff * (2 ** (attempt - 1))
                 logger.debug("Retrying in %.1fs", delay)
                 time.sleep(delay)
@@ -253,9 +266,7 @@ class CMSTool:
             return self._normalize_wp_post(result)
         return result
 
-    def update_post(
-        self, post_id: int, data: dict[str, Any]
-    ) -> dict[str, Any]:
+    def update_post(self, post_id: int, data: dict[str, Any]) -> dict[str, Any]:
         """Update an existing post in the CMS.
 
         Args:
@@ -367,9 +378,7 @@ class CMSTool:
     # Category / taxonomy management
     # ------------------------------------------------------------------
 
-    def get_categories(
-        self, parent_id: Optional[int] = None
-    ) -> list[dict[str, Any]]:
+    def get_categories(self, parent_id: Optional[int] = None) -> list[dict[str, Any]]:
         """Retrieve categories from the CMS.
 
         Args:

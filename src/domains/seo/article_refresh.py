@@ -38,21 +38,22 @@ logger = get_logger("domains.seo.article_refresh")
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class RefreshTrigger(str, Enum):
     """Reasons an article should be refreshed."""
 
-    AGE = "age"                         # article_age > refresh cycle
+    AGE = "age"  # article_age > refresh cycle
     RANKING_PLATEAU = "ranking_plateau"  # stuck pos 10-30, high impressions
-    PRODUCT_CHANGE = "product_change"    # product discontinued / new model
+    PRODUCT_CHANGE = "product_change"  # product discontinued / new model
 
 
 @unique
 class PageCategory(str, Enum):
     """Article category that determines refresh frequency."""
 
-    MONEY = "money"                  # core buying guides / reviews
-    SUPPORT = "support"              # support / comparison articles
+    MONEY = "money"  # core buying guides / reviews
+    SUPPORT = "support"  # support / comparison articles
     INFORMATIONAL = "informational"  # informational / educational
 
 
@@ -71,10 +72,10 @@ class RefreshAction(str, Enum):
 class RefreshUrgency(IntEnum):
     """Refresh urgency level. Lower = more urgent."""
 
-    CRITICAL = 1    # Product change — immediate
-    HIGH = 2        # Ranking plateau — strong opportunity
-    NORMAL = 3      # Age-based — routine maintenance
-    LOW = 4         # Within cycle but close to threshold
+    CRITICAL = 1  # Product change — immediate
+    HIGH = 2  # Ranking plateau — strong opportunity
+    NORMAL = 3  # Age-based — routine maintenance
+    LOW = 4  # Within cycle but close to threshold
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +98,7 @@ AGE_EVALUATION_DAYS = 45
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ArticleStatus:
@@ -223,6 +225,7 @@ def get_refresh_cycle(category: PageCategory) -> int:
 # Trigger detection
 # ---------------------------------------------------------------------------
 
+
 def check_age_trigger(article: ArticleStatus) -> Optional[RefreshTrigger]:
     """Check if the article exceeds its refresh cycle.
 
@@ -271,6 +274,7 @@ def check_product_change(article: ArticleStatus) -> Optional[RefreshTrigger]:
 # Action determination
 # ---------------------------------------------------------------------------
 
+
 def determine_refresh_actions(
     article: ArticleStatus,
     triggers: Sequence[RefreshTrigger],
@@ -301,7 +305,10 @@ def determine_refresh_actions(
     if RefreshTrigger.AGE in triggers:
         if RefreshAction.EXPAND_FAQ not in actions:
             actions.append(RefreshAction.EXPAND_FAQ)
-        if article.internal_link_count < 5 and RefreshAction.ADD_INTERNAL_LINKS not in actions:
+        if (
+            article.internal_link_count < 5
+            and RefreshAction.ADD_INTERNAL_LINKS not in actions
+        ):
             actions.append(RefreshAction.ADD_INTERNAL_LINKS)
 
     return actions
@@ -310,6 +317,7 @@ def determine_refresh_actions(
 # ---------------------------------------------------------------------------
 # Priority scoring
 # ---------------------------------------------------------------------------
+
 
 def compute_refresh_priority(
     article: ArticleStatus,
@@ -371,6 +379,7 @@ def compute_refresh_priority(
 # Single article analysis
 # ---------------------------------------------------------------------------
 
+
 def plan_refresh(article: ArticleStatus) -> Optional[RefreshPlan]:
     """Evaluate a single article and generate a refresh plan if needed.
 
@@ -391,7 +400,9 @@ def plan_refresh(article: ArticleStatus) -> Optional[RefreshPlan]:
     if age_trigger:
         triggers.append(age_trigger)
         cycle = get_refresh_cycle(article.page_category)
-        notes.append(f"Content age ({article.effective_age_days}d) exceeds {cycle}d cycle")
+        notes.append(
+            f"Content age ({article.effective_age_days}d) exceeds {cycle}d cycle"
+        )
 
     plateau_trigger = check_ranking_plateau(article)
     if plateau_trigger:
@@ -437,6 +448,7 @@ def plan_refresh(article: ArticleStatus) -> Optional[RefreshPlan]:
 # ---------------------------------------------------------------------------
 # Batch pipeline
 # ---------------------------------------------------------------------------
+
 
 def evaluate_refresh_queue(
     articles: Sequence[ArticleStatus],

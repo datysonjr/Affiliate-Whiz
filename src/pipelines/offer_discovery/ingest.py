@@ -241,7 +241,10 @@ def _retry_with_backoff(
             last_exc = exc
             if attempt > max_retries:
                 break
-            delay = min(base_delay * (DEFAULT_RETRY_EXPONENTIAL_BASE ** (attempt - 1)), max_delay)
+            delay = min(
+                base_delay * (DEFAULT_RETRY_EXPONENTIAL_BASE ** (attempt - 1)),
+                max_delay,
+            )
             log_event(
                 logger,
                 "ingest.retry",
@@ -378,7 +381,11 @@ def ingest_all(
             result.offers_by_source[source] = len(offers)
         except (IngestionError, SourceUnavailableError) as exc:
             result.errors.append(
-                {"source": source, "error": str(exc), "details": getattr(exc, "details", {})}
+                {
+                    "source": source,
+                    "error": str(exc),
+                    "details": getattr(exc, "details", {}),
+                }
             )
             log_event(
                 logger,

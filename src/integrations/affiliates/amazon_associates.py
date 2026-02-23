@@ -94,6 +94,7 @@ _COMMISSION_SCHEDULE: Dict[str, float] = {
 # Data containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AmazonProduct:
     """Normalised product record returned by PA-API search or detail calls.
@@ -162,6 +163,7 @@ class CommissionInfo:
 # ---------------------------------------------------------------------------
 # AmazonAssociates client
 # ---------------------------------------------------------------------------
+
 
 class AmazonAssociates:
     """Integration client for the Amazon Product Advertising API.
@@ -582,12 +584,12 @@ class AmazonAssociates:
         """
         results: List[CommissionInfo] = []
 
-        target_categories = categories if categories else list(_COMMISSION_SCHEDULE.keys())
+        target_categories = (
+            categories if categories else list(_COMMISSION_SCHEDULE.keys())
+        )
 
         for category in target_categories:
-            rate = _COMMISSION_SCHEDULE.get(
-                category, _COMMISSION_SCHEDULE["default"]
-            )
+            rate = _COMMISSION_SCHEDULE.get(category, _COMMISSION_SCHEDULE["default"])
             info = CommissionInfo(
                 category=category,
                 rate=rate,

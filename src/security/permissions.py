@@ -48,58 +48,96 @@ DEFAULT_PERMISSIONS_FILE = "data/permissions.json"
 # ---------------------------------------------------------------------------
 
 BUILT_IN_ROLES: Dict[str, FrozenSet[str]] = {
-    "admin": frozenset({
-        # Full system access
-        "config.read", "config.write",
-        "offers.read", "offers.write", "offers.delete",
-        "content.read", "content.write", "content.delete",
-        "publish.create", "publish.delete",
-        "sites.read", "sites.write", "sites.delete",
-        "campaigns.read", "campaigns.write", "campaigns.delete",
-        "experiments.read", "experiments.write", "experiments.delete",
-        "agents.read", "agents.manage", "agents.kill",
-        "metrics.read", "metrics.write",
-        "vault.read", "vault.write",
-        "audit.read",
-        "killswitch.engage", "killswitch.disengage",
-        "system.shutdown", "system.restart",
-    }),
-    "operator": frozenset({
-        # Operational access (no system-level or vault writes)
-        "config.read", "config.write",
-        "offers.read", "offers.write",
-        "content.read", "content.write",
-        "publish.create",
-        "sites.read", "sites.write",
-        "campaigns.read", "campaigns.write",
-        "experiments.read", "experiments.write",
-        "agents.read", "agents.manage",
-        "metrics.read",
-        "audit.read",
-        "killswitch.engage", "killswitch.disengage",
-    }),
-    "agent": frozenset({
-        # Minimum permissions for automated pipeline agents
-        "config.read",
-        "offers.read", "offers.write",
-        "content.read", "content.write",
-        "publish.create",
-        "sites.read",
-        "campaigns.read",
-        "experiments.read", "experiments.write",
-        "metrics.read", "metrics.write",
-    }),
-    "viewer": frozenset({
-        # Read-only access
-        "config.read",
-        "offers.read",
-        "content.read",
-        "sites.read",
-        "campaigns.read",
-        "experiments.read",
-        "metrics.read",
-        "audit.read",
-    }),
+    "admin": frozenset(
+        {
+            # Full system access
+            "config.read",
+            "config.write",
+            "offers.read",
+            "offers.write",
+            "offers.delete",
+            "content.read",
+            "content.write",
+            "content.delete",
+            "publish.create",
+            "publish.delete",
+            "sites.read",
+            "sites.write",
+            "sites.delete",
+            "campaigns.read",
+            "campaigns.write",
+            "campaigns.delete",
+            "experiments.read",
+            "experiments.write",
+            "experiments.delete",
+            "agents.read",
+            "agents.manage",
+            "agents.kill",
+            "metrics.read",
+            "metrics.write",
+            "vault.read",
+            "vault.write",
+            "audit.read",
+            "killswitch.engage",
+            "killswitch.disengage",
+            "system.shutdown",
+            "system.restart",
+        }
+    ),
+    "operator": frozenset(
+        {
+            # Operational access (no system-level or vault writes)
+            "config.read",
+            "config.write",
+            "offers.read",
+            "offers.write",
+            "content.read",
+            "content.write",
+            "publish.create",
+            "sites.read",
+            "sites.write",
+            "campaigns.read",
+            "campaigns.write",
+            "experiments.read",
+            "experiments.write",
+            "agents.read",
+            "agents.manage",
+            "metrics.read",
+            "audit.read",
+            "killswitch.engage",
+            "killswitch.disengage",
+        }
+    ),
+    "agent": frozenset(
+        {
+            # Minimum permissions for automated pipeline agents
+            "config.read",
+            "offers.read",
+            "offers.write",
+            "content.read",
+            "content.write",
+            "publish.create",
+            "sites.read",
+            "campaigns.read",
+            "experiments.read",
+            "experiments.write",
+            "metrics.read",
+            "metrics.write",
+        }
+    ),
+    "viewer": frozenset(
+        {
+            # Read-only access
+            "config.read",
+            "offers.read",
+            "content.read",
+            "sites.read",
+            "campaigns.read",
+            "experiments.read",
+            "metrics.read",
+            "audit.read",
+        }
+    ),
 }
 
 
@@ -316,8 +354,7 @@ class Permissions:
         """
         with self._lock:
             return {
-                subject: sorted(roles)
-                for subject, roles in self._assignments.items()
+                subject: sorted(roles) for subject, roles in self._assignments.items()
             }
 
     def list_available_roles(self) -> Dict[str, List[str]]:
@@ -355,9 +392,7 @@ class Permissions:
             If the name conflicts with a built-in role.
         """
         if name in BUILT_IN_ROLES:
-            raise SecurityError(
-                f"Cannot redefine built-in role: {name!r}"
-            )
+            raise SecurityError(f"Cannot redefine built-in role: {name!r}")
         with self._lock:
             self._custom_roles[name] = set(permissions)
             self._save()
@@ -377,12 +412,10 @@ class Permissions:
         """Persist role assignments and custom roles to disk."""
         data = {
             "assignments": {
-                subject: sorted(roles)
-                for subject, roles in self._assignments.items()
+                subject: sorted(roles) for subject, roles in self._assignments.items()
             },
             "custom_roles": {
-                name: sorted(perms)
-                for name, perms in self._custom_roles.items()
+                name: sorted(perms) for name, perms in self._custom_roles.items()
             },
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -394,7 +427,9 @@ class Permissions:
             with path.open("w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2)
         except OSError as exc:
-            logger.warning("Failed to save permissions to %s: %s", self._storage_path, exc)
+            logger.warning(
+                "Failed to save permissions to %s: %s", self._storage_path, exc
+            )
 
     def _load(self) -> None:
         """Load role assignments and custom roles from disk."""
@@ -406,7 +441,9 @@ class Permissions:
             with path.open("r", encoding="utf-8") as fh:
                 data = json.load(fh)
         except (OSError, json.JSONDecodeError) as exc:
-            logger.warning("Failed to load permissions from %s: %s", self._storage_path, exc)
+            logger.warning(
+                "Failed to load permissions from %s: %s", self._storage_path, exc
+            )
             return
 
         assignments = data.get("assignments", {})

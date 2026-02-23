@@ -40,6 +40,7 @@ logger = get_logger("domains.seo.competitor_scanner")
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class WeaknessType(str, Enum):
     """The 5 weakness dimensions from the spec."""
@@ -55,10 +56,10 @@ class WeaknessType(str, Enum):
 class AttackPriority(str, Enum):
     """How urgently a SERP should be targeted."""
 
-    IMMEDIATE = "immediate"     # weakness_total >= 70
-    HIGH = "high"               # weakness_total >= 50
-    MODERATE = "moderate"       # weakness_total >= 30
-    LOW = "low"                 # weakness_total < 30
+    IMMEDIATE = "immediate"  # weakness_total >= 70
+    HIGH = "high"  # weakness_total >= 50
+    MODERATE = "moderate"  # weakness_total >= 30
+    LOW = "low"  # weakness_total < 30
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +68,7 @@ class AttackPriority(str, Enum):
 
 THIN_CONTENT_WORD_THRESHOLD = 1000
 THIN_CONTENT_HEADING_THRESHOLD = 3
-OUTDATED_YEAR_THRESHOLD = 1       # years behind current
+OUTDATED_YEAR_THRESHOLD = 1  # years behind current
 WEAK_DOMAIN_DA_THRESHOLD = 30
 ATTACKABLE_WEAKNESS_THRESHOLD = 50
 
@@ -77,6 +78,7 @@ CURRENT_YEAR = datetime.now(timezone.utc).year
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class CompetitorPage:
@@ -212,6 +214,7 @@ class SERPWeaknessReport:
 # Individual weakness detectors
 # ---------------------------------------------------------------------------
 
+
 def detect_thin_content(page: CompetitorPage) -> WeaknessSignal:
     """Detect thin content weakness.
 
@@ -255,7 +258,9 @@ def detect_outdated(page: CompetitorPage) -> WeaknessSignal:
         years_behind = CURRENT_YEAR - page.last_updated_year
         if years_behind >= OUTDATED_YEAR_THRESHOLD:
             score += min(years_behind * 5, 20)
-            reasons.append(f"last updated {page.last_updated_year} ({years_behind}y behind)")
+            reasons.append(
+                f"last updated {page.last_updated_year} ({years_behind}y behind)"
+            )
     else:
         # Unknown update date is mildly suspicious
         score += 5
@@ -361,6 +366,7 @@ def detect_bad_ux(page: CompetitorPage) -> WeaknessSignal:
 # Page-level analysis
 # ---------------------------------------------------------------------------
 
+
 def score_competitor_page(page: CompetitorPage) -> PageWeaknessReport:
     """Analyse a single competitor page across all 5 weakness dimensions.
 
@@ -444,6 +450,7 @@ def classify_attack_priority(weakness_total: float) -> AttackPriority:
 # ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
+
 
 def scan_serp_weaknesses(
     keyword: str,

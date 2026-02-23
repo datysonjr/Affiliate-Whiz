@@ -33,6 +33,7 @@ from src.core.logger import log_event
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @unique
 class ScheduleFrequency(str, Enum):
     """How often a scheduled task should fire."""
@@ -110,6 +111,7 @@ class DispatchSummary:
 # Agent implementation
 # ---------------------------------------------------------------------------
 
+
 class MasterSchedulerAgent(BaseAgent):
     """Creates daily/weekly task lists and dispatches them to other agents.
 
@@ -159,7 +161,9 @@ class MasterSchedulerAgent(BaseAgent):
             schedule_window_end=now,
         )
 
-        log_event(self.logger, "scheduler.plan.start", window_start=plan.schedule_window_start)
+        log_event(
+            self.logger, "scheduler.plan.start", window_start=plan.schedule_window_start
+        )
 
         # Evaluate each agent's schedule
         for agent_name in AgentName:
@@ -211,7 +215,9 @@ class MasterSchedulerAgent(BaseAgent):
         summary = DispatchSummary()
 
         for task in plan.tasks:
-            if self._check_dry_run(f"dispatch task {task.task_id} to {task.target_agent}"):
+            if self._check_dry_run(
+                f"dispatch task {task.task_id} to {task.target_agent}"
+            ):
                 task.status = TaskStatus.SKIPPED
                 task.dispatch_result = "dry_run"
                 summary.skipped += 1

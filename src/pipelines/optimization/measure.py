@@ -30,6 +30,7 @@ logger = get_logger("pipelines.optimization.measure")
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ContentMetrics:
     """Performance metrics for a single piece of content.
@@ -141,6 +142,7 @@ class SiteMetrics:
 # Period parsing
 # ---------------------------------------------------------------------------
 
+
 def _parse_period(period: str) -> tuple[datetime, datetime]:
     """Parse a period string into start and end datetimes.
 
@@ -196,6 +198,7 @@ def _parse_period(period: str) -> tuple[datetime, datetime]:
 # Core measurement functions
 # ---------------------------------------------------------------------------
 
+
 def measure_content_performance(
     post_id: str,
     *,
@@ -235,7 +238,9 @@ def measure_content_performance(
     ContentMetrics
         Comprehensive performance snapshot.
     """
-    log_event(logger, "measure.content.start", post_id=post_id, lookback_days=lookback_days)
+    log_event(
+        logger, "measure.content.start", post_id=post_id, lookback_days=lookback_days
+    )
 
     post = post_data or {}
     analytics = analytics_data or {}
@@ -252,7 +257,9 @@ def measure_content_performance(
             if isinstance(pub_str, datetime):
                 published_at = pub_str
             else:
-                published_at = datetime.fromisoformat(str(pub_str)).replace(tzinfo=timezone.utc)
+                published_at = datetime.fromisoformat(str(pub_str)).replace(
+                    tzinfo=timezone.utc
+                )
             age_days = (now - published_at).days
         except (ValueError, TypeError):
             logger.debug("Could not parse published_at for %s: %r", post_id, pub_str)
@@ -377,9 +384,7 @@ def get_traffic_metrics(
     total_sessions = int(data.get("total_sessions", 0))
     total_users = int(data.get("total_users", 0))
 
-    pages_per_session = (
-        total_pageviews / total_sessions if total_sessions > 0 else 0.0
-    )
+    pages_per_session = total_pageviews / total_sessions if total_sessions > 0 else 0.0
 
     result: Dict[str, Any] = {
         "site_id": site_id,
@@ -392,13 +397,16 @@ def get_traffic_metrics(
         "pages_per_session": round(pages_per_session, 2),
         "avg_session_duration": float(data.get("avg_session_duration", 0.0)),
         "bounce_rate": float(data.get("bounce_rate", 0.0)),
-        "traffic_sources": data.get("traffic_sources", {
-            "organic": 0,
-            "direct": 0,
-            "referral": 0,
-            "social": 0,
-            "paid": 0,
-        }),
+        "traffic_sources": data.get(
+            "traffic_sources",
+            {
+                "organic": 0,
+                "direct": 0,
+                "referral": 0,
+                "social": 0,
+                "paid": 0,
+            },
+        ),
         "top_pages": data.get("top_pages", []),
     }
 

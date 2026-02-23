@@ -37,6 +37,7 @@ logger = get_logger("domains.seo.authority_snowball")
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class GrowthStage(IntEnum):
     """The 4 site growth stages from the spec.
@@ -44,10 +45,10 @@ class GrowthStage(IntEnum):
     Each stage has different goals, strategies, and safe publishing speeds.
     """
 
-    SEED = 1         # 0-20 pages: prove topical relevance
-    TRUST = 2        # 20-80 pages: build topical dominance
-    EXPANSION = 3    # 80-200 pages: own the topic ecosystem
-    AUTHORITY = 4    # 200-500+ pages: become default reference
+    SEED = 1  # 0-20 pages: prove topical relevance
+    TRUST = 2  # 20-80 pages: build topical dominance
+    EXPANSION = 3  # 80-200 pages: own the topic ecosystem
+    AUTHORITY = 4  # 200-500+ pages: become default reference
 
 
 @unique
@@ -84,14 +85,15 @@ _STAGE_PUBLISHING_SPEED: dict[GrowthStage, int] = {
 }
 
 # Snowball signal thresholds
-INDEXING_HOURS_THRESHOLD = 72       # pages should index within 72h
-IMPRESSIONS_TREND_THRESHOLD = 0.0   # must be non-negative (rising)
-LONG_TAIL_RANKING_THRESHOLD = 5     # need some long-tail rankings
+INDEXING_HOURS_THRESHOLD = 72  # pages should index within 72h
+IMPRESSIONS_TREND_THRESHOLD = 0.0  # must be non-negative (rising)
+LONG_TAIL_RANKING_THRESHOLD = 5  # need some long-tail rankings
 
 
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class SnowballSignals:
@@ -112,8 +114,8 @@ class SnowballSignals:
         Number of pages ranking for long-tail queries.
     """
 
-    avg_indexing_hours: float = 168.0   # default: 1 week (not fast)
-    impressions_trend: float = 0.0      # flat by default
+    avg_indexing_hours: float = 168.0  # default: 1 week (not fast)
+    impressions_trend: float = 0.0  # flat by default
     long_tail_rankings: int = 0
 
 
@@ -223,6 +225,7 @@ def determine_growth_stage(total_pages: int) -> GrowthStage:
 # Snowball signal checks
 # ---------------------------------------------------------------------------
 
+
 def check_snowball_signals(signals: SnowballSignals) -> tuple[bool, List[str]]:
     """Check if all snowball signals support safe scaling.
 
@@ -298,6 +301,7 @@ _STAGE_PAGE_TYPES: dict[GrowthStage, list[PageType]] = {
 # Publishing speed computation
 # ---------------------------------------------------------------------------
 
+
 def compute_publishing_speed(
     stage: GrowthStage,
     safe_to_scale: bool,
@@ -334,6 +338,7 @@ def compute_publishing_speed(
 # ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
+
 
 def build_publishing_plan(snapshot: SiteSnapshot) -> PublishingPlan:
     """Generate a publishing plan based on the site's current state.

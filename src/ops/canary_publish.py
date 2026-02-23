@@ -373,24 +373,28 @@ def run_canary_publish(
 
     from src.agents.tools.cms_tool import CMSTool
 
-    cms = CMSTool({
-        "cms_type": "wordpress",
-        "api_base_url": cms_config.base_url,
-        "api_key": cms_config.api_key,
-        "username": cms_config.username,
-        "default_status": "draft",
-        "request_timeout": 30,
-        "verify_ssl": True,
-    })
+    cms = CMSTool(
+        {
+            "cms_type": "wordpress",
+            "api_base_url": cms_config.base_url,
+            "api_key": cms_config.api_key,
+            "username": cms_config.username,
+            "default_status": "draft",
+            "request_timeout": 30,
+            "verify_ssl": True,
+        }
+    )
 
     try:
-        result = cms.create_post({
-            "title": payload["title"],
-            "content": payload["content"],
-            "excerpt": payload.get("excerpt", ""),
-            "slug": payload.get("slug", ""),
-            "status": "draft",
-        })
+        result = cms.create_post(
+            {
+                "title": payload["title"],
+                "content": payload["content"],
+                "excerpt": payload.get("excerpt", ""),
+                "slug": payload.get("slug", ""),
+                "status": "draft",
+            }
+        )
     except Exception as exc:
         raise CMSConnectionError(
             f"Canary publish failed: {exc}",

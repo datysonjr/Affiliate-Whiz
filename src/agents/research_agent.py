@@ -27,6 +27,7 @@ from src.core.logger import log_event
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class KeywordCandidate:
     """A keyword discovered during research.
@@ -134,6 +135,7 @@ class ResearchResults:
 # Agent implementation
 # ---------------------------------------------------------------------------
 
+
 class ResearchAgent(BaseAgent):
     """Handles niche research, SERP scanning, keyword research, and competitor analysis.
 
@@ -234,7 +236,9 @@ class ResearchAgent(BaseAgent):
             self.logger.error("Keyword expansion failed: %s", exc)
 
         # --- SERP scanning ---
-        log_event(self.logger, "research.serp.start", query_count=len(plan.serp_queries))
+        log_event(
+            self.logger, "research.serp.start", query_count=len(plan.serp_queries)
+        )
         for query in plan.serp_queries:
             if self._check_dry_run(f"SERP scan for '{query}'"):
                 continue
@@ -258,8 +262,12 @@ class ResearchAgent(BaseAgent):
                 profile = self._analyse_competitor(domain)
                 results.competitor_profiles.append(profile)
             except Exception as exc:
-                results.errors.append(f"Competitor analysis failed for '{domain}': {exc}")
-                self.logger.error("Competitor analysis failed for '%s': %s", domain, exc)
+                results.errors.append(
+                    f"Competitor analysis failed for '{domain}': {exc}"
+                )
+                self.logger.error(
+                    "Competitor analysis failed for '%s': %s", domain, exc
+                )
 
         # --- Content opportunity identification ---
         results.content_opportunities = self._identify_content_opportunities(results)
@@ -281,7 +289,9 @@ class ResearchAgent(BaseAgent):
             "keywords_found": len(result.keywords),
             "top_keywords": [
                 {"keyword": kw.keyword, "score": kw.score, "volume": kw.search_volume}
-                for kw in sorted(result.keywords, key=lambda k: k.score, reverse=True)[:10]
+                for kw in sorted(result.keywords, key=lambda k: k.score, reverse=True)[
+                    :10
+                ]
             ],
             "serp_queries_run": len(result.serp_results),
             "competitors_analysed": len(result.competitor_profiles),
@@ -291,8 +301,12 @@ class ResearchAgent(BaseAgent):
 
         self._log_metric("research.keywords.found", len(result.keywords))
         self._log_metric("research.serp_queries.run", len(result.serp_results))
-        self._log_metric("research.competitors.analysed", len(result.competitor_profiles))
-        self._log_metric("research.opportunities.found", len(result.content_opportunities))
+        self._log_metric(
+            "research.competitors.analysed", len(result.competitor_profiles)
+        )
+        self._log_metric(
+            "research.opportunities.found", len(result.content_opportunities)
+        )
         self._log_metric("research.errors", len(result.errors))
 
         if result.errors:
@@ -349,9 +363,7 @@ class ResearchAgent(BaseAgent):
 
         for seed in seed_keywords:
             # Include the seed itself
-            candidates.append(
-                KeywordCandidate(keyword=seed, source="seed")
-            )
+            candidates.append(KeywordCandidate(keyword=seed, source="seed"))
             # Generate modifier variants
             for mod in modifiers:
                 candidates.append(
@@ -361,10 +373,14 @@ class ResearchAgent(BaseAgent):
                     )
                 )
 
-        self.logger.info("Expanded %d seeds into %d candidates.", len(seed_keywords), len(candidates))
+        self.logger.info(
+            "Expanded %d seeds into %d candidates.", len(seed_keywords), len(candidates)
+        )
         return candidates
 
-    def _score_keywords(self, candidates: List[KeywordCandidate]) -> List[KeywordCandidate]:
+    def _score_keywords(
+        self, candidates: List[KeywordCandidate]
+    ) -> List[KeywordCandidate]:
         """Score each keyword candidate on a composite viability metric.
 
         The score combines search volume, competition, CPC, and intent
@@ -443,24 +459,28 @@ class ResearchAgent(BaseAgent):
         for kw in results.keywords:
             # Keywords with high score and low competition are prime targets
             if kw.score >= 60 and kw.competition < 0.5:
-                opportunities.append({
-                    "keyword": kw.keyword,
-                    "score": kw.score,
-                    "competition": kw.competition,
-                    "reasoning": "High viability score with low competition.",
-                    "priority": 100 - kw.score,  # Lower number = higher priority
-                })
+                opportunities.append(
+                    {
+                        "keyword": kw.keyword,
+                        "score": kw.score,
+                        "competition": kw.competition,
+                        "reasoning": "High viability score with low competition.",
+                        "priority": 100 - kw.score,  # Lower number = higher priority
+                    }
+                )
 
         # Check for competitor content gaps
         for profile in results.competitor_profiles:
             for gap in profile.content_gaps:
-                opportunities.append({
-                    "keyword": gap,
-                    "score": 55,
-                    "competition": 0.3,
-                    "reasoning": f"Content gap identified from competitor {profile.domain}.",
-                    "priority": 40,
-                })
+                opportunities.append(
+                    {
+                        "keyword": gap,
+                        "score": 55,
+                        "competition": 0.3,
+                        "reasoning": f"Content gap identified from competitor {profile.domain}.",
+                        "priority": 40,
+                    }
+                )
 
         opportunities.sort(key=lambda o: o["priority"])
         self.logger.info("Identified %d content opportunities.", len(opportunities))

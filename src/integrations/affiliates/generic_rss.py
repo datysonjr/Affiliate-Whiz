@@ -53,6 +53,7 @@ _CONTENT_NS = "http://purl.org/rss/1.0/modules/content/"
 # Data containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RSSFeedEntry:
     """A single entry parsed from an RSS or Atom feed.
@@ -133,6 +134,7 @@ class NormalisedOffer:
 # ---------------------------------------------------------------------------
 # GenericRSSFeed client
 # ---------------------------------------------------------------------------
+
 
 class GenericRSSFeed:
     """RSS/Atom feed fetcher and parser for affiliate offer discovery.
@@ -299,20 +301,14 @@ class GenericRSSFeed:
             guid = (item.findtext("guid") or "").strip()
             pub_date = item.findtext("pubDate") or item.findtext("pubdate")
             author = (
-                item.findtext(f"{{{_DC_NS}}}creator")
-                or item.findtext("author")
-                or ""
+                item.findtext(f"{{{_DC_NS}}}creator") or item.findtext("author") or ""
             ).strip()
 
             # Full content via content:encoded
-            content_encoded = (
-                item.findtext(f"{{{_CONTENT_NS}}}encoded") or ""
-            ).strip()
+            content_encoded = (item.findtext(f"{{{_CONTENT_NS}}}encoded") or "").strip()
 
             categories = [
-                (cat.text or "").strip()
-                for cat in item.findall("category")
-                if cat.text
+                (cat.text or "").strip() for cat in item.findall("category") if cat.text
             ]
 
             entry_id = guid or self._generate_entry_id({"link": link, "title": title})
@@ -368,9 +364,7 @@ class GenericRSSFeed:
             content = (entry_elem.findtext("atom:content", "", ns)).strip()
             published = entry_elem.findtext("atom:published", "", ns)
             updated = entry_elem.findtext("atom:updated", "", ns)
-            author_name = (
-                entry_elem.findtext("atom:author/atom:name", "", ns)
-            ).strip()
+            author_name = (entry_elem.findtext("atom:author/atom:name", "", ns)).strip()
 
             categories = [
                 cat.get("term", "")
@@ -553,7 +547,9 @@ class GenericRSSFeed:
             source=self._source_name,
             name=entry.title,
             url=entry.link,
-            description=entry.description or entry.content[:500] if entry.content else entry.description,
+            description=entry.description or entry.content[:500]
+            if entry.content
+            else entry.description,
             categories=entry.categories,
             discovered_at=datetime.now(timezone.utc),
             metadata={

@@ -456,9 +456,7 @@ class SEOTool:
             raise ValueError("Keyword must not be empty")
 
         effective_num = num_competitors or self.max_results
-        logger.info(
-            "Analyzing top %d competitors for '%s'", effective_num, keyword
-        )
+        logger.info("Analyzing top %d competitors for '%s'", effective_num, keyword)
 
         # Step 1: Get SERP results
         serp_data = self.check_serp(keyword, num_results=effective_num)

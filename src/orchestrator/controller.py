@@ -50,6 +50,7 @@ from src.agents.base_agent import BaseAgent, RunResult
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AgentRecord:
     """Bookkeeping entry for a registered agent.
@@ -78,6 +79,7 @@ class AgentRecord:
 # ---------------------------------------------------------------------------
 # OrchestratorController
 # ---------------------------------------------------------------------------
+
 
 class OrchestratorController:
     """Central orchestrator that manages every agent in the OpenClaw system.

@@ -30,6 +30,7 @@ logger = get_logger("seo.serp")
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class SERPFeature(str, Enum):
     """SERP feature types that may appear alongside organic results."""
@@ -60,6 +61,7 @@ class CompetitionLevel(str, Enum):
 # ---------------------------------------------------------------------------
 # Data models
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class SERPResult:
@@ -174,6 +176,7 @@ class ContentGap:
 # ---------------------------------------------------------------------------
 # Analysis functions
 # ---------------------------------------------------------------------------
+
 
 def analyze_serp(
     keyword: str,
@@ -295,10 +298,10 @@ def assess_competition(
 
     # Scoring heuristic
     score = 0.0
-    score += min(avg_da, 100) * 0.4            # DA contributes 40%
-    score += high_da_count * 5                   # Major sites penalty
-    score += min(avg_wc / 50, 20)               # Content depth (max 20 points)
-    score += affiliate_count * 3                 # Affiliate saturation
+    score += min(avg_da, 100) * 0.4  # DA contributes 40%
+    score += high_da_count * 5  # Major sites penalty
+    score += min(avg_wc / 50, 20)  # Content depth (max 20 points)
+    score += affiliate_count * 3  # Affiliate saturation
 
     if score >= 70:
         return CompetitionLevel.VERY_HIGH
@@ -335,13 +338,15 @@ def find_content_gaps(
     top_10 = get_top_results(results, 10)
 
     if not top_10:
-        gaps.append(ContentGap(
-            description=f"No organic results found for '{keyword}' -- untapped opportunity",
-            gap_type="missing_angle",
-            opportunity_score=95.0,
-            suggested_content_type="blog_post",
-            keywords=[keyword],
-        ))
+        gaps.append(
+            ContentGap(
+                description=f"No organic results found for '{keyword}' -- untapped opportunity",
+                gap_type="missing_angle",
+                opportunity_score=95.0,
+                suggested_content_type="blog_post",
+                keywords=[keyword],
+            )
+        )
         return gaps
 
     # Gap: outdated content
@@ -356,77 +361,86 @@ def find_content_gaps(
                 outdated_count += 1
 
     if outdated_count >= 3:
-        gaps.append(ContentGap(
-            description=(
-                f"{outdated_count} of top 10 results for '{keyword}' appear outdated. "
-                "Fresh, updated content could rank quickly."
-            ),
-            gap_type="outdated_content",
-            opportunity_score=80.0,
-            suggested_content_type="blog_post",
-            keywords=[keyword],
-        ))
+        gaps.append(
+            ContentGap(
+                description=(
+                    f"{outdated_count} of top 10 results for '{keyword}' appear outdated. "
+                    "Fresh, updated content could rank quickly."
+                ),
+                gap_type="outdated_content",
+                opportunity_score=80.0,
+                suggested_content_type="blog_post",
+                keywords=[keyword],
+            )
+        )
 
     # Gap: thin content
     wcs = [r.word_count for r in top_10 if r.word_count > 0]
     if wcs and statistics.mean(wcs) < 1000:
-        gaps.append(ContentGap(
-            description=(
-                f"Average word count for '{keyword}' is only {statistics.mean(wcs):.0f}. "
-                "A comprehensive long-form article could outrank existing thin content."
-            ),
-            gap_type="thin_content",
-            opportunity_score=70.0,
-            suggested_content_type="blog_post",
-            keywords=[keyword],
-        ))
+        gaps.append(
+            ContentGap(
+                description=(
+                    f"Average word count for '{keyword}' is only {statistics.mean(wcs):.0f}. "
+                    "A comprehensive long-form article could outrank existing thin content."
+                ),
+                gap_type="thin_content",
+                opportunity_score=70.0,
+                suggested_content_type="blog_post",
+                keywords=[keyword],
+            )
+        )
 
     # Gap: no affiliate angle
     affiliate_count = sum(1 for r in top_10 if r.has_affiliate_links)
     if affiliate_count == 0:
-        gaps.append(ContentGap(
-            description=(
-                f"No affiliate content in top 10 for '{keyword}'. "
-                "Opportunity to be the first affiliate-focused result."
-            ),
-            gap_type="no_affiliate",
-            opportunity_score=75.0,
-            suggested_content_type="product_review",
-            keywords=[keyword],
-        ))
+        gaps.append(
+            ContentGap(
+                description=(
+                    f"No affiliate content in top 10 for '{keyword}'. "
+                    "Opportunity to be the first affiliate-focused result."
+                ),
+                gap_type="no_affiliate",
+                opportunity_score=75.0,
+                suggested_content_type="product_review",
+                keywords=[keyword],
+            )
+        )
 
     # Gap: missing comparison content
     has_comparison = any(
-        "vs" in r.title.lower() or "comparison" in r.title.lower()
-        for r in top_10
+        "vs" in r.title.lower() or "comparison" in r.title.lower() for r in top_10
     )
     if not has_comparison and len(keyword.split()) >= 2:
-        gaps.append(ContentGap(
-            description=(
-                f"No comparison content in top 10 for '{keyword}'. "
-                "A comparison article could capture commercial intent traffic."
-            ),
-            gap_type="missing_angle",
-            opportunity_score=65.0,
-            suggested_content_type="comparison",
-            keywords=[keyword],
-        ))
+        gaps.append(
+            ContentGap(
+                description=(
+                    f"No comparison content in top 10 for '{keyword}'. "
+                    "A comparison article could capture commercial intent traffic."
+                ),
+                gap_type="missing_angle",
+                opportunity_score=65.0,
+                suggested_content_type="comparison",
+                keywords=[keyword],
+            )
+        )
 
     # Gap: weak domain authority
     das = [r.domain_authority for r in top_10 if r.domain_authority > 0]
     if das:
         low_da_count = sum(1 for da in das if da < 30)
         if low_da_count >= 4:
-            gaps.append(ContentGap(
-                description=(
-                    f"{low_da_count} of top 10 results for '{keyword}' have low domain "
-                    "authority (<30). Even a newer site can compete here."
-                ),
-                gap_type="missing_angle",
-                opportunity_score=60.0,
-                suggested_content_type="roundup",
-                keywords=[keyword],
-            ))
+            gaps.append(
+                ContentGap(
+                    description=(
+                        f"{low_da_count} of top 10 results for '{keyword}' have low domain "
+                        "authority (<30). Even a newer site can compete here."
+                    ),
+                    gap_type="missing_angle",
+                    opportunity_score=60.0,
+                    suggested_content_type="roundup",
+                    keywords=[keyword],
+                )
+            )
 
     gaps.sort(key=lambda g: g.opportunity_score, reverse=True)
     logger.debug("Found %d content gaps for '%s'", len(gaps), keyword)

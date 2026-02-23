@@ -42,43 +42,44 @@ logger = get_logger("domains.ops.empire_scaling")
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class ScalingStage(IntEnum):
     """The 4 stages of OpenClaw empire scaling."""
 
-    VALIDATION = 1       # 0-1 winning site: prove real revenue
-    REPLICATION = 2      # 1→3 sites: confirm pattern is repeatable
-    PORTFOLIO = 3        # 3→10 sites: diversify revenue sources
-    EMPIRE = 4           # 10+ sites: maximize ROI per compute hour
+    VALIDATION = 1  # 0-1 winning site: prove real revenue
+    REPLICATION = 2  # 1→3 sites: confirm pattern is repeatable
+    PORTFOLIO = 3  # 3→10 sites: diversify revenue sources
+    EMPIRE = 4  # 10+ sites: maximize ROI per compute hour
 
 
 @unique
 class SiteMaturity(str, Enum):
     """Site maturity classification for publishing speed limits."""
 
-    NEW = "new"                # <30 days, 2-4 pages/week
-    GROWING = "growing"        # 30-180 days with traction, 4-8 pages/week
-    AUTHORITY = "authority"    # 180+ days with strong metrics, 8-15 pages/week
+    NEW = "new"  # <30 days, 2-4 pages/week
+    GROWING = "growing"  # 30-180 days with traction, 4-8 pages/week
+    AUTHORITY = "authority"  # 180+ days with strong metrics, 8-15 pages/week
 
 
 @unique
 class SiteVerdict(str, Enum):
     """Operational verdict for a site."""
 
-    EXPAND = "expand"          # healthy — continue publishing
-    HOLD = "hold"              # signals mixed — maintain but don't grow
+    EXPAND = "expand"  # healthy — continue publishing
+    HOLD = "hold"  # signals mixed — maintain but don't grow
     REFRESH_ONLY = "refresh_only"  # health issues — fix before new content
-    KILL = "kill"              # kill-fast policy triggered
-    SATURATED = "saturated"    # niche saturated — redirect capacity
+    KILL = "kill"  # kill-fast policy triggered
+    SATURATED = "saturated"  # niche saturated — redirect capacity
 
 
 @unique
 class CapacityBucket(str, Enum):
     """The 3 compute capacity buckets from the 60/30/10 rule."""
 
-    REFRESH = "refresh"             # 60% — refresh + optimization
-    EXPANSION = "expansion"         # 30% — validated cluster expansion
-    EXPERIMENTAL = "experimental"   # 10% — trend tests / new niches
+    REFRESH = "refresh"  # 60% — refresh + optimization
+    EXPANSION = "expansion"  # 30% — validated cluster expansion
+    EXPERIMENTAL = "experimental"  # 10% — trend tests / new niches
 
 
 # ---------------------------------------------------------------------------
@@ -112,8 +113,8 @@ CAPACITY_EXPANSION_PCT = 30
 CAPACITY_EXPERIMENTAL_PCT = 10
 
 # Domain health thresholds
-HEALTH_INDEX_COVERAGE_MIN = 70       # percent
-HEALTH_ERROR_RATE_MAX = 5            # percent
+HEALTH_INDEX_COVERAGE_MIN = 70  # percent
+HEALTH_ERROR_RATE_MAX = 5  # percent
 
 # Kill-fast policy thresholds
 KILL_NO_INDEX_DAYS = 45
@@ -134,6 +135,7 @@ AUTOMATION_THRESHOLD_SITES = 50
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class SiteMetrics:
@@ -240,7 +242,7 @@ class DomainHealthScore:
     impressions_rising: bool = False
     refresh_on_time: bool = False
     error_rate_ok: bool = False
-    score: float = 0.0      # 0-100
+    score: float = 0.0  # 0-100
 
     @property
     def is_healthy(self) -> bool:
@@ -319,13 +321,15 @@ class ExpansionTriggerCheck:
     @property
     def triggers_met(self) -> int:
         """Count of satisfied expansion triggers."""
-        return sum([
-            self.revenue_increasing,
-            self.indexing_stable,
-            self.no_penalties,
-            self.refresh_under_control,
-            self.infra_costs_safe,
-        ])
+        return sum(
+            [
+                self.revenue_increasing,
+                self.indexing_stable,
+                self.no_penalties,
+                self.refresh_under_control,
+                self.infra_costs_safe,
+            ]
+        )
 
     @property
     def can_expand(self) -> bool:
@@ -361,7 +365,9 @@ class PortfolioScalingPlan:
 
     stage: ScalingStage = ScalingStage.VALIDATION
     site_decisions: List[SiteScalingDecision] = field(default_factory=list)
-    expansion_check: ExpansionTriggerCheck = field(default_factory=ExpansionTriggerCheck)
+    expansion_check: ExpansionTriggerCheck = field(
+        default_factory=ExpansionTriggerCheck
+    )
     can_launch_new_site: bool = False
     next_launch_weeks: int = 0
     capacity: CapacityAllocation = field(default_factory=CapacityAllocation)
@@ -385,6 +391,7 @@ class PortfolioScalingPlan:
 # ---------------------------------------------------------------------------
 # Scaling stage determination
 # ---------------------------------------------------------------------------
+
 
 def determine_scaling_stage(sites: Sequence[SiteMetrics]) -> ScalingStage:
     """Classify the portfolio into a scaling stage.
@@ -411,6 +418,7 @@ def determine_scaling_stage(sites: Sequence[SiteMetrics]) -> ScalingStage:
 # ---------------------------------------------------------------------------
 # Site maturity classification
 # ---------------------------------------------------------------------------
+
 
 def classify_site_maturity(site: SiteMetrics) -> SiteMaturity:
     """Classify a site's maturity for publishing speed limits.
@@ -441,6 +449,7 @@ def get_safe_publishing_rate(maturity: SiteMaturity) -> tuple[int, int]:
 # ---------------------------------------------------------------------------
 # Domain health scoring
 # ---------------------------------------------------------------------------
+
 
 def compute_domain_health(site: SiteMetrics) -> DomainHealthScore:
     """Score the health of a single site.
@@ -483,6 +492,7 @@ def compute_domain_health(site: SiteMetrics) -> DomainHealthScore:
 # Niche saturation detection
 # ---------------------------------------------------------------------------
 
+
 def detect_niche_saturation(site: SiteMetrics) -> bool:
     """Check if a site's niche is saturated.
 
@@ -494,7 +504,9 @@ def detect_niche_saturation(site: SiteMetrics) -> bool:
     When saturated: stop publishing, shift capacity elsewhere.
     """
     slow_ranking = site.avg_days_to_rank > SATURATION_RANKING_DAYS
-    flat_impressions = site.impressions_trend <= 0 and site.age_days > SATURATION_PLATEAU_DAYS
+    flat_impressions = (
+        site.impressions_trend <= 0 and site.age_days > SATURATION_PLATEAU_DAYS
+    )
     declining_ctr = site.ctr_trend < 0
 
     # Saturated if 2+ signals present
@@ -505,6 +517,7 @@ def detect_niche_saturation(site: SiteMetrics) -> bool:
 # ---------------------------------------------------------------------------
 # Kill-fast policy
 # ---------------------------------------------------------------------------
+
 
 def check_kill_policy(site: SiteMetrics) -> bool:
     """Check if a site triggers the kill-fast policy.
@@ -518,7 +531,11 @@ def check_kill_policy(site: SiteMetrics) -> bool:
         return True
     if site.age_days >= KILL_NO_IMPRESSIONS_DAYS and site.monthly_impressions == 0:
         return True
-    if site.age_days >= KILL_NO_RANKING_DAYS and site.monthly_clicks == 0 and site.monthly_impressions == 0:
+    if (
+        site.age_days >= KILL_NO_RANKING_DAYS
+        and site.monthly_clicks == 0
+        and site.monthly_impressions == 0
+    ):
         return True
     return False
 
@@ -526,6 +543,7 @@ def check_kill_policy(site: SiteMetrics) -> bool:
 # ---------------------------------------------------------------------------
 # Per-site scaling decision
 # ---------------------------------------------------------------------------
+
 
 def decide_site_scaling(site: SiteMetrics) -> SiteScalingDecision:
     """Generate a scaling decision for a single site.
@@ -573,13 +591,17 @@ def decide_site_scaling(site: SiteMetrics) -> SiteScalingDecision:
     if not health.is_healthy:
         issues = []
         if not health.index_coverage_ok:
-            issues.append(f"index coverage {site.index_coverage:.0f}% (need >{HEALTH_INDEX_COVERAGE_MIN}%)")
+            issues.append(
+                f"index coverage {site.index_coverage:.0f}% (need >{HEALTH_INDEX_COVERAGE_MIN}%)"
+            )
         if not health.impressions_rising:
             issues.append("impressions not rising")
         if not health.refresh_on_time:
             issues.append(f"{site.refresh_backlog} pages overdue for refresh")
         if not health.error_rate_ok:
-            issues.append(f"error rate {site.error_rate:.1f}% (need <{HEALTH_ERROR_RATE_MAX}%)")
+            issues.append(
+                f"error rate {site.error_rate:.1f}% (need <{HEALTH_ERROR_RATE_MAX}%)"
+            )
 
         reasons.append(f"Health issues: {'; '.join(issues)}")
         return SiteScalingDecision(
@@ -621,6 +643,7 @@ def decide_site_scaling(site: SiteMetrics) -> SiteScalingDecision:
 # ---------------------------------------------------------------------------
 # Expansion trigger check
 # ---------------------------------------------------------------------------
+
 
 def check_expansion_triggers(
     sites: Sequence[SiteMetrics],
@@ -687,6 +710,7 @@ def check_expansion_triggers(
 # Capacity allocation
 # ---------------------------------------------------------------------------
 
+
 def compute_capacity_allocation(
     total_capacity: float = 100.0,
 ) -> CapacityAllocation:
@@ -702,13 +726,16 @@ def compute_capacity_allocation(
         total_capacity=total_capacity,
         refresh_capacity=round(total_capacity * CAPACITY_REFRESH_PCT / 100, 1),
         expansion_capacity=round(total_capacity * CAPACITY_EXPANSION_PCT / 100, 1),
-        experimental_capacity=round(total_capacity * CAPACITY_EXPERIMENTAL_PCT / 100, 1),
+        experimental_capacity=round(
+            total_capacity * CAPACITY_EXPERIMENTAL_PCT / 100, 1
+        ),
     )
 
 
 # ---------------------------------------------------------------------------
 # Validation stage check
 # ---------------------------------------------------------------------------
+
 
 def check_validation_stage(sites: Sequence[SiteMetrics]) -> bool:
     """Check if any site meets the Stage 1 validation criteria.
@@ -721,7 +748,10 @@ def check_validation_stage(sites: Sequence[SiteMetrics]) -> bool:
     """
     for site in sites:
         pages_ok = site.indexed_pages >= VALIDATION_MIN_INDEXED_PAGES
-        impressions_ok = site.impressions_trend > 0 and site.age_days >= VALIDATION_MIN_IMPRESSION_DAYS
+        impressions_ok = (
+            site.impressions_trend > 0
+            and site.age_days >= VALIDATION_MIN_IMPRESSION_DAYS
+        )
         converting_ok = site.converting_pages >= VALIDATION_MIN_CONVERTING_PAGES
         revenue_ok = site.monthly_revenue > 0
 
@@ -734,6 +764,7 @@ def check_validation_stage(sites: Sequence[SiteMetrics]) -> bool:
 # ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
+
 
 def build_scaling_plan(
     sites: Sequence[SiteMetrics],
@@ -770,10 +801,9 @@ def build_scaling_plan(
     capacity = compute_capacity_allocation(total_capacity)
 
     # Detect saturated niches
-    saturated_niches = list({
-        s.niche for s in sites
-        if detect_niche_saturation(s) and s.niche
-    })
+    saturated_niches = list(
+        {s.niche for s in sites if detect_niche_saturation(s) and s.niche}
+    )
 
     # Determine if new site launch is safe
     can_launch = False
@@ -794,7 +824,9 @@ def build_scaling_plan(
         if can_launch:
             next_launch_weeks = 0
         else:
-            next_launch_weeks = max(MIN_WEEKS_BETWEEN_LAUNCHES - weeks_since_last_launch, 0)
+            next_launch_weeks = max(
+                MIN_WEEKS_BETWEEN_LAUNCHES - weeks_since_last_launch, 0
+            )
     elif stage in (ScalingStage.PORTFOLIO, ScalingStage.EMPIRE):
         # Need expansion triggers + staggered cadence
         can_launch = (
@@ -804,7 +836,9 @@ def build_scaling_plan(
         if can_launch:
             next_launch_weeks = 0
         elif expansion_check.can_expand:
-            next_launch_weeks = max(MIN_WEEKS_BETWEEN_LAUNCHES - weeks_since_last_launch, 0)
+            next_launch_weeks = max(
+                MIN_WEEKS_BETWEEN_LAUNCHES - weeks_since_last_launch, 0
+            )
 
     # Portfolio-wide ROI
     total_revenue = sum(s.monthly_revenue for s in sites)

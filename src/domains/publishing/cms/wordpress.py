@@ -42,6 +42,7 @@ except ImportError:  # pragma: no cover
 # Data containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class WPPost:
     """Represents a WordPress post returned by the REST API.
@@ -148,6 +149,7 @@ class WPMedia:
 # WordPress CMS client
 # ---------------------------------------------------------------------------
 
+
 class WordPressCMS:
     """Client for managing content on a WordPress site via the REST API.
 
@@ -195,11 +197,13 @@ class WordPressCMS:
         credentials = base64.b64encode(
             f"{username}:{app_password}".encode("utf-8")
         ).decode("utf-8")
-        self._session.headers.update({
-            "Authorization": f"Basic {credentials}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        })
+        self._session.headers.update(
+            {
+                "Authorization": f"Basic {credentials}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            }
+        )
 
         self._connected = False
 
@@ -318,7 +322,9 @@ class WordPressCMS:
         data = self._api_request("POST", "/posts", json_data=payload)
         post = self._parse_post(data)
 
-        self.logger.info("Created post #%d: '%s' (status=%s)", post.id, post.title, post.status)
+        self.logger.info(
+            "Created post #%d: '%s' (status=%s)", post.id, post.title, post.status
+        )
         return post
 
     def update_post(
@@ -510,16 +516,18 @@ class WordPressCMS:
         # Set alt text if provided
         if alt_text:
             try:
-                self._api_request("POST", f"/media/{media.id}", json_data={
-                    "alt_text": alt_text,
-                    "caption": caption,
-                })
+                self._api_request(
+                    "POST",
+                    f"/media/{media.id}",
+                    json_data={
+                        "alt_text": alt_text,
+                        "caption": caption,
+                    },
+                )
             except PublishingError:
                 self.logger.warning("Failed to set alt text for media #%d", media.id)
 
-        self.logger.info(
-            "Uploaded media #%d: '%s' (%s)", media.id, filename, mime_type
-        )
+        self.logger.info("Uploaded media #%d: '%s' (%s)", media.id, filename, mime_type)
         return media
 
     # ------------------------------------------------------------------
@@ -555,14 +563,16 @@ class WordPressCMS:
 
         if isinstance(data, list):
             for item in data:
-                categories.append(WPCategory(
-                    id=item.get("id", 0),
-                    name=item.get("name", ""),
-                    slug=item.get("slug", ""),
-                    description=item.get("description", ""),
-                    parent=item.get("parent", 0),
-                    count=item.get("count", 0),
-                ))
+                categories.append(
+                    WPCategory(
+                        id=item.get("id", 0),
+                        name=item.get("name", ""),
+                        slug=item.get("slug", ""),
+                        description=item.get("description", ""),
+                        parent=item.get("parent", 0),
+                        count=item.get("count", 0),
+                    )
+                )
 
         self.logger.debug("Retrieved %d categories", len(categories))
         return categories
@@ -709,10 +719,21 @@ class WordPressCMS:
             date_published=data.get("date", ""),
             date_modified=data.get("modified", ""),
             metadata={
-                k: v for k, v in data.items()
-                if k not in {
-                    "id", "title", "slug", "content", "excerpt", "status",
-                    "categories", "tags", "featured_media", "link", "date",
+                k: v
+                for k, v in data.items()
+                if k
+                not in {
+                    "id",
+                    "title",
+                    "slug",
+                    "content",
+                    "excerpt",
+                    "status",
+                    "categories",
+                    "tags",
+                    "featured_media",
+                    "link",
+                    "date",
                     "modified",
                 }
             },
@@ -734,6 +755,4 @@ class WordPressCMS:
         return self._connected
 
     def __repr__(self) -> str:
-        return (
-            f"WordPressCMS(site={self.site_url!r}, connected={self._connected})"
-        )
+        return f"WordPressCMS(site={self.site_url!r}, connected={self._connected})"

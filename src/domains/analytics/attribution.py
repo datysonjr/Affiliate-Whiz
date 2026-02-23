@@ -29,6 +29,7 @@ logger = get_logger("analytics.attribution")
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Touchpoint:
     """A single touchpoint in a user's conversion path.
@@ -97,6 +98,7 @@ class AttributionResult:
 # Attribution models
 # ---------------------------------------------------------------------------
 
+
 def last_click(
     touchpoints: Sequence[Touchpoint],
     conversion_value: float = 1.0,
@@ -133,13 +135,15 @@ def last_click(
     credits: List[Dict[str, Any]] = []
     for i, tp in enumerate(sorted_tps):
         credit = conversion_value if i == len(sorted_tps) - 1 else 0.0
-        credits.append({
-            "touchpoint": i,
-            "channel": tp.channel,
-            "source": tp.source,
-            "page_url": tp.page_url,
-            "credit": round(credit, 6),
-        })
+        credits.append(
+            {
+                "touchpoint": i,
+                "channel": tp.channel,
+                "source": tp.source,
+                "page_url": tp.page_url,
+                "credit": round(credit, 6),
+            }
+        )
 
     time_to_conv = _compute_time_to_conversion(sorted_tps)
 
@@ -197,13 +201,15 @@ def first_click(
     credits: List[Dict[str, Any]] = []
     for i, tp in enumerate(sorted_tps):
         credit = conversion_value if i == 0 else 0.0
-        credits.append({
-            "touchpoint": i,
-            "channel": tp.channel,
-            "source": tp.source,
-            "page_url": tp.page_url,
-            "credit": round(credit, 6),
-        })
+        credits.append(
+            {
+                "touchpoint": i,
+                "channel": tp.channel,
+                "source": tp.source,
+                "page_url": tp.page_url,
+                "credit": round(credit, 6),
+            }
+        )
 
     time_to_conv = _compute_time_to_conversion(sorted_tps)
 
@@ -264,19 +270,22 @@ def linear(
 
     credits: List[Dict[str, Any]] = []
     for i, tp in enumerate(sorted_tps):
-        credits.append({
-            "touchpoint": i,
-            "channel": tp.channel,
-            "source": tp.source,
-            "page_url": tp.page_url,
-            "credit": round(equal_credit, 6),
-        })
+        credits.append(
+            {
+                "touchpoint": i,
+                "channel": tp.channel,
+                "source": tp.source,
+                "page_url": tp.page_url,
+                "credit": round(equal_credit, 6),
+            }
+        )
 
     time_to_conv = _compute_time_to_conversion(sorted_tps)
 
     logger.debug(
         "linear: %d touchpoints, %.4f credit each",
-        n, equal_credit,
+        n,
+        equal_credit,
     )
 
     return AttributionResult(
@@ -337,9 +346,7 @@ def time_decay(
     raw_weights: List[float] = []
     for tp in sorted_tps:
         tp_time = tp.timestamp or conversion_ts
-        seconds_before = max(
-            (conversion_ts - tp_time).total_seconds(), 0
-        )
+        seconds_before = max((conversion_ts - tp_time).total_seconds(), 0)
         weight = math.exp(-decay_constant * seconds_before)
         raw_weights.append(weight)
 
@@ -349,20 +356,23 @@ def time_decay(
     credits: List[Dict[str, Any]] = []
     for i, (tp, weight) in enumerate(zip(sorted_tps, raw_weights)):
         credit = (weight / total_weight) * conversion_value
-        credits.append({
-            "touchpoint": i,
-            "channel": tp.channel,
-            "source": tp.source,
-            "page_url": tp.page_url,
-            "credit": round(credit, 6),
-        })
+        credits.append(
+            {
+                "touchpoint": i,
+                "channel": tp.channel,
+                "source": tp.source,
+                "page_url": tp.page_url,
+                "credit": round(credit, 6),
+            }
+        )
 
     time_to_conv = _compute_time_to_conversion(sorted_tps)
 
     logger.debug(
         "time_decay: %d touchpoints, half_life=%.1f days, "
         "max_credit=%.4f, min_credit=%.4f",
-        len(sorted_tps), half_life_days,
+        len(sorted_tps),
+        half_life_days,
         max(c["credit"] for c in credits),
         min(c["credit"] for c in credits),
     )
@@ -382,6 +392,7 @@ def time_decay(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _compute_time_to_conversion(sorted_touchpoints: List[Touchpoint]) -> float:
     """Calculate the time from first touchpoint to last in seconds.

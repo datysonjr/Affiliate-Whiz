@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class ContentStatus(str, Enum):
     """Lifecycle status of a content piece.
@@ -77,6 +78,7 @@ class ContentType(str, Enum):
 # ContentSection
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ContentSection:
     """A single section within a content outline or article.
@@ -125,6 +127,7 @@ class ContentSection:
 # ---------------------------------------------------------------------------
 # ContentOutline
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ContentOutline:
@@ -238,6 +241,7 @@ class ContentOutline:
 # ---------------------------------------------------------------------------
 # Article
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Article:
@@ -441,7 +445,9 @@ class Article:
             "reading_time_minutes": self.reading_time_minutes,
             "is_publishable": self.is_publishable,
             "created_at": self.created_at.isoformat(),
-            "published_at": self.published_at.isoformat() if self.published_at else None,
+            "published_at": self.published_at.isoformat()
+            if self.published_at
+            else None,
             "updated_at": self.updated_at.isoformat(),
             "metadata": self.metadata,
         }

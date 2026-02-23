@@ -39,6 +39,7 @@ logger = get_logger("domains.seo.monopoly_strategy")
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class SiteType(IntEnum):
     """The 4 site types from the Monopoly domination model.
@@ -46,20 +47,20 @@ class SiteType(IntEnum):
     Order reflects recommended launch sequence.
     """
 
-    AUTHORITY = 1       # Primary ranking engine
-    REVIEW = 2          # High-conversion buyer capture
-    SPECIALIST = 3      # Sub-niche authority capture
-    TREND = 4           # Early emerging traffic capture
+    AUTHORITY = 1  # Primary ranking engine
+    REVIEW = 2  # High-conversion buyer capture
+    SPECIALIST = 3  # Sub-niche authority capture
+    TREND = 4  # Early emerging traffic capture
 
 
 @unique
 class BuyerStage(IntEnum):
     """Stages of the buyer journey that sites map to."""
 
-    AWARENESS = 1       # learns about product category
-    COMPARISON = 2      # compares options
-    RESEARCH = 3        # researches specific model
-    DECISION = 4        # decides purchase
+    AWARENESS = 1  # learns about product category
+    COMPARISON = 2  # compares options
+    RESEARCH = 3  # researches specific model
+    DECISION = 4  # decides purchase
 
 
 @unique
@@ -76,9 +77,9 @@ class ContentFocus(str, Enum):
 class InterlinkSafety(str, Enum):
     """Safety classification of cross-site links."""
 
-    SAFE = "safe"               # natural contextual citations
-    CAUTION = "caution"         # occasional reference links
-    FORBIDDEN = "forbidden"     # footer farms, obvious cross-monetization
+    SAFE = "safe"  # natural contextual citations
+    CAUTION = "caution"  # occasional reference links
+    FORBIDDEN = "forbidden"  # footer farms, obvious cross-monetization
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +119,7 @@ _SITE_CONTENT_FOCUS: dict[SiteType, ContentFocus] = {
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class SiteBlueprint:
@@ -297,6 +299,7 @@ def _build_site_blueprint(
 # SERP occupation planning
 # ---------------------------------------------------------------------------
 
+
 def plan_serp_occupation(
     keyword: str,
     niche: str,
@@ -396,6 +399,7 @@ def classify_interlink_safety(link_type: str) -> InterlinkSafety:
 # Main pipeline
 # ---------------------------------------------------------------------------
 
+
 def build_monopoly_plan(
     niche: str,
     *,
@@ -430,16 +434,19 @@ def build_monopoly_plan(
 
     # Build blueprints for all 4 site types
     sites = [
-        _build_site_blueprint(SiteType.AUTHORITY, niche, sub_niche=sub_niche, year=year),
+        _build_site_blueprint(
+            SiteType.AUTHORITY, niche, sub_niche=sub_niche, year=year
+        ),
         _build_site_blueprint(SiteType.REVIEW, niche, sub_niche=sub_niche, year=year),
-        _build_site_blueprint(SiteType.SPECIALIST, niche, sub_niche=sub_niche, year=year),
+        _build_site_blueprint(
+            SiteType.SPECIALIST, niche, sub_niche=sub_niche, year=year
+        ),
         _build_site_blueprint(SiteType.TREND, niche, sub_niche=sub_niche, year=year),
     ]
 
     # Plan SERP occupation for each keyword
     serp_plans = [
-        plan_serp_occupation(kw, niche, sub_niche=sub_niche)
-        for kw in keywords
+        plan_serp_occupation(kw, niche, sub_niche=sub_niche) for kw in keywords
     ]
 
     plan = NicheMonopolyPlan(

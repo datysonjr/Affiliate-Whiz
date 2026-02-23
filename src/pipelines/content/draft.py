@@ -51,6 +51,7 @@ _FTC_DISCLOSURE_FULL = (
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SectionDraft:
     """A single drafted section of the article.
@@ -119,6 +120,7 @@ class ArticleDraft:
 # ---------------------------------------------------------------------------
 # Section writing
 # ---------------------------------------------------------------------------
+
 
 def write_section(
     section_plan: SectionPlan,
@@ -208,7 +210,9 @@ def _build_section_prompt(
     str
         A structured prompt string.
     """
-    keywords_str = ", ".join(section_plan.keywords) if section_plan.keywords else "none specified"
+    keywords_str = (
+        ", ".join(section_plan.keywords) if section_plan.keywords else "none specified"
+    )
 
     return (
         f"Write a {section_plan.target_words}-word section for an affiliate article.\n\n"
@@ -268,6 +272,7 @@ def _generate_stub_section(
 # Disclosure handling
 # ---------------------------------------------------------------------------
 
+
 def add_disclosure(
     *,
     full_disclosure: bool = True,
@@ -291,6 +296,7 @@ def add_disclosure(
 # ---------------------------------------------------------------------------
 # Article assembly
 # ---------------------------------------------------------------------------
+
 
 def assemble_article(
     sections: List[SectionDraft],
@@ -383,6 +389,7 @@ def assemble_article(
 # Main entry point
 # ---------------------------------------------------------------------------
 
+
 def generate_draft(
     outline: ContentOutline,
     offer_data: Dict[str, Any],
@@ -446,9 +453,7 @@ def generate_draft(
             )
             section_drafts.append(draft_section)
         except Exception as exc:
-            logger.error(
-                "Failed to draft section '%s': %s", section_plan.heading, exc
-            )
+            logger.error("Failed to draft section '%s': %s", section_plan.heading, exc)
             # Insert a placeholder so the article structure remains intact
             section_drafts.append(
                 SectionDraft(

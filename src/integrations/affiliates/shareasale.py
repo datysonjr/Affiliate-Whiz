@@ -54,6 +54,7 @@ _API_VERSION = "2.9"
 # Data containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ShareASaleMerchant:
     """Normalised merchant record from the ShareASale API.
@@ -190,6 +191,7 @@ class ShareASaleCommission:
 # ShareASaleIntegration client
 # ---------------------------------------------------------------------------
 
+
 class ShareASaleIntegration:
     """Client for the ShareASale affiliate network API.
 
@@ -268,7 +270,9 @@ class ShareASaleIntegration:
         sig_input = f"{self._api_token}:{timestamp}:{action}:{self._api_secret}"
         return hashlib.sha256(sig_input.encode("utf-8")).hexdigest()
 
-    def _build_params(self, action: str, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _build_params(
+        self, action: str, extra: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Build the standard query parameters for a ShareASale API call.
 
         Parameters
@@ -328,12 +332,20 @@ class ShareASaleIntegration:
             url=data.get("URL", data.get("url", "")),
             category=data.get("Category", data.get("category", "")),
             status=data.get("Status", data.get("status", "")),
-            commission_percent=float(data.get("Commission", data.get("commission", 0.0))),
-            commission_type=data.get("CommissionType", data.get("commissionType", "percent")),
+            commission_percent=float(
+                data.get("Commission", data.get("commission", 0.0))
+            ),
+            commission_type=data.get(
+                "CommissionType", data.get("commissionType", "percent")
+            ),
             cookie_days=int(data.get("CookieLength", data.get("cookieLength", 30))),
             epc_seven_day=float(data.get("EpcSevenDay", data.get("epcSevenDay", 0.0))),
-            epc_thirty_day=float(data.get("EpcThirtyDay", data.get("epcThirtyDay", 0.0))),
-            reversal_rate=float(data.get("ReversalRate", data.get("reversalRate", 0.0))),
+            epc_thirty_day=float(
+                data.get("EpcThirtyDay", data.get("epcThirtyDay", 0.0))
+            ),
+            reversal_rate=float(
+                data.get("ReversalRate", data.get("reversalRate", 0.0))
+            ),
             average_sale=float(data.get("AverageSale", data.get("averageSale", 0.0))),
             power_rank=int(data.get("PowerRank", data.get("powerRank", 0))),
             raw=data,
@@ -359,7 +371,9 @@ class ShareASaleIntegration:
         raw_end = data.get("EndDate", data.get("endDate"))
         if raw_start:
             try:
-                start_date = datetime.fromisoformat(str(raw_start).replace("Z", "+00:00"))
+                start_date = datetime.fromisoformat(
+                    str(raw_start).replace("Z", "+00:00")
+                )
             except (ValueError, TypeError):
                 start_date = None
         if raw_end:
@@ -397,10 +411,14 @@ class ShareASaleIntegration:
             Normalised commission record.
         """
         trans_date = None
-        raw_date = data.get("TransDate", data.get("transDate", data.get("TransactionDate")))
+        raw_date = data.get(
+            "TransDate", data.get("transDate", data.get("TransactionDate"))
+        )
         if raw_date:
             try:
-                trans_date = datetime.fromisoformat(str(raw_date).replace("Z", "+00:00"))
+                trans_date = datetime.fromisoformat(
+                    str(raw_date).replace("Z", "+00:00")
+                )
             except (ValueError, TypeError):
                 trans_date = None
 
@@ -467,9 +485,7 @@ class ShareASaleIntegration:
         )
         self._track_request()
 
-        logger.debug(
-            "ShareASale merchantSearch request with %d params", len(params)
-        )
+        logger.debug("ShareASale merchantSearch request with %d params", len(params))
 
         # Production: HTTP GET to self._base_url with params, parse XML/JSON.
         # merchants = parsed_response.get("merchants", [])
@@ -528,9 +544,7 @@ class ShareASaleIntegration:
         )
         self._track_request()
 
-        logger.debug(
-            "ShareASale couponDeals request with %d params", len(params)
-        )
+        logger.debug("ShareASale couponDeals request with %d params", len(params))
 
         # Production: HTTP GET, parse deal records.
         return []
@@ -645,9 +659,7 @@ class ShareASaleIntegration:
         )
         self._track_request()
 
-        logger.debug(
-            "ShareASale getLinks for merchant=%s page=%d", merchant_id, page
-        )
+        logger.debug("ShareASale getLinks for merchant=%s page=%d", merchant_id, page)
 
         # Production: HTTP GET, parse link records.
         return []

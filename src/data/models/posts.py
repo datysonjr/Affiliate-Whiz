@@ -225,9 +225,7 @@ class PostRepository:
         Post or None
             The post if found, otherwise ``None``.
         """
-        row = self._db.fetch_one(
-            "SELECT * FROM posts WHERE id = ?", (post_id,)
-        )
+        row = self._db.fetch_one("SELECT * FROM posts WHERE id = ?", (post_id,))
         if row is None:
             return None
         return self._row_to_post(row)
@@ -515,9 +513,7 @@ class PostRepository:
         bool
             ``True`` if a row was deleted, ``False`` if no such post.
         """
-        cursor = self._db.execute(
-            "DELETE FROM posts WHERE id = ?", (post_id,)
-        )
+        cursor = self._db.execute("DELETE FROM posts WHERE id = ?", (post_id,))
         deleted = cursor.rowcount > 0
         if deleted:
             log_event(logger, "post.deleted", id=post_id)

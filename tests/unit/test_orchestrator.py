@@ -17,6 +17,7 @@ from src.core.errors import (
 # Test helpers
 # ---------------------------------------------------------------------------
 
+
 class DummyAgent(BaseAgent):
     """Minimal agent for testing the orchestrator."""
 
@@ -39,6 +40,7 @@ def make_agent(name="test_agent", enabled=True, dry_run=False):
 # ---------------------------------------------------------------------------
 # StateMachine tests
 # ---------------------------------------------------------------------------
+
 
 class TestStateMachine:
     def test_initial_state_is_idle(self):
@@ -96,6 +98,7 @@ class TestStateMachine:
 # ---------------------------------------------------------------------------
 # OrchestratorController tests
 # ---------------------------------------------------------------------------
+
 
 class TestController:
     def test_create_controller(self):
@@ -185,9 +188,11 @@ class TestController:
 # Scheduler tests
 # ---------------------------------------------------------------------------
 
+
 class TestScheduler:
     def test_cron_matches(self):
         from src.orchestrator.scheduler import cron_matches
+
         # Every minute
         dt = datetime(2025, 6, 15, 10, 30, tzinfo=timezone.utc)
         assert cron_matches("* * * * *", dt) is True
@@ -197,11 +202,13 @@ class TestScheduler:
 
     def test_cron_step(self):
         from src.orchestrator.scheduler import cron_matches
+
         dt = datetime(2025, 6, 15, 10, 0, tzinfo=timezone.utc)
         assert cron_matches("*/30 * * * *", dt) is True  # 0 % 30 == 0
 
     def test_schedule_and_cancel_task(self):
         from src.orchestrator.scheduler import Scheduler
+
         sched = Scheduler()
         task = sched.schedule_task("test_task", "*/5 * * * *")
         assert sched.task_count == 1

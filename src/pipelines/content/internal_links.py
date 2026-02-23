@@ -32,6 +32,7 @@ logger = get_logger("pipelines.content.internal_links")
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class LinkOpportunity:
     """A potential internal link insertion point.
@@ -117,6 +118,7 @@ class SiteArticle:
 # Link opportunity discovery
 # ---------------------------------------------------------------------------
 
+
 def find_link_opportunities(
     article_text: str,
     existing_articles: List[SiteArticle],
@@ -152,7 +154,7 @@ def find_link_opportunities(
     """
     opportunities: List[LinkOpportunity] = []
     text_lower = article_text.lower()
-    sentences = re.split(r'(?<=[.!?])\s+', article_text.strip())
+    sentences = re.split(r"(?<=[.!?])\s+", article_text.strip())
     seen_targets: set[str] = set()
 
     for target in existing_articles:
@@ -236,7 +238,7 @@ def _find_best_anchor(
             if keyword in sentence.lower():
                 # Extract the original-case version of the keyword
                 start = sentence.lower().find(keyword)
-                anchor = sentence[start:start + len(keyword)]
+                anchor = sentence[start : start + len(keyword)]
                 return (anchor, sentence, 0.9)
 
     # Strategy 2: Match significant title words (3+ chars)
@@ -296,6 +298,7 @@ def _extract_matching_phrase(sentence: str, tokens: List[str]) -> str:
 # Link insertion
 # ---------------------------------------------------------------------------
 
+
 def insert_links(
     article_text: str,
     opportunities: List[LinkOpportunity],
@@ -338,7 +341,9 @@ def insert_links(
 
         # Only replace the first occurrence to avoid over-linking
         if link_format == "html":
-            link_tag = f'<a href="{opp.target_url}" title="{opp.target_title}">{anchor}</a>'
+            link_tag = (
+                f'<a href="{opp.target_url}" title="{opp.target_title}">{anchor}</a>'
+            )
         else:
             link_tag = f"[{anchor}]({opp.target_url})"
 
@@ -361,6 +366,7 @@ def insert_links(
 # ---------------------------------------------------------------------------
 # Hub page management
 # ---------------------------------------------------------------------------
+
 
 def update_hub_pages(
     article_url: str,
@@ -429,6 +435,7 @@ def update_hub_pages(
 # ---------------------------------------------------------------------------
 # Orphan page detection
 # ---------------------------------------------------------------------------
+
 
 def check_orphan_pages(
     all_articles: List[SiteArticle],

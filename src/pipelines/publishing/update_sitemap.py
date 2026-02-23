@@ -49,6 +49,7 @@ _MAX_SITEMAP_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SitemapEntry:
     """A single URL entry in the sitemap.
@@ -111,6 +112,7 @@ class SitemapResult:
 # Sitemap generation
 # ---------------------------------------------------------------------------
 
+
 def generate_sitemap(
     entries: List[SitemapEntry],
     *,
@@ -158,7 +160,9 @@ def generate_sitemap(
         if entry.lastmod:
             xml_lines.append(f"    <lastmod>{xml_escape(entry.lastmod)}</lastmod>")
         if entry.changefreq:
-            xml_lines.append(f"    <changefreq>{xml_escape(entry.changefreq)}</changefreq>")
+            xml_lines.append(
+                f"    <changefreq>{xml_escape(entry.changefreq)}</changefreq>"
+            )
         xml_lines.append(f"    <priority>{entry.priority:.1f}</priority>")
         xml_lines.append("  </url>")
 
@@ -197,6 +201,7 @@ def generate_sitemap(
 # ---------------------------------------------------------------------------
 # Sitemap update (incremental)
 # ---------------------------------------------------------------------------
+
 
 def update_sitemap(
     existing_entries: List[SitemapEntry],
@@ -245,7 +250,9 @@ def update_sitemap(
         if entry.loc in entries_by_url:
             # Update existing entry's lastmod and other fields
             existing = entries_by_url[entry.loc]
-            existing.lastmod = entry.lastmod or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            existing.lastmod = entry.lastmod or datetime.now(timezone.utc).strftime(
+                "%Y-%m-%d"
+            )
             if entry.changefreq:
                 existing.changefreq = entry.changefreq
             if entry.priority != 0.5:
@@ -280,6 +287,7 @@ def update_sitemap(
 # ---------------------------------------------------------------------------
 # Sitemap validation
 # ---------------------------------------------------------------------------
+
 
 def validate_sitemap(
     xml_content: str,
@@ -327,7 +335,7 @@ def validate_sitemap(
         errors.append("Missing <urlset> root element.")
 
     # Count and validate URLs
-    url_matches = re.findall(r'<loc>(.*?)</loc>', xml_content)
+    url_matches = re.findall(r"<loc>(.*?)</loc>", xml_content)
     url_count = len(url_matches)
 
     if url_count == 0:
@@ -345,14 +353,22 @@ def validate_sitemap(
                 errors.append(f"Invalid URL (must be absolute): {url}")
 
     # Check for valid changefreq values
-    valid_changefreqs = {"always", "hourly", "daily", "weekly", "monthly", "yearly", "never"}
-    freq_matches = re.findall(r'<changefreq>(.*?)</changefreq>', xml_content)
+    valid_changefreqs = {
+        "always",
+        "hourly",
+        "daily",
+        "weekly",
+        "monthly",
+        "yearly",
+        "never",
+    }
+    freq_matches = re.findall(r"<changefreq>(.*?)</changefreq>", xml_content)
     for freq in freq_matches:
         if freq not in valid_changefreqs:
             warnings.append(f"Invalid changefreq value: {freq}")
 
     # Check priority values
-    priority_matches = re.findall(r'<priority>(.*?)</priority>', xml_content)
+    priority_matches = re.findall(r"<priority>(.*?)</priority>", xml_content)
     for pri_str in priority_matches:
         try:
             pri = float(pri_str)

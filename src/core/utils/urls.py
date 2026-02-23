@@ -30,16 +30,28 @@ from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 # Tracking parameters to strip during normalization
 # =====================================================================
 
-_TRACKING_PARAMS = frozenset({
-    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-    "fbclid", "gclid", "msclkid", "dclid", "twclid",
-    "mc_cid", "mc_eid",
-})
+_TRACKING_PARAMS = frozenset(
+    {
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_term",
+        "utm_content",
+        "fbclid",
+        "gclid",
+        "msclkid",
+        "dclid",
+        "twclid",
+        "mc_cid",
+        "mc_eid",
+    }
+)
 
 
 # =====================================================================
 # URL normalization
 # =====================================================================
+
 
 def normalize_url(
     url: str,
@@ -96,8 +108,7 @@ def normalize_url(
     query_params = parse_qs(parsed.query, keep_blank_values=True)
     if strip_tracking:
         query_params = {
-            k: v for k, v in query_params.items()
-            if k.lower() not in _TRACKING_PARAMS
+            k: v for k, v in query_params.items() if k.lower() not in _TRACKING_PARAMS
         }
 
     # Sort for deterministic output
@@ -116,6 +127,7 @@ def normalize_url(
 # =====================================================================
 # Domain extraction
 # =====================================================================
+
 
 def extract_domain(url: str, *, include_subdomain: bool = True) -> str:
     """Extract the domain from a URL.
@@ -166,6 +178,7 @@ def extract_domain(url: str, *, include_subdomain: bool = True) -> str:
 # =====================================================================
 # Validation
 # =====================================================================
+
 
 def is_valid_url(url: str, *, require_https: bool = False) -> bool:
     """Check if a string is a valid HTTP(S) URL.
@@ -280,8 +293,7 @@ def build_affiliate_url(
     # Start with existing query parameters
     existing_params = parse_qs(parsed.query, keep_blank_values=True)
     merged: dict[str, str] = {
-        k: v[0] if isinstance(v, list) else v
-        for k, v in existing_params.items()
+        k: v[0] if isinstance(v, list) else v for k, v in existing_params.items()
     }
 
     # Add the network-specific tracking parameter
@@ -298,14 +310,16 @@ def build_affiliate_url(
 
     new_query = urlencode(sorted(merged.items()))
 
-    return urlunparse((
-        parsed.scheme,
-        parsed.netloc,
-        parsed.path,
-        parsed.params,
-        new_query,
-        "",  # Strip fragment from affiliate URLs
-    ))
+    return urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            "",  # Strip fragment from affiliate URLs
+        )
+    )
 
 
 def strip_affiliate_params(url: str) -> str:
@@ -333,22 +347,25 @@ def strip_affiliate_params(url: str) -> str:
     parsed = urlparse(url)
     query_params = parse_qs(parsed.query, keep_blank_values=True)
     cleaned = {
-        k: v for k, v in query_params.items()
-        if k.lower() not in all_affiliate_params
+        k: v for k, v in query_params.items() if k.lower() not in all_affiliate_params
     }
 
-    new_query = urlencode(
-        sorted(((k, v[0]) for k, v in cleaned.items()), key=lambda p: p[0])
-    ) if cleaned else ""
+    new_query = (
+        urlencode(sorted(((k, v[0]) for k, v in cleaned.items()), key=lambda p: p[0]))
+        if cleaned
+        else ""
+    )
 
-    return urlunparse((
-        parsed.scheme,
-        parsed.netloc,
-        parsed.path,
-        parsed.params,
-        new_query,
-        "",
-    ))
+    return urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            "",
+        )
+    )
 
 
 def join_url(base: str, path: str) -> str:

@@ -32,6 +32,7 @@ logger = get_logger("integrations.proxy.proxy_pool")
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 @unique
 class ProxyProtocol(str, Enum):
     """Supported proxy protocols."""
@@ -55,6 +56,7 @@ class ProxyStatus(str, Enum):
 # ---------------------------------------------------------------------------
 # Data containers
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ProxyEntry:
@@ -133,6 +135,7 @@ class ProxyEntry:
 # ProxyPool
 # ---------------------------------------------------------------------------
 
+
 class ProxyPool:
     """Manages a pool of rotating HTTP/SOCKS proxies.
 
@@ -181,7 +184,8 @@ class ProxyPool:
                 self._proxies[proxy.proxy_id] = proxy
 
         log_event(
-            logger, "proxy_pool.init",
+            logger,
+            "proxy_pool.init",
             pool_size=len(self._proxies),
             strategy=rotation_strategy,
         )
@@ -219,9 +223,9 @@ class ProxyPool:
             If no healthy proxies are available.
         """
         candidates = [
-            p for p in self._proxies.values()
-            if p.status in (ProxyStatus.HEALTHY, ProxyStatus.DEGRADED)
-            and not p.in_use
+            p
+            for p in self._proxies.values()
+            if p.status in (ProxyStatus.HEALTHY, ProxyStatus.DEGRADED) and not p.in_use
         ]
 
         if country:
@@ -247,7 +251,10 @@ class ProxyPool:
 
         logger.debug(
             "Acquired proxy %s (%s:%d, reliability=%.2f)",
-            proxy.proxy_id, proxy.host, proxy.port, proxy.reliability,
+            proxy.proxy_id,
+            proxy.host,
+            proxy.port,
+            proxy.reliability,
         )
         return proxy
 
@@ -318,8 +325,10 @@ class ProxyPool:
             # Update rolling average response time
             total = proxy.success_count + proxy.failure_count
             proxy.avg_response_time = (
-                (proxy.avg_response_time * (total - 1) + response_time) / total
-            ) if total > 0 else response_time
+                ((proxy.avg_response_time * (total - 1) + response_time) / total)
+                if total > 0
+                else response_time
+            )
         else:
             proxy.failure_count += 1
             proxy.consecutive_failures += 1
@@ -327,12 +336,16 @@ class ProxyPool:
                 proxy.status = ProxyStatus.FAILED
                 logger.warning(
                     "Proxy %s marked as FAILED after %d consecutive failures",
-                    proxy_id, proxy.consecutive_failures,
+                    proxy_id,
+                    proxy.consecutive_failures,
                 )
 
         logger.debug(
             "Released proxy %s (success=%s, reliability=%.2f, status=%s)",
-            proxy_id, success, proxy.reliability, proxy.status.value,
+            proxy_id,
+            success,
+            proxy.reliability,
+            proxy.status.value,
         )
 
     def mark_failed(
@@ -359,8 +372,10 @@ class ProxyPool:
         proxy.in_use = False
 
         log_event(
-            logger, "proxy_pool.mark_failed",
-            proxy_id=proxy_id, reason=reason,
+            logger,
+            "proxy_pool.mark_failed",
+            proxy_id=proxy_id,
+            reason=reason,
         )
 
     # ------------------------------------------------------------------
@@ -389,8 +404,10 @@ class ProxyPool:
 
         if rotated:
             log_event(
-                logger, "proxy_pool.rotate",
-                rotated=rotated, pool_size=len(self._proxies),
+                logger,
+                "proxy_pool.rotate",
+                rotated=rotated,
+                pool_size=len(self._proxies),
             )
 
         return rotated
@@ -404,7 +421,9 @@ class ProxyPool:
             Proxy entry to add.
         """
         self._proxies[proxy.proxy_id] = proxy
-        logger.debug("Added proxy %s to pool (%s:%d)", proxy.proxy_id, proxy.host, proxy.port)
+        logger.debug(
+            "Added proxy %s to pool (%s:%d)", proxy.proxy_id, proxy.host, proxy.port
+        )
 
     def remove_proxy(self, proxy_id: str) -> bool:
         """Remove a proxy from the pool.
@@ -439,9 +458,9 @@ class ProxyPool:
             that are not currently in use.
         """
         return sum(
-            1 for p in self._proxies.values()
-            if p.status in (ProxyStatus.HEALTHY, ProxyStatus.DEGRADED)
-            and not p.in_use
+            1
+            for p in self._proxies.values()
+            if p.status in (ProxyStatus.HEALTHY, ProxyStatus.DEGRADED) and not p.in_use
         )
 
     @property

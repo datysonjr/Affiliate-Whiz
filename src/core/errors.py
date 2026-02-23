@@ -51,6 +51,7 @@ from typing import Any
 # Base exception
 # =====================================================================
 
+
 class OpenClawError(Exception):
     """Base exception for all OpenClaw errors.
 
@@ -103,6 +104,7 @@ class OpenClawError(Exception):
 # Configuration errors
 # =====================================================================
 
+
 class ConfigError(OpenClawError):
     """Raised when configuration is missing, malformed, or invalid.
 
@@ -114,6 +116,7 @@ class ConfigError(OpenClawError):
 # =====================================================================
 # Pipeline errors
 # =====================================================================
+
 
 class PipelineError(OpenClawError):
     """Raised when a pipeline fails during execution."""
@@ -149,6 +152,7 @@ class PipelineTimeoutError(PipelineError):
 # Agent errors
 # =====================================================================
 
+
 class AgentError(OpenClawError):
     """Raised when an agent encounters an unrecoverable failure."""
 
@@ -164,6 +168,7 @@ class AgentTimeoutError(AgentError):
 # =====================================================================
 # Integration errors
 # =====================================================================
+
 
 class IntegrationError(OpenClawError):
     """Raised when an external service integration fails.
@@ -210,6 +215,7 @@ class CircuitBreakerOpenError(IntegrationError):
 # Publishing errors
 # =====================================================================
 
+
 class PublishingError(OpenClawError):
     """Raised when content publishing fails."""
 
@@ -234,6 +240,7 @@ class DuplicateContentError(PublishingError):
 # Security errors
 # =====================================================================
 
+
 class SecurityError(OpenClawError):
     """Raised for security-related failures: credentials, permissions, etc."""
 
@@ -249,6 +256,7 @@ class CredentialExpiredError(SecurityError):
 # =====================================================================
 # Orchestrator errors
 # =====================================================================
+
 
 class OrchestratorError(OpenClawError):
     """Raised when the orchestrator encounters an unrecoverable state."""
@@ -287,6 +295,7 @@ class InvalidStateTransitionError(OrchestratorError):
 # Policy errors
 # =====================================================================
 
+
 class PolicyViolationError(OpenClawError):
     """Raised when an action violates an enforced policy."""
 
@@ -307,6 +316,7 @@ class RiskPolicyViolationError(PolicyViolationError):
 # Scheduling errors
 # =====================================================================
 
+
 class SchedulerError(OpenClawError):
     """Raised for scheduling failures (bad cron expression, missing config, etc.)."""
 
@@ -314,6 +324,7 @@ class SchedulerError(OpenClawError):
 # =====================================================================
 # Routing errors
 # =====================================================================
+
 
 class RoutingError(OpenClawError):
     """Raised when a task cannot be routed to any agent or node."""

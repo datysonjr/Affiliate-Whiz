@@ -47,9 +47,7 @@ class ScraperTool:
                 * ``headers`` (dict) -- extra HTTP headers to include.
         """
         self.config = config
-        self._user_agent: str = config.get(
-            "user_agent", "Affiliate-Whiz Scraper/1.0"
-        )
+        self._user_agent: str = config.get("user_agent", "Affiliate-Whiz Scraper/1.0")
         self._timeout: int = config.get("timeout", 30)
         self._max_retries: int = config.get("max_retries", 3)
         self._respect_robots: bool = config.get("respect_robots_txt", True)
@@ -84,8 +82,7 @@ class ScraperTool:
             import httpx  # type: ignore[import-untyped]
         except ImportError as exc:
             raise RuntimeError(
-                "httpx is required for ScraperTool. Install it with: "
-                "pip install httpx"
+                "httpx is required for ScraperTool. Install it with: pip install httpx"
             ) from exc
 
         headers = {"User-Agent": self._user_agent, **self._extra_headers}
@@ -116,8 +113,7 @@ class ScraperTool:
                 )
 
         raise RuntimeError(
-            f"Failed to fetch {url} after {self._max_retries} attempts: "
-            f"{last_error}"
+            f"Failed to fetch {url} after {self._max_retries} attempts: {last_error}"
         )
 
     @staticmethod
@@ -180,9 +176,7 @@ class ScraperTool:
         title: str = title_tag.get_text(strip=True) if title_tag else ""
 
         meta_tag = soup.find("meta", attrs={"name": "description"})
-        meta_description: str = (
-            meta_tag.get("content", "") if meta_tag else ""
-        )
+        meta_description: str = meta_tag.get("content", "") if meta_tag else ""
 
         links = self.extract_links(html, base_url=url)
         text = self.extract_text(html)

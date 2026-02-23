@@ -34,6 +34,7 @@ logger = get_logger("publishing.cms.headless")
 # Data containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CMSContent:
     """Generic content record returned by a headless CMS.
@@ -146,6 +147,7 @@ class ContentType:
 # ---------------------------------------------------------------------------
 # Abstract base class
 # ---------------------------------------------------------------------------
+
 
 class HeadlessCMS(ABC):
     """Abstract interface for headless CMS integrations.

@@ -28,6 +28,7 @@ logger = get_logger("analytics.reporting")
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TrafficSummary:
     """Aggregated traffic metrics for a reporting period.
@@ -195,9 +196,7 @@ class SiteReport:
     period: str = "daily"
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
-    generated_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    generated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     traffic: TrafficSummary = field(default_factory=TrafficSummary)
     revenue: RevenueSummary = field(default_factory=RevenueSummary)
     content: ContentSummary = field(default_factory=ContentSummary)
@@ -209,6 +208,7 @@ class SiteReport:
 # ---------------------------------------------------------------------------
 # Report generation functions
 # ---------------------------------------------------------------------------
+
 
 def generate_daily_report(
     site_id: str,
@@ -274,8 +274,10 @@ def generate_daily_report(
     report.alerts = _generate_alerts(report)
 
     log_event(
-        logger, "reporting.daily_generated",
-        site_id=site_id, date=start.strftime("%Y-%m-%d"),
+        logger,
+        "reporting.daily_generated",
+        site_id=site_id,
+        date=start.strftime("%Y-%m-%d"),
         page_views=report.traffic.page_views,
         revenue=report.revenue.total_revenue,
         alerts=len(report.alerts),
@@ -348,7 +350,8 @@ def generate_weekly_report(
     report.alerts = _generate_alerts(report)
 
     log_event(
-        logger, "reporting.weekly_generated",
+        logger,
+        "reporting.weekly_generated",
         site_id=site_id,
         week_start=start.strftime("%Y-%m-%d"),
         page_views=report.traffic.page_views,
@@ -434,9 +437,11 @@ def generate_monthly_report(
     report.alerts = _generate_alerts(report)
 
     log_event(
-        logger, "reporting.monthly_generated",
+        logger,
+        "reporting.monthly_generated",
         site_id=site_id,
-        year=year, month=month,
+        year=year,
+        month=month,
         page_views=report.traffic.page_views,
         revenue=report.revenue.total_revenue,
     )
@@ -447,6 +452,7 @@ def generate_monthly_report(
 # ---------------------------------------------------------------------------
 # Internal builders
 # ---------------------------------------------------------------------------
+
 
 def _build_traffic_summary(data: Dict[str, Any]) -> TrafficSummary:
     """Build a TrafficSummary from raw traffic data.
@@ -591,8 +597,7 @@ def _generate_alerts(report: SiteReport) -> List[str]:
 
     if report.traffic.bounce_rate > 80:
         alerts.append(
-            f"High bounce rate: {report.traffic.bounce_rate:.1f}% "
-            "(threshold: 80%)"
+            f"High bounce rate: {report.traffic.bounce_rate:.1f}% (threshold: 80%)"
         )
 
     if report.revenue.total_clicks > 0 and report.revenue.conversion_rate < 0.5:

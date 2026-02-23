@@ -50,8 +50,8 @@ DEFAULT_WEIGHTS: Dict[str, float] = {
 
 # Commission rate benchmarks (expressed as decimal fractions)
 _COMMISSION_BENCHMARKS = {
-    "floor": 0.01,   # 1% -- minimum noteworthy commission
-    "good": 0.08,    # 8% -- solid mid-range
+    "floor": 0.01,  # 1% -- minimum noteworthy commission
+    "good": 0.08,  # 8% -- solid mid-range
     "excellent": 0.20,  # 20% -- top-tier digital/SaaS offers
 }
 
@@ -73,6 +73,7 @@ _COOKIE_BENCHMARKS = {
 # ---------------------------------------------------------------------------
 # Sub-score calculators
 # ---------------------------------------------------------------------------
+
 
 def _normalize_to_score(
     value: float,
@@ -239,8 +240,15 @@ def _estimate_conversion_score(offer_data: Dict[str, Any]) -> float:
 
     # Boost for popular categories
     popular_categories = {
-        "technology", "software", "saas", "finance", "health",
-        "home_office", "fitness", "education", "travel",
+        "technology",
+        "software",
+        "saas",
+        "finance",
+        "health",
+        "home_office",
+        "fitness",
+        "education",
+        "travel",
     }
     category = offer_data.get("category", "").lower()
     if category in popular_categories:
@@ -293,6 +301,7 @@ def _estimate_competition_score(offer_data: Dict[str, Any]) -> float:
 # ---------------------------------------------------------------------------
 # Main scoring functions
 # ---------------------------------------------------------------------------
+
 
 def score_offer(
     offer_data: Dict[str, Any],

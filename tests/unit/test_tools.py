@@ -21,26 +21,30 @@ class TestLLMToolInit:
         assert tool.fallback_provider is None
 
     def test_custom_config(self):
-        tool = LLMTool({
-            "primary_provider": "openai",
-            "primary_model": "gpt-4o",
-            "primary_api_key": "pk",
-            "fallback_provider": "anthropic",
-            "fallback_model": "claude-sonnet-4-20250514",
-            "fallback_api_key": "fk",
-            "default_max_tokens": 2048,
-            "temperature": 0.5,
-        })
+        tool = LLMTool(
+            {
+                "primary_provider": "openai",
+                "primary_model": "gpt-4o",
+                "primary_api_key": "pk",
+                "fallback_provider": "anthropic",
+                "fallback_model": "claude-sonnet-4-20250514",
+                "fallback_api_key": "fk",
+                "default_max_tokens": 2048,
+                "temperature": 0.5,
+            }
+        )
         assert tool.primary_provider == "openai"
         assert tool.fallback_provider == "anthropic"
         assert tool.default_max_tokens == 2048
         assert tool.temperature == 0.5
 
     def test_unsupported_provider_raises(self):
-        tool = LLMTool({
-            "primary_provider": "llama-local",
-            "primary_api_key": "x",
-        })
+        tool = LLMTool(
+            {
+                "primary_provider": "llama-local",
+                "primary_api_key": "x",
+            }
+        )
         with pytest.raises(ValueError, match="Unsupported provider"):
             tool._init_client("llama-local", "model", "key")
 
@@ -48,17 +52,21 @@ class TestLLMToolInit:
 class TestLLMToolGenerate:
     def _make_tool_with_mock(self, response_content="Generated text"):
         """Create an LLMTool with a mocked _call_provider."""
-        tool = LLMTool({
-            "primary_provider": "anthropic",
-            "primary_api_key": "test-key",
-        })
-        tool._call_provider = MagicMock(return_value={
-            "content": response_content,
-            "prompt_tokens": 10,
-            "completion_tokens": 20,
-            "provider": "anthropic",
-            "model": "claude-sonnet-4-20250514",
-        })
+        tool = LLMTool(
+            {
+                "primary_provider": "anthropic",
+                "primary_api_key": "test-key",
+            }
+        )
+        tool._call_provider = MagicMock(
+            return_value={
+                "content": response_content,
+                "prompt_tokens": 10,
+                "completion_tokens": 20,
+                "provider": "anthropic",
+                "model": "claude-sonnet-4-20250514",
+            }
+        )
         return tool
 
     def test_generate_success(self):
@@ -114,15 +122,17 @@ class TestLLMToolGenerate:
 
 class TestLLMToolFallback:
     def test_fallback_on_primary_failure(self):
-        tool = LLMTool({
-            "primary_provider": "anthropic",
-            "primary_api_key": "bad-key",
-            "fallback_provider": "openai",
-            "fallback_model": "gpt-4o",
-            "fallback_api_key": "fallback-key",
-            "retry_attempts": 1,
-            "retry_delay": 0.0,
-        })
+        tool = LLMTool(
+            {
+                "primary_provider": "anthropic",
+                "primary_api_key": "bad-key",
+                "fallback_provider": "openai",
+                "fallback_model": "gpt-4o",
+                "fallback_api_key": "fallback-key",
+                "retry_attempts": 1,
+                "retry_delay": 0.0,
+            }
+        )
 
         # Mock _dispatch_call to fail on anthropic, succeed on openai
         call_count = {"primary": 0, "fallback": 0}
@@ -151,14 +161,16 @@ class TestLLMToolFallback:
         assert tool._fallback_requests == 1
 
     def test_all_providers_fail_raises(self):
-        tool = LLMTool({
-            "primary_provider": "anthropic",
-            "primary_api_key": "bad",
-            "fallback_provider": "openai",
-            "fallback_api_key": "also-bad",
-            "retry_attempts": 1,
-            "retry_delay": 0.0,
-        })
+        tool = LLMTool(
+            {
+                "primary_provider": "anthropic",
+                "primary_api_key": "bad",
+                "fallback_provider": "openai",
+                "fallback_api_key": "also-bad",
+                "retry_attempts": 1,
+                "retry_delay": 0.0,
+            }
+        )
 
         def mock_dispatch(provider, client, model, messages, max_tokens, temp):
             raise RuntimeError(f"{provider} is down")
@@ -208,22 +220,26 @@ class TestCMSToolInit:
 
 class TestCMSToolSession:
     def test_wordpress_basic_auth(self):
-        tool = CMSTool({
-            "cms_type": "wordpress",
-            "api_base_url": "https://example.com/wp-json/wp/v2",
-            "username": "admin",
-            "api_key": "app-password",
-        })
+        tool = CMSTool(
+            {
+                "cms_type": "wordpress",
+                "api_base_url": "https://example.com/wp-json/wp/v2",
+                "username": "admin",
+                "api_key": "app-password",
+            }
+        )
         session = tool._get_session()
         assert session.auth == ("admin", "app-password")
         assert session.headers["User-Agent"] == "OpenClaw/0.1.0"
 
     def test_bearer_auth(self):
-        tool = CMSTool({
-            "cms_type": "ghost",
-            "api_base_url": "https://example.com/api",
-            "api_key": "some-token",
-        })
+        tool = CMSTool(
+            {
+                "cms_type": "ghost",
+                "api_base_url": "https://example.com/api",
+                "api_key": "some-token",
+            }
+        )
         session = tool._get_session()
         assert session.headers["Authorization"] == "Bearer some-token"
 
@@ -251,15 +267,19 @@ class TestCMSToolCreatePost:
             "modified": "2025-01-01T00:00:00",
         }
 
-        tool = CMSTool({
-            "api_base_url": "https://example.com/wp-json/wp/v2",
-            "api_key": "test",
-            "username": "admin",
-        })
-        result = tool.create_post({
-            "title": "Test Post",
-            "content": "<p>Hello</p>",
-        })
+        tool = CMSTool(
+            {
+                "api_base_url": "https://example.com/wp-json/wp/v2",
+                "api_key": "test",
+                "username": "admin",
+            }
+        )
+        result = tool.create_post(
+            {
+                "title": "Test Post",
+                "content": "<p>Hello</p>",
+            }
+        )
 
         assert result["id"] == 42
         assert result["url"] == "https://example.com/test-post/"
@@ -278,11 +298,13 @@ class TestCMSToolCreatePost:
             "modified": "",
         }
 
-        tool = CMSTool({
-            "api_base_url": "https://example.com/wp-json/wp/v2",
-            "default_status": "private",
-            "default_author_id": 5,
-        })
+        tool = CMSTool(
+            {
+                "api_base_url": "https://example.com/wp-json/wp/v2",
+                "default_status": "private",
+                "default_author_id": 5,
+            }
+        )
         tool.create_post({"title": "T", "content": "C"})
 
         call_args = mock_request.call_args

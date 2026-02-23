@@ -75,8 +75,14 @@ class AuditEntry:
     """
 
     __slots__ = (
-        "entry_id", "timestamp", "actor", "action",
-        "resource", "outcome", "details", "source_ip",
+        "entry_id",
+        "timestamp",
+        "actor",
+        "action",
+        "resource",
+        "outcome",
+        "details",
+        "source_ip",
     )
 
     def __init__(
@@ -353,7 +359,9 @@ class AuditLog:
 
                 if actor is not None and entry.get("actor") != actor:
                     continue
-                if action is not None and not entry.get("action", "").startswith(action):
+                if action is not None and not entry.get("action", "").startswith(
+                    action
+                ):
                     continue
 
                 results.append(entry)
@@ -374,7 +382,7 @@ class AuditLog:
             # Add to ring buffer
             self._buffer.append(entry)
             if len(self._buffer) > self._buffer_size:
-                self._buffer = self._buffer[-self._buffer_size:]
+                self._buffer = self._buffer[-self._buffer_size :]
             self._total_entries += 1
 
         # Append to file (outside lock to avoid holding it during I/O)

@@ -313,7 +313,9 @@ class Settings:
             return value.strip().lower() in ("true", "1", "yes", "on")
         return bool(value)
 
-    def get_list(self, dotted_key: str, default: Optional[List[Any]] = None) -> List[Any]:
+    def get_list(
+        self, dotted_key: str, default: Optional[List[Any]] = None
+    ) -> List[Any]:
         """Return a list value (empty list if missing)."""
         value = self.get(dotted_key, default)
         if value is None:
@@ -405,7 +407,13 @@ class Settings:
                 upper = key.upper()
                 if any(
                     secret_word in upper
-                    for secret_word in ("KEY", "SECRET", "PASSWORD", "TOKEN", "CREDENTIAL")
+                    for secret_word in (
+                        "KEY",
+                        "SECRET",
+                        "PASSWORD",
+                        "TOKEN",
+                        "CREDENTIAL",
+                    )
                 ):
                     snapshot["env"][key] = "***MASKED***"
         return snapshot
