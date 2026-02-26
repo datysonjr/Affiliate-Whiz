@@ -13,19 +13,28 @@ OPENCLAW_USER="openclaw"
 OPENCLAW_HOME="/Users/$OPENCLAW_USER"
 OPENCLAW_REPO="$OPENCLAW_HOME/openclaw"
 
-# Node -> role mapping
-declare -A NODE_ROLES=(
-    ["oc-core-01"]="controller"
-    ["oc-pub-01"]="publisher"
-)
+ALL_NODES="oc-core-01 oc-pub-01"
 
-declare -A NODE_IPS=(
-    ["oc-core-01"]="192.168.1.10"
-    ["oc-pub-01"]="192.168.1.11"
-)
+# --- Node lookups (bash 3.2 compatible) ---
+get_node_role() {
+    case "$1" in
+        oc-core-01) echo "controller" ;;
+        oc-pub-01)  echo "publisher" ;;
+        *)          echo "" ;;
+    esac
+}
 
-# Track results for final summary
-declare -A RESULTS=()
+get_node_ip() {
+    case "$1" in
+        oc-core-01) echo "192.168.1.10" ;;
+        oc-pub-01)  echo "192.168.1.11" ;;
+        *)          echo "" ;;
+    esac
+}
+
+# Track results for final summary (parallel arrays, bash 3.2 compatible)
+RESULT_NAMES=()
+RESULT_VALUES=()
 WARNINGS=()
 
 # --- Helpers ---
@@ -44,13 +53,15 @@ banner() {
 }
 
 pass() {
-    RESULTS["$1"]="PASS"
-    log "  ✓ $1"
+    RESULT_NAMES+=("$1")
+    RESULT_VALUES+=("PASS")
+    log "  PASS: $1"
 }
 
 fail() {
-    RESULTS["$1"]="FAIL"
-    log "  ✗ $1"
+    RESULT_NAMES+=("$1")
+    RESULT_VALUES+=("FAIL")
+    log "  FAIL: $1"
 }
 
 warn() {
@@ -114,16 +125,18 @@ print_summary() {
     banner "Setup Summary"
 
     log "Node:    $NODE_NAME"
-    log "Role:    ${NODE_ROLES[$NODE_NAME]}"
-    log "IP:      ${NODE_IPS[$NODE_NAME]}"
+    log "Role:    $NODE_ROLE"
+    log "IP:      $TARGET_IP"
     log "Date:    $(date)"
     log ""
 
     # Results table
     printf "%-35s %s\n" "CHECK" "STATUS" | tee -a "$LOG_FILE"
     printf "%-35s %s\n" "-----------------------------------" "------" | tee -a "$LOG_FILE"
-    for check in "${!RESULTS[@]}"; do
-        printf "%-35s %s\n" "$check" "${RESULTS[$check]}" | tee -a "$LOG_FILE"
+    local i=0
+    while [[ $i -lt ${#RESULT_NAMES[@]} ]]; do
+        printf "%-35s %s\n" "${RESULT_NAMES[$i]}" "${RESULT_VALUES[$i]}" | tee -a "$LOG_FILE"
+        i=$((i + 1))
     done
 
     # Warnings
@@ -148,18 +161,18 @@ MODE="${2:-full}"
 
 if [[ -z "$NODE_NAME" ]]; then
     log "ERROR: Usage: sudo bash $0 <node-name> [mode]"
-    log "  Valid nodes: ${!NODE_IPS[*]}"
+    log "  Valid nodes: $ALL_NODES"
     log "  Modes: full, infra-only, app-only"
     exit 1
 fi
 
-if [[ -z "${NODE_IPS[$NODE_NAME]+x}" ]]; then
-    log "ERROR: Unknown node '$NODE_NAME'. Valid nodes: ${!NODE_IPS[*]}"
+TARGET_IP=$(get_node_ip "$NODE_NAME")
+NODE_ROLE=$(get_node_role "$NODE_NAME")
+
+if [[ -z "$TARGET_IP" ]]; then
+    log "ERROR: Unknown node '$NODE_NAME'. Valid nodes: $ALL_NODES"
     exit 1
 fi
-
-TARGET_IP="${NODE_IPS[$NODE_NAME]}"
-NODE_ROLE="${NODE_ROLES[$NODE_NAME]}"
 
 banner "OpenClaw Cluster Node Setup"
 log "Node:    $NODE_NAME"

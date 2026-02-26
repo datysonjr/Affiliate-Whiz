@@ -8,16 +8,21 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 LOG_FILE="/tmp/openclaw_setup_static_ip_$(date +%Y%m%d_%H%M%S).log"
 
-# --- Node IP Map ---
-declare -A NODE_IPS=(
-    ["oc-core-01"]="192.168.1.10"
-    ["oc-pub-01"]="192.168.1.11"
-)
-
 GATEWAY="192.168.1.1"
 SUBNET="255.255.255.0"
 DNS_1="1.1.1.1"
 DNS_2="1.0.0.1"
+
+# --- Node lookup (bash 3.2 compatible) ---
+get_node_ip() {
+    case "$1" in
+        oc-core-01) echo "192.168.1.10" ;;
+        oc-pub-01)  echo "192.168.1.11" ;;
+        *)          echo "" ;;
+    esac
+}
+
+ALL_NODES="oc-core-01 oc-pub-01"
 
 # --- Helpers ---
 log() {
@@ -77,16 +82,15 @@ check_macos
 NODE_NAME="${1:-}"
 if [[ -z "$NODE_NAME" ]]; then
     log "ERROR: Usage: sudo bash $0 <node-name>"
-    log "  Valid nodes: ${!NODE_IPS[*]}"
+    log "  Valid nodes: $ALL_NODES"
     exit 1
 fi
 
-if [[ -z "${NODE_IPS[$NODE_NAME]+x}" ]]; then
-    log "ERROR: Unknown node '$NODE_NAME'. Valid nodes: ${!NODE_IPS[*]}"
+TARGET_IP=$(get_node_ip "$NODE_NAME")
+if [[ -z "$TARGET_IP" ]]; then
+    log "ERROR: Unknown node '$NODE_NAME'. Valid nodes: $ALL_NODES"
     exit 1
 fi
-
-TARGET_IP="${NODE_IPS[$NODE_NAME]}"
 
 log "=== Static IP Setup ==="
 log "Node:    $NODE_NAME"
@@ -124,8 +128,8 @@ log "Hostname set."
 
 # Update /etc/hosts
 log "Updating /etc/hosts..."
-for node in "${!NODE_IPS[@]}"; do
-    ip="${NODE_IPS[$node]}"
+for node in $ALL_NODES; do
+    ip=$(get_node_ip "$node")
     if ! grep -q "$ip.*$node" /etc/hosts 2>/dev/null; then
         echo "$ip  $node" >> /etc/hosts
         log "  Added: $ip  $node"
