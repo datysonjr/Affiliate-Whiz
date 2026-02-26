@@ -1,0 +1,52 @@
+# config/cluster/network.yaml
+# Filled-in network configuration (from network.example.yaml)
+version: 1
+
+isp: "Spectrum"
+dedicated_line_mbps: 1000
+
+router:
+  model: "Spectrum Router"  # TODO: update with actual model
+  lan_gateway_ip: "192.168.1.1"
+  lan_subnet_cidr: "192.168.1.0/24"
+  dns_servers:
+    - "1.1.1.1"
+    - "1.0.0.1"
+  dhcp:
+    enabled: true
+    range_start: "192.168.1.100"
+    range_end: "192.168.1.199"
+  reservations:
+    - hostname: "oc-core-01"
+      mac_address: "TODO"  # fill in after hardware setup (System Settings > Network > Ethernet > Details > Hardware)
+      ip: "192.168.1.10"
+    - hostname: "oc-pub-01"
+      mac_address: "TODO"  # fill in after hardware setup
+      ip: "192.168.1.11"
+
+switch:
+  model: "Netgear 16-port PoE Gigabit"
+  uplink_port: 1
+  port_map:
+    "1": "Router uplink"
+    "2": "oc-core-01 (node_a)"
+    "3": "oc-pub-01 (node_b)"
+    # leave remaining ports open for expansion
+
+ups:
+  model: "CyberPower CP1500AVRLCD3"
+  protected_devices:
+    - "router"
+    - "switch"
+    - "node_a"
+    - "node_b"
+  usb_shutdown_host: "oc-core-01"
+
+vpn:
+  provider: "Tailscale"
+  purpose: "Remote SSH and Screen Sharing access from outside LAN"
+  nodes:
+    - hostname: "oc-core-01"
+      tailscale_ip: "TODO"  # fill in after Tailscale setup (run: tailscale ip -4)
+    - hostname: "oc-pub-01"
+      tailscale_ip: "TODO"  # fill in after Tailscale setup

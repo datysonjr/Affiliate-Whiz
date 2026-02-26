@@ -1,0 +1,43 @@
+# config/cluster/nodes.yaml
+# Filled-in cluster node configuration (from nodes.example.yaml)
+version: 1
+
+cluster_name: "openclaw-affiliate-cluster"
+owners:
+  - "DA / Don Anthony"
+  - "Corey"
+  - "Fern"
+  - "David"
+  - "Jamie"
+
+nodes:
+  - id: "node_a"
+    hostname: "oc-core-01"
+    description: "Primary control/orchestrator node"
+    os: "macos"
+    roles:
+      - "orchestrator"
+      - "scheduler"
+      - "db_primary"
+      - "worker_light"
+    static_ip: "192.168.1.10"
+    ssh_user: "openclaw"
+    data_mount_path: "/Volumes/OpenClawData"  # adjust to your SSD dock mount
+    labels:
+      location: "cluster_shelf"
+      ups_backed: true
+
+  - id: "node_b"
+    hostname: "oc-pub-01"
+    description: "Primary content + publishing worker node"
+    os: "macos"
+    roles:
+      - "worker_heavy"
+      - "publishing"
+      - "analytics"
+    static_ip: "192.168.1.11"
+    ssh_user: "openclaw"
+    data_mount_path: "/Volumes/OpenClawData"  # adjust to your SSD dock mount
+    labels:
+      location: "cluster_shelf"
+      ups_backed: true
