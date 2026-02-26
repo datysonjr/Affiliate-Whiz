@@ -26,14 +26,26 @@ check_macos
 log "=== Tailscale VPN Setup ==="
 log "macOS: $(sw_vers -productVersion)"
 
+# Helper to find the tailscale CLI (App Store puts it inside the .app bundle)
+find_tailscale_cli() {
+    if command -v tailscale &>/dev/null; then
+        echo "tailscale"
+    elif [[ -x "/Applications/Tailscale.app/Contents/MacOS/Tailscale" ]]; then
+        echo "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+    else
+        echo ""
+    fi
+}
+
 # Check if already installed
 INSTALLED=false
-if command -v tailscale &>/dev/null; then
+TS_CLI=$(find_tailscale_cli)
+if [[ -n "$TS_CLI" ]]; then
     INSTALLED=true
-    log "Tailscale CLI already available."
+    log "Tailscale found at: $TS_CLI"
 elif [[ -d "/Applications/Tailscale.app" ]]; then
     INSTALLED=true
-    log "Tailscale.app already installed."
+    log "Tailscale.app installed (CLI not directly available -- use GUI)."
 fi
 
 if [[ "$INSTALLED" == "false" ]]; then
@@ -66,26 +78,27 @@ sleep 3
 HOSTNAME=$(scutil --get HostName 2>/dev/null || hostname -s)
 log "Setting Tailscale hostname to: $HOSTNAME"
 
-if command -v tailscale &>/dev/null; then
+TS_CLI=$(find_tailscale_cli)
+if [[ -n "$TS_CLI" ]]; then
     # Check if already connected
-    if tailscale status &>/dev/null; then
-        TS_STATUS=$(tailscale status --json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('BackendState',''))" 2>/dev/null || echo "unknown")
+    if "$TS_CLI" status &>/dev/null; then
+        TS_STATUS=$("$TS_CLI" status --json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('BackendState',''))" 2>/dev/null || echo "unknown")
         if [[ "$TS_STATUS" == "Running" ]]; then
             log "Tailscale is already connected."
-            TS_IP=$(tailscale ip -4 2>/dev/null || echo "unknown")
+            TS_IP=$("$TS_CLI" ip -4 2>/dev/null || echo "unknown")
             log "Tailscale IP: $TS_IP"
         else
             log "Tailscale backend state: $TS_STATUS"
             log "Bringing up Tailscale..."
-            tailscale up --hostname="$HOSTNAME" 2>&1 | tee -a "$LOG_FILE" || true
+            "$TS_CLI" up --hostname="$HOSTNAME" 2>&1 | tee -a "$LOG_FILE" || true
         fi
     else
         log "Bringing up Tailscale..."
-        tailscale up --hostname="$HOSTNAME" 2>&1 | tee -a "$LOG_FILE" || true
+        "$TS_CLI" up --hostname="$HOSTNAME" 2>&1 | tee -a "$LOG_FILE" || true
     fi
 else
-    log "Tailscale CLI not yet available (app may still be starting)."
-    log "The CLI becomes available after the app launches for the first time."
+    log "Tailscale CLI not available. Use the Tailscale menu bar app to connect."
+    log "If installed from App Store, the CLI cannot be used directly."
 fi
 
 log ""
@@ -99,7 +112,7 @@ log "  3. Authorize this node ('$HOSTNAME')"
 log "  4. Verify with: tailscale status"
 log ""
 log "  After both nodes are connected, you can:"
-log "    - SSH from anywhere: ssh openclaw@<tailscale-ip>"
+log "    - SSH from anywhere: ssh <your-admin-user>@<tailscale-ip>"
 log "    - Screen Share from anywhere: vnc://<tailscale-ip>:5900"
 log ""
 log "  Tailscale Admin Console: https://login.tailscale.com/admin/machines"
@@ -108,8 +121,9 @@ log ""
 # Wait for connection (with timeout)
 log "Waiting for Tailscale to connect (up to 60s)..."
 for i in {1..12}; do
-    if command -v tailscale &>/dev/null && tailscale status &>/dev/null; then
-        TS_IP=$(tailscale ip -4 2>/dev/null || echo "")
+    TS_CLI=$(find_tailscale_cli)
+    if [[ -n "$TS_CLI" ]] && "$TS_CLI" status &>/dev/null; then
+        TS_IP=$("$TS_CLI" ip -4 2>/dev/null || echo "")
         if [[ -n "$TS_IP" ]]; then
             log "Tailscale connected!"
             log "  Tailscale IP: $TS_IP"

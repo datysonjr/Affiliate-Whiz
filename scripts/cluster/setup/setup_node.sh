@@ -310,11 +310,20 @@ Press ENTER after you have verified key-based SSH login works."; then
     sudo -u "$ADMIN_USER" bash "$SCRIPT_DIR/setup_tailscale.sh" 2>&1 | tee -a "$LOG_FILE" || \
         bash "$SCRIPT_DIR/setup_tailscale.sh" 2>&1 | tee -a "$LOG_FILE" || true
 
-    if command -v tailscale &>/dev/null && tailscale ip -4 &>/dev/null; then
-        pass "Tailscale"
+    # Check Tailscale -- handle App Store install where CLI isn't in PATH
+    TS_CLI=""
+    if command -v tailscale &>/dev/null; then
+        TS_CLI="tailscale"
+    elif [[ -x "/Applications/Tailscale.app/Contents/MacOS/Tailscale" ]]; then
+        TS_CLI="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+    fi
+
+    if [[ -n "$TS_CLI" ]] && "$TS_CLI" ip -4 &>/dev/null; then
+        pass "Tailscale ($("$TS_CLI" ip -4 2>/dev/null))"
+    elif [[ -d "/Applications/Tailscale.app" ]]; then
+        warn "Tailscale app installed -- verify connection via menu bar icon"
     else
         warn "Tailscale may need manual auth -- check menu bar icon"
-        # Don't fail here -- it might just need browser auth
     fi
 
     # Step 8: macOS Hardening
@@ -420,12 +429,20 @@ else
     fail "Screen Sharing (VNC)"
 fi
 
-# Tailscale
-if command -v tailscale &>/dev/null && tailscale ip -4 &>/dev/null; then
-    TS_IP=$(tailscale ip -4 2>/dev/null)
-    pass "Tailscale ($TS_IP)"
+# Tailscale (handle App Store install)
+TS_CHECK=""
+if command -v tailscale &>/dev/null; then
+    TS_CHECK="tailscale"
+elif [[ -x "/Applications/Tailscale.app/Contents/MacOS/Tailscale" ]]; then
+    TS_CHECK="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+fi
+
+if [[ -n "$TS_CHECK" ]] && "$TS_CHECK" ip -4 &>/dev/null; then
+    pass "Tailscale ($("$TS_CHECK" ip -4 2>/dev/null))"
+elif [[ -d "/Applications/Tailscale.app" ]]; then
+    pass "Tailscale (app installed -- check menu bar for connection)"
 else
-    fail "Tailscale (not connected)"
+    fail "Tailscale (not installed)"
 fi
 
 # Hostname

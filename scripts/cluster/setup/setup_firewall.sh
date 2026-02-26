@@ -84,11 +84,13 @@ pass quick on lo0 all
 # Allow all established/related connections
 pass in quick proto tcp from any to any flags A/A
 
-# Allow SSH (port 22) from LAN
+# Allow SSH (port 22) from LAN and Tailscale
 pass in quick proto tcp from 192.168.1.0/24 to any port 22
+pass in quick proto tcp from 100.64.0.0/10 to any port 22
 
-# Allow VNC/Screen Sharing (port 5900) from LAN
+# Allow VNC/Screen Sharing (port 5900) from LAN and Tailscale
 pass in quick proto tcp from 192.168.1.0/24 to any port 5900
+pass in quick proto tcp from 100.64.0.0/10 to any port 5900
 
 # Allow Tailscale WireGuard (UDP 41641)
 pass in quick proto udp from any to any port 41641
@@ -98,6 +100,8 @@ pass quick on utun0 all
 pass quick on utun1 all
 pass quick on utun2 all
 pass quick on utun3 all
+pass quick on utun4 all
+pass quick on utun5 all
 
 # Allow all inter-node traffic on LAN
 pass in quick proto tcp from 192.168.1.0/24 to any
