@@ -13,6 +13,15 @@ OPENCLAW_USER="openclaw"
 OPENCLAW_HOME="/Users/$OPENCLAW_USER"
 OPENCLAW_REPO="$OPENCLAW_HOME/openclaw"
 
+# Detect the admin user who ran sudo (ching1, chong2, etc.)
+ADMIN_USER="${SUDO_USER:-$(whoami)}"
+if [[ "$ADMIN_USER" == "root" ]]; then
+    echo "ERROR: Could not detect your admin username."
+    echo "  Run this script with sudo, not as root directly."
+    echo "  Example: sudo bash $0 oc-core-01"
+    exit 1
+fi
+
 ALL_NODES="oc-core-01 oc-pub-01"
 
 # --- Node lookups (bash 3.2 compatible) ---
@@ -175,37 +184,48 @@ if [[ -z "$TARGET_IP" ]]; then
 fi
 
 banner "OpenClaw Cluster Node Setup"
-log "Node:    $NODE_NAME"
-log "Role:    $NODE_ROLE"
-log "IP:      $TARGET_IP"
-log "Mode:    $MODE"
-log "macOS:   $(sw_vers -productVersion)"
-log "Date:    $(date)"
-log "Log:     $LOG_FILE"
+log "Node:       $NODE_NAME"
+log "Role:       $NODE_ROLE"
+log "IP:         $TARGET_IP"
+log "Mode:       $MODE"
+log "Admin user: $ADMIN_USER"
+log "Service:    $OPENCLAW_USER"
+log "macOS:      $(sw_vers -productVersion)"
+log "Date:       $(date)"
+log "Log:        $LOG_FILE"
 
 # -------------------------------------------------------
 # Phase 0: Pre-flight
 # -------------------------------------------------------
 banner "Phase 0: Pre-flight Checks"
 
-# Check openclaw user exists
-if dscl . -read "/Users/$OPENCLAW_USER" &>/dev/null; then
-    log "User '$OPENCLAW_USER' exists."
-    pass "User exists"
+# Verify admin user exists
+if dscl . -read "/Users/$ADMIN_USER" &>/dev/null; then
+    log "Admin user '$ADMIN_USER' verified."
+    pass "Admin user ($ADMIN_USER)"
 else
-    log "User '$OPENCLAW_USER' does not exist."
-    log "Creating user..."
+    fail "Admin user ($ADMIN_USER)"
+    log "ERROR: Admin user '$ADMIN_USER' not found on this system."
+    exit 1
+fi
+
+# Create openclaw service account (non-admin) if it doesn't exist
+if dscl . -read "/Users/$OPENCLAW_USER" &>/dev/null; then
+    log "Service user '$OPENCLAW_USER' already exists."
+    pass "Service user (openclaw)"
+else
+    log "Creating service user '$OPENCLAW_USER' (non-admin)..."
     echo ""
-    echo "You need to set a password for the '$OPENCLAW_USER' user."
+    echo "Set a password for the '$OPENCLAW_USER' service account."
     sysadminctl -addUser "$OPENCLAW_USER" \
         -fullName "OpenClaw Service" \
         -shell /bin/bash \
-        -home "$OPENCLAW_HOME" \
-        -admin 2>&1 | tee -a "$LOG_FILE"
+        -home "$OPENCLAW_HOME" 2>&1 | tee -a "$LOG_FILE"
     if dscl . -read "/Users/$OPENCLAW_USER" &>/dev/null; then
-        pass "User created"
+        pass "Service user created (openclaw)"
+        log "  NOTE: openclaw is a non-admin account (no SSH, runs app only)."
     else
-        fail "User creation"
+        fail "Service user creation"
         log "ERROR: Failed to create user. Create manually:"
         log "  System Settings > Users & Groups > Add User"
         exit 1
@@ -259,20 +279,22 @@ if [[ "$MODE" != "app-only" ]]; then
     fi
 
     # Step 3: SSH (with password auth still enabled)
-    run_step "SSH setup" "$SCRIPT_DIR/setup_ssh.sh" "$OPENCLAW_USER"
+    # Only the admin user (ching1/chong2) gets SSH access, not openclaw
+    run_step "SSH setup" "$SCRIPT_DIR/setup_ssh.sh" "$ADMIN_USER"
 
     # Step 4: Pause for SSH key copy
     banner "Step: SSH Key Distribution"
     log "SSH is now enabled with password authentication."
     log "You MUST copy your SSH public key before we disable password auth."
+    log "Admin user for SSH: $ADMIN_USER"
     if pause_for_action "From your operator machine, run:
-    ssh-copy-id $OPENCLAW_USER@$TARGET_IP
-    ssh $OPENCLAW_USER@$TARGET_IP   # verify it works
+    ssh-copy-id $ADMIN_USER@$TARGET_IP
+    ssh $ADMIN_USER@$TARGET_IP   # verify it works
 
 Press ENTER after you have verified key-based SSH login works."; then
         # Now lock down SSH (disable password auth)
         log "Locking down SSH (disabling password auth)..."
-        LOCKDOWN=true bash "$SCRIPT_DIR/setup_ssh.sh" "$OPENCLAW_USER" 2>&1 | tee -a "$LOG_FILE"
+        LOCKDOWN=true bash "$SCRIPT_DIR/setup_ssh.sh" "$ADMIN_USER" 2>&1 | tee -a "$LOG_FILE"
         pass "SSH lockdown"
     else
         warn "SSH lockdown skipped -- password auth remains enabled"
@@ -281,13 +303,12 @@ Press ENTER after you have verified key-based SSH login works."; then
     # Step 5: Firewall
     run_step "Firewall" "$SCRIPT_DIR/setup_firewall.sh"
 
-    # Step 6: Screen Sharing
-    run_step "Screen Sharing" "$SCRIPT_DIR/setup_screen_sharing.sh" "$OPENCLAW_USER"
+    # Step 6: Screen Sharing (for admin user, not openclaw)
+    run_step "Screen Sharing" "$SCRIPT_DIR/setup_screen_sharing.sh" "$ADMIN_USER"
 
-    # Step 7: Tailscale
+    # Step 7: Tailscale (run as admin user -- they have the GUI session for auth)
     banner "Step: Tailscale VPN"
-    # Tailscale doesn't need sudo for Homebrew install
-    sudo -u "$OPENCLAW_USER" bash "$SCRIPT_DIR/setup_tailscale.sh" 2>&1 | tee -a "$LOG_FILE" || \
+    sudo -u "$ADMIN_USER" bash "$SCRIPT_DIR/setup_tailscale.sh" 2>&1 | tee -a "$LOG_FILE" || \
         bash "$SCRIPT_DIR/setup_tailscale.sh" 2>&1 | tee -a "$LOG_FILE" || true
 
     if command -v tailscale &>/dev/null && tailscale ip -4 &>/dev/null; then
@@ -453,8 +474,12 @@ print_summary
 log ""
 log "NEXT STEPS:"
 log "  1. Set up the other node (if not done yet)"
-log "  2. Test SSH between nodes: ssh $OPENCLAW_USER@<other-node-ip>"
+log "  2. Test SSH between nodes: ssh $ADMIN_USER@<other-node-ip>"
 log "  3. Enable FileVault if not already on"
 log "  4. Enable launchd auto-start when ready:"
 log "     sudo -u $OPENCLAW_USER launchctl load $OPENCLAW_HOME/Library/LaunchAgents/com.openclaw.node.plist"
 log "  5. See: docs/ops/RUNBOOK_NODE_SETUP.md for full details"
+log ""
+log "ACCOUNT SUMMARY:"
+log "  Admin (SSH/Screen Sharing): $ADMIN_USER"
+log "  Service (runs the app):     $OPENCLAW_USER (no SSH access)"

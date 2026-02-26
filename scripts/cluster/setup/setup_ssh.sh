@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # setup_ssh.sh --- Enable and harden SSH on a Mac Mini cluster node
 # Usage: sudo bash scripts/cluster/setup/setup_ssh.sh [allowed-users]
-#   allowed-users: comma-separated list (default: openclaw)
+#   allowed-users: comma-separated list (default: detected from $SUDO_USER)
 set -euo pipefail
 
 LOG_FILE="/tmp/openclaw_setup_ssh_$(date +%Y%m%d_%H%M%S).log"
 SSHD_CONFIG="/etc/ssh/sshd_config"
-ALLOWED_USERS="${1:-openclaw}"
+DEFAULT_USER="${SUDO_USER:-$(whoami)}"
+ALLOWED_USERS="${1:-$DEFAULT_USER}"
 
 # --- Helpers ---
 log() {
@@ -155,12 +156,14 @@ fi
 log ""
 log "=== SSH Setup Complete ==="
 log ""
+log "SSH AllowUsers: $ALLOW_LIST"
+log ""
 log "NEXT STEPS:"
 log "  1. From your operator machine, copy your SSH key:"
-log "     ssh-copy-id openclaw@$(hostname -I 2>/dev/null | awk '{print $1}' || echo '<this-node-ip>')"
+log "     ssh-copy-id $ALLOW_LIST@$(hostname -I 2>/dev/null | awk '{print $1}' || echo '<this-node-ip>')"
 log "  2. Test key-based login:"
-log "     ssh openclaw@<this-node-ip>"
+log "     ssh $ALLOW_LIST@<this-node-ip>"
 log "  3. Then disable password auth:"
-log "     sudo LOCKDOWN=true bash $0"
+log "     sudo LOCKDOWN=true bash $0 $ALLOWED_USERS"
 log ""
 log "Log saved to: $LOG_FILE"
