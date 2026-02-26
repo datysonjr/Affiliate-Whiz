@@ -110,17 +110,16 @@ run_step() {
     local step_name="$1"
     local script="$2"
     shift 2
-    local args=("$@")
 
     banner "Step: $step_name"
 
-    if bash "$script" "${args[@]}" 2>&1 | tee -a "$LOG_FILE"; then
+    if bash "$script" "$@" 2>&1 | tee -a "$LOG_FILE"; then
         pass "$step_name"
     else
         fail "$step_name"
         log "  Step failed. Check log for details."
         log "  You can re-run this step individually:"
-        log "    sudo bash $script ${args[*]}"
+        log "    sudo bash $script $*"
         read -rp "  Continue with remaining steps? [Y/n]: " cont
         if [[ "$cont" =~ ^[Nn] ]]; then
             log "Setup aborted by operator."
