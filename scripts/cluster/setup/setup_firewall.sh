@@ -57,13 +57,16 @@ fi
 "$SOCKETFILTERFW" --setstealthmode on
 log "Stealth mode enabled."
 
-# Enable logging
-"$SOCKETFILTERFW" --setloggingmode on
-log "Firewall logging enabled."
+# Enable logging (flag varies by macOS version; skip if unsupported)
+if "$SOCKETFILTERFW" --setloggingmode on 2>/dev/null; then
+    log "Firewall logging enabled."
+else
+    log "Firewall logging flag not supported on this macOS version (non-fatal)."
+fi
 
-# Allow signed apps automatically
-"$SOCKETFILTERFW" --setallowsigned on
-"$SOCKETFILTERFW" --setallowsignedapp on
+# Allow signed apps automatically (flags vary by macOS version)
+"$SOCKETFILTERFW" --setallowsigned on 2>/dev/null || true
+"$SOCKETFILTERFW" --setallowsignedapp on 2>/dev/null || true
 log "Signed apps allowed automatically."
 
 # -------------------------------------------------------
