@@ -41,7 +41,7 @@ except ImportError:  # pragma: no cover
 try:
     from bs4 import BeautifulSoup  # type: ignore[import-untyped]
 except ImportError:  # pragma: no cover
-    BeautifulSoup = None  # type: ignore[assignment]
+    BeautifulSoup = None  # type: ignore[assignment,misc]
 
 
 # ---------------------------------------------------------------------------
